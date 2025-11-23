@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Bookings collection
+    match /bookings/{bookingId} {
+      // Users can read their own bookings
+      allow read: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Allow authenticated users to read all bookings (for admin dashboard)
+      // TODO: Add proper admin check in production
+      allow read: if request.auth != null;
+      
+      // Only server (Firebase Functions) can write
+      allow write: if false;
+    }
+    
+    // Admins collection (optional - for admin role management)
+    match /admins/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Only you can manually add admins in console
+    }
+    
+    // Users collection (if you have one)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

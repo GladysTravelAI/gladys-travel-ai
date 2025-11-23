@@ -1,0 +1,44 @@
+mutation CreatePublicTrip($name: String!, $destination: String!, $startDate: Date!, $endDate: Date!, $description: String) @auth(level: PUBLIC, insecureReason: "This mutation creates a public trip that can be viewed by anyone.") {
+  trip_insert(data: {
+    name: $name,
+    destination: $destination,
+    startDate: $startDate,
+    endDate: $endDate,
+    description: $description,
+    isPublic: true
+  })
+}
+
+query GetPublicTrips @auth(level: PUBLIC, insecureReason: "This query retrieves public trips that can be viewed by anyone.") {
+  trips(where: {isPublic: {eq: true}}) {
+    id
+    name
+    destination
+    startDate
+    endDate
+    description
+  }
+}
+
+mutation CreatePrivateTripForUser($name: String!, $destination: String!, $startDate: Date!, $endDate: Date!, $description: String) @auth(level: USER) {
+  trip_insert(data: {
+    userId_expr: "auth.uid",
+    name: $name,
+    destination: $destination,
+    startDate: $startDate,
+    endDate: $endDate,
+    description: $description,
+    isPublic: false
+  })
+}
+
+query GetPrivateTripsForUser @auth(level: USER) {
+  trips(where: {userId: {eq_expr: "auth.uid"}}) {
+    id
+    name
+    destination
+    startDate
+    endDate
+    description
+  }
+}

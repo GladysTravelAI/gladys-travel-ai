@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Existing User model - UPDATE THIS ONE (don't duplicate)
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  image          String?
+  hashedPassword String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  bookings       Booking[]  // Add this relation
+}
+
+// New Booking models
+model Booking {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  bookingNumber   String   @unique
+  status          BookingStatus @default(PENDING)
+  
+  // Trip Details
+  destination     String
+  origin          String
+  startDate       DateTime
+  endDate         DateTime
+  travelers       Int      @default(1)
+  
+  // Pricing
+  flightCost      Float    @default(0)
+  hotelCost       Float    @default(0)
+  servicesFee     Float    @default(0)
+  totalAmount     Float
+  
+  // Bookings
+  flights         FlightBooking[]
+  hotels          HotelBooking[]
+  
+  // Payment
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   String?
+  transactionId   String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model FlightBooking {
+  id              String   @id @default(cuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  airline         String
+  flightNumber    String
+  origin          String
+  destination     String
+  departTime      String
+  arriveTime      String
+  departDate      DateTime
+  duration        String
+  class           String
+  price           Float
+  
+  confirmationNumber String?
+  eTicketNumber   String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model HotelBooking {
+  id              String   @id @default(cuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  hotelName       String
+  checkIn         DateTime
+  checkOut        DateTime
+  roomType        String
+  nights          Int
+  pricePerNight   Float
+  totalPrice      Float
+  
+  confirmationNumber String?
+  
+  createdAt       DateTime @default(now())
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
