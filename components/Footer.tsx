@@ -1,4 +1,4 @@
-import { Sparkles, Mail, MapPin, Phone, Twitter, Facebook, Instagram, Linkedin } from "lucide-react";
+import { Sparkles, Mail, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 
 const Footer = () => (
@@ -15,7 +15,7 @@ const Footer = () => (
             <h3 className="text-2xl font-bold text-white">GladysTravelAI</h3>
           </div>
           <p className="text-gray-300 mb-6 leading-relaxed">
-            Your AI-powered luxury travel companion for unforgettable journeys worldwide.
+            Your AI-powered travel companion for unforgettable journeys worldwide.
           </p>
           <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full border border-purple-500/30 inline-flex">
             <Sparkles className="text-yellow-400" size={16} />
@@ -115,65 +115,34 @@ const Footer = () => (
           <ul className="space-y-4">
             <li>
               <a 
-                href="mailto:support@gladystravelai.com" 
+                href="mailto:gladystravelai@gmail.com" 
                 className="text-gray-300 hover:text-white transition-all duration-300 flex items-start group"
               >
                 <Mail size={18} className="text-purple-400 mr-3 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm">support@gladystravelai.com</span>
+                <span className="text-sm">gladystravelai@gmail.com</span>
               </a>
             </li>
             <li>
               <a 
-                href="tel:+1234567890" 
+                href="tel:+27645452236" 
                 className="text-gray-300 hover:text-white transition-all duration-300 flex items-start group"
               >
                 <Phone size={18} className="text-purple-400 mr-3 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm">+1 (234) 567-890</span>
+                <span className="text-sm">+27 64 545 2236</span>
               </a>
             </li>
             <li className="flex items-start text-gray-300">
               <MapPin size={18} className="text-purple-400 mr-3 mt-0.5 flex-shrink-0" />
-              <span className="text-sm">123 Travel Street<br />San Francisco, CA 94102</span>
+              <span className="text-sm">Johannesburg<br />South Africa</span>
             </li>
           </ul>
           
-          {/* Social Media */}
-          <div className="mt-6">
-            <h5 className="text-white font-semibold text-sm mb-3">Follow Us</h5>
-            <div className="flex space-x-3">
-              <a 
-                href="https://twitter.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 bg-white/10 hover:bg-purple-500 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-              >
-                <Twitter size={18} className="text-white" />
-              </a>
-              <a 
-                href="https://facebook.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 bg-white/10 hover:bg-purple-500 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-              >
-                <Facebook size={18} className="text-white" />
-              </a>
-              <a 
-                href="https://instagram.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 bg-white/10 hover:bg-purple-500 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-              >
-                <Instagram size={18} className="text-white" />
-              </a>
-              <a 
-                href="https://linkedin.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="w-10 h-10 bg-white/10 hover:bg-purple-500 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
-              >
-                <Linkedin size={18} className="text-white" />
-              </a>
-            </div>
+          {/* Coming Soon Badge */}
+          <div className="mt-6 px-4 py-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
+            <p className="text-sm text-gray-300">
+              <span className="font-semibold text-white">🚀 Coming Soon:</span><br />
+              Follow us on social media for travel tips and updates!
+            </p>
           </div>
         </div>
       </div>

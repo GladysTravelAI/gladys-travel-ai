@@ -608,20 +608,22 @@ export default function HomeClient() {
           <section id="results-section" className="relative px-6 pb-16">
             <div className="max-w-7xl mx-auto">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid grid-cols-9 w-full bg-white border border-gray-200 p-2 rounded-2xl shadow-sm">
-                  <TabsTrigger value="itinerary" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Itinerary</TabsTrigger>
-                  <TabsTrigger value="flights" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Flights</TabsTrigger>
-                  <TabsTrigger value="hotels" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Hotels</TabsTrigger>
-                  <TabsTrigger value="restaurants" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Dining</TabsTrigger>
-                  <TabsTrigger value="activities" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Activities</TabsTrigger>
-                  <TabsTrigger value="insurance" className="rounded-xl data-[state=active]:bg-green-600 data-[state=active]:text-white">
-                    <Shield size={14} className="mr-1" />
-                    Insurance
-                  </TabsTrigger>
-                  <TabsTrigger value="transport" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Transport</TabsTrigger>
-                  <TabsTrigger value="maps" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Maps</TabsTrigger>
-                  <TabsTrigger value="photos" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white">Photos</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto">
+                  <TabsList className="inline-flex min-w-full lg:grid lg:grid-cols-9 bg-white border border-gray-200 p-2 rounded-2xl shadow-sm">
+                    <TabsTrigger value="itinerary" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Itinerary</TabsTrigger>
+                    <TabsTrigger value="flights" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Flights</TabsTrigger>
+                    <TabsTrigger value="hotels" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Hotels</TabsTrigger>
+                    <TabsTrigger value="restaurants" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Dining</TabsTrigger>
+                    <TabsTrigger value="activities" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Activities</TabsTrigger>
+                    <TabsTrigger value="insurance" className="rounded-xl data-[state=active]:bg-green-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">
+                      <Shield size={14} className="mr-1 inline" />
+                      Insurance
+                    </TabsTrigger>
+                    <TabsTrigger value="transport" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Transport</TabsTrigger>
+                    <TabsTrigger value="maps" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Maps</TabsTrigger>
+                    <TabsTrigger value="photos" className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:text-white whitespace-nowrap px-3 py-2 text-sm">Photos</TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <div className="bg-white rounded-3xl border border-gray-200 p-8 min-h-[500px] shadow-lg">
                   <TabsContent value="itinerary" className="mt-0">
