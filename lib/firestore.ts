@@ -1,5 +1,5 @@
 import { getFirestore, collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
-import { db } from './Firebase'; // Import db directly, not the app
+import { db } from '@/lib/firebase'; // Import db directly, not the app
 
 // Create a booking
 export async function createBooking(bookingData: any) {

@@ -147,11 +147,29 @@ export default function HomeClient() {
 
     const prefs = preferences || tripPreferences;
 
+    console.log('🔍 Search initiated with:', { location, preferences: prefs });
+
     setLoading(true);
     setError(null);
     setShowPreview(false);
     
     try {
+      const itineraryPayload = { 
+        location, 
+        // ✅ FIXED: Use new TripPreferences fields
+        tripType: prefs?.tripType || tripType || 'balanced',
+        budget: prefs?.budget || selectedBudget,
+        days: prefs?.days || days,
+        origin: prefs?.origin || origin,
+        groupSize: prefs?.groupSize || 1,
+        groupType: prefs?.groupType || 'solo',
+        optimize: true,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+      };
+
+      console.log('📤 Sending itinerary request:', itineraryPayload);
+
       const [
         itineraryRes, 
         restaurantsRes, 
@@ -164,19 +182,7 @@ export default function HomeClient() {
         fetch("/api/itinerary", { 
           method: "POST", 
           headers: { "Content-Type": "application/json" }, 
-          body: JSON.stringify({ 
-            location, 
-            // ✅ FIXED: Use new TripPreferences fields
-            tripType: prefs?.tripType || tripType || 'balanced',
-            budget: prefs?.budget || selectedBudget,
-            days: prefs?.days || days,
-            origin: prefs?.origin || origin,
-            groupSize: prefs?.groupSize || 1,
-            groupType: prefs?.groupType || 'solo',
-            optimize: true,
-            startDate: startDate?.toISOString(),
-            endDate: endDate?.toISOString(),
-          }) 
+          body: JSON.stringify(itineraryPayload) 
         }),
         fetch("/api/restaurants", { 
           method: "POST", 
@@ -240,7 +246,11 @@ export default function HomeClient() {
         transportRes.json()
       ]);
 
-      if (!itineraryRes.ok) throw new Error("Failed to fetch itinerary");
+      if (!itineraryRes.ok) {
+        const errorData = await itineraryRes.json();
+        console.error('❌ Itinerary API error:', errorData);
+        throw new Error(errorData.error || "Failed to fetch itinerary");
+      }
 
       setItineraryData(itinerary);
       setRestaurants(restaurantsData.restaurants || []);
@@ -262,9 +272,11 @@ export default function HomeClient() {
       } else {
         setActiveTab("itinerary");
       }
-    } catch (err) {
-      console.error("Search error:", err);
-      setError("Failed to fetch travel data. Please try again.");
+    } catch (err: any) {
+      console.error("❌ Search error:", err);
+      const errorMessage = err.message || "Failed to fetch travel data. Please try again.";
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}\n\nPlease check the browser console for details.`);
     } finally {
       setLoading(false);
     }
@@ -759,7 +771,9 @@ export default function HomeClient() {
         />
         
         {/* AI Companion */}
-        <GladysAICompanion currentDestination={firstDestination || "Paris"} />
+        <div className="pb-20 md:pb-0">
+          <GladysAICompanion currentDestination={firstDestination || "Paris"} />
+        </div>
       </div>
     </main>
   );

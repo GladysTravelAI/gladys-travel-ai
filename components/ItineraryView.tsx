@@ -121,7 +121,7 @@ interface ItineraryData {
 export default function SmartItineraryView({ data }: { data?: ItineraryData }) {
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
-  
+
   // Handle missing or invalid data
   if (!data || !data.tripSummary || !data.days || data.days.length === 0) {
     return (
@@ -172,7 +172,6 @@ export default function SmartItineraryView({ data }: { data?: ItineraryData }) {
     element?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Expand all days helper
   const expandAllDays = () => {
     setExpandedDays(new Set(data.days.map(d => d.day)));
   };

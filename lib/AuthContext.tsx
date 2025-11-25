@@ -1,95 +1,103 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import {
-  User,
-  onAuthStateChanged,
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  signInWithPopup,
+  onAuthStateChanged,
   GoogleAuthProvider,
-  sendPasswordResetEmail,
-  updateProfile,
-  UserCredential,
+  signInWithPopup,
+  User
 } from 'firebase/auth';
-import { auth } from '@/lib/Firebase';
+import { auth } from '@/lib/firebase'; // Make sure you have this file
+
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<UserCredential>;
-  signup: (email: string, password: string, displayName?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<UserCredential>;
-  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: User | null) => {
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+        });
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<UserCredential> => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const login = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signup = async (email: string, password: string, displayName?: string): Promise<void> => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    
-    if (displayName && userCredential.user) {
-      await updateProfile(userCredential.user, { displayName });
+  const signup = async (email: string, password: string) => {
+    // Validate password strength
+    if (password.length < 8) {
+      throw new Error('Password must be at least 8 characters');
     }
+    if (!/[A-Z]/.test(password)) {
+      throw new Error('Password must contain at least one uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      throw new Error('Password must contain at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+      throw new Error('Password must contain at least one number');
+    }
+    
+    await createUserWithEmailAndPassword(auth, email, password);
   };
 
-  const logout = async (): Promise<void> => {
-    return signOut(auth);
-  };
-
-  const loginWithGoogle = async (): Promise<UserCredential> => {
+  const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    return signInWithPopup(auth, provider);
+    await signInWithPopup(auth, provider);
   };
 
-  const resetPassword = async (email: string): Promise<void> => {
-    return sendPasswordResetEmail(auth, email);
+  const logout = async () => {
+    await signOut(auth);
   };
 
-  const value: AuthContextType = {
+  const value = {
     user,
     loading,
     login,
     signup,
-    logout,
     loginWithGoogle,
-    resetPassword,
+    logout,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

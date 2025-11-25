@@ -1,5 +1,5 @@
-import { MapPin, Navigation, Clock, Car, Train, Bus, } from "lucide-react";
-import { useState } from "react";
+import { MapPin, Navigation, Clock, Car, Bus, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -20,6 +20,19 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
   const [directions, setDirections] = useState<DirectionsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState<"driving" | "transit" | "walking">("driving");
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  // Check if Google Maps API key exists
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    setHasApiKey(!!apiKey && apiKey !== '');
+    
+    if (!apiKey || apiKey === '') {
+      console.error("❌ Google Maps API key is missing! Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your .env.local");
+    } else {
+      console.log("✅ Google Maps API key found");
+    }
+  }, []);
 
   const modes = [
     { value: "driving", label: "Driving", icon: Car },
@@ -58,6 +71,27 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
           <p className="text-sm text-gray-500">Get directions to {destination}</p>
         </div>
       </div>
+
+      {/* API Key Warning */}
+      {!hasApiKey && (
+        <Card className="p-6 bg-yellow-50 border-2 border-yellow-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-yellow-600 flex-shrink-0 mt-0.5" size={24} />
+            <div>
+              <h4 className="font-bold text-yellow-900 mb-2">Google Maps API Key Missing</h4>
+              <p className="text-sm text-yellow-800 mb-3">
+                To enable maps, add your Google Maps API key to the environment variables:
+              </p>
+              <ol className="text-sm text-yellow-800 space-y-1 list-decimal list-inside">
+                <li>Get a key from <a href="https://console.cloud.google.com/google/maps-apis" target="_blank" className="underline font-semibold">Google Cloud Console</a></li>
+                <li>Add to <code className="bg-yellow-200 px-2 py-0.5 rounded">.env.local</code>: <code className="bg-yellow-200 px-2 py-0.5 rounded">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_key</code></li>
+                <li>Add to Vercel: Settings → Environment Variables</li>
+                <li>Redeploy your app</li>
+              </ol>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Mode Selection */}
       <div className="flex space-x-3">
@@ -110,17 +144,27 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
       </div>
 
       {/* Google Maps Embed */}
-      <Card className="overflow-hidden border-gray-200">
-        <iframe
-          width="100%"
-          height="400"
-          style={{ border: 0 }}
-          loading="lazy"
-          allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
-          src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(destination)}&zoom=14`}
-        ></iframe>
-      </Card>
+      {hasApiKey ? (
+        <Card className="overflow-hidden border-gray-200">
+          <iframe
+            width="100%"
+            height="400"
+            style={{ border: 0 }}
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="no-referrer-when-downgrade"
+            src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(destination)}&zoom=14`}
+          ></iframe>
+        </Card>
+      ) : (
+        <Card className="p-12 bg-gray-50 border-gray-200">
+          <div className="text-center">
+            <MapPin className="mx-auto text-gray-300 mb-4" size={64} />
+            <p className="text-gray-600 font-semibold mb-2">Map Preview Unavailable</p>
+            <p className="text-sm text-gray-500">Add Google Maps API key to enable maps</p>
+          </div>
+        </Card>
+      )}
 
       {/* Directions Results */}
       {directions && (
@@ -139,7 +183,6 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
             </div>
           </div>
 
-          {/* Step-by-step directions */}
           <div className="space-y-3">
             {directions.steps.map((step, index) => (
               <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
@@ -151,7 +194,6 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
             ))}
           </div>
 
-          {/* Open in Google Maps */}
           <div className="mt-6 flex space-x-3">
             <Button
               onClick={() => {
@@ -190,6 +232,19 @@ export default function MapsDirections({ destination }: MapsDirectionsProps) {
           <li>• Allow extra time for security and check-in at airports</li>
         </ul>
       </Card>
+
+      {/* Alternative: Open in Google Maps Button */}
+      <Button
+        onClick={() => {
+          const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destination)}`;
+          window.open(url, '_blank');
+        }}
+        variant="outline"
+        className="w-full"
+      >
+        <MapPin size={16} className="mr-2" />
+        Open {destination} in Google Maps
+      </Button>
     </div>
   );
 }

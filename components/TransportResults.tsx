@@ -1,4 +1,3 @@
-// components/TransportSection.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -26,26 +25,38 @@ interface TransportData {
 }
 
 interface TransportResultsProps {
-    transport: WebTransport[];
-  currentDestination?: string;
+  transport?: TransportData | null;
+  destination?: string;
 }
 
-export default function TransportResults({ currentDestination = "Paris" }: TransportResultsProps) {
-  const [transportData, setTransportData] = useState<TransportData | null>(null);
+export default function TransportResults({ transport: initialTransport, destination: initialDestination }: TransportResultsProps) {
+  const [transportData, setTransportData] = useState<TransportData | null>(initialTransport || null);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(currentDestination);
+  const [searchQuery, setSearchQuery] = useState(initialDestination || "");
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-search when component mounts or destination changes
+  // ✅ FIX: Update when props change
   useEffect(() => {
-    if (currentDestination) {
-      setSearchQuery(currentDestination);
-      searchTransport(currentDestination);
+    if (initialDestination && initialDestination !== searchQuery) {
+      setSearchQuery(initialDestination);
+      searchTransport(initialDestination);
     }
-  }, [currentDestination]);
+  }, [initialDestination]);
 
-  const searchTransport = async (destination: string) => {
-    if (!destination.trim()) return;
+  // ✅ FIX: Use initialTransport if provided
+  useEffect(() => {
+    if (initialTransport) {
+      setTransportData(initialTransport);
+    }
+  }, [initialTransport]);
+
+  const searchTransport = async (dest: string) => {
+    if (!dest || !dest.trim()) {
+      setError("Please enter a destination");
+      return;
+    }
+
+    console.log("🔍 Searching transport for:", dest);
 
     setLoading(true);
     setError(null);
@@ -55,7 +66,7 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          destination: destination.trim()
+          destination: dest.trim()
         })
       });
 
@@ -64,9 +75,11 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
       }
 
       const data = await response.json();
+      console.log("✅ Transport data received:", data);
+      
       setTransportData(data.transport || null);
     } catch (error) {
-      console.error('Error fetching transport:', error);
+      console.error('❌ Error fetching transport:', error);
       setError('Unable to load transport options. Please try again.');
       setTransportData(null);
     } finally {
@@ -191,7 +204,6 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
                 key={index}
                 className="p-6 hover:shadow-xl transition-all duration-300 border-2 hover:border-blue-300"
               >
-                {/* Icon and Type */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="p-3 bg-blue-50 rounded-xl">
                     {getIconComponent(option.icon)}
@@ -201,7 +213,6 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
                   </Badge>
                 </div>
 
-                {/* Name and Description */}
                 <h3 className="font-bold text-lg text-gray-800 mb-2">
                   {option.name}
                 </h3>
@@ -209,7 +220,6 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
                   {option.description}
                 </p>
 
-                {/* Details */}
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 text-gray-600">
@@ -230,7 +240,6 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
                   </div>
                 </div>
 
-                {/* Availability */}
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">Available:</span>
@@ -238,11 +247,9 @@ export default function TransportResults({ currentDestination = "Paris" }: Trans
                   </div>
                 </div>
 
-                {/* Book Button */}
                 <Button 
                   className="w-full mt-4 bg-blue-600 hover:bg-blue-700"
                   onClick={() => {
-                    // Open Google Maps or booking site
                     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(option.name + ' ' + searchQuery)}`;
                     window.open(searchUrl, '_blank');
                   }}
