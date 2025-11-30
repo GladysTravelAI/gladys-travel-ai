@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Apple uses SF Pro, but Inter is the closest web-safe alternative
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: "GladysTravelAI",
-  description: "Your smart travel planner",
+  title: "Gladys Travel AI",
+  description: "Your intelligent travel companion",
 };
 
 export default function RootLayout({
@@ -24,9 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+    <html lang="en" className="scroll-smooth">
+      <body className={`${inter.variable} font-sans antialiased bg-white text-gray-900`}>
         <Providers>{children}</Providers>
       </body>
     </html>
