@@ -2,64 +2,48 @@ import { Sparkles, Mail, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 
 const Footer = () => (
-  <footer className="relative mt-20 bg-gradient-to-br from-gray-900 via-gray-800 to-black border-t border-white/20">
-    <div className="max-w-7xl mx-auto px-6 py-16">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+  <footer className="relative mt-12 bg-gray-900 border-t border-gray-800">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         
         {/* Brand Section */}
-        <div className="col-span-1 md:col-span-2 lg:col-span-1">
-          <div className="flex items-center space-x-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/50">
-              <Sparkles className="text-white" size={24} />
+        <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+          <div className="flex items-center space-x-2 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <Sparkles className="text-white" size={20} />
             </div>
-            <h3 className="text-2xl font-bold text-white">GladysTravelAI</h3>
+            <h3 className="text-xl font-semibold text-white">GladysTravelAI</h3>
           </div>
-          <p className="text-gray-300 mb-6 leading-relaxed">
-            Your AI-powered travel companion for unforgettable journeys worldwide.
+          <p className="text-gray-400 text-sm mb-4 leading-relaxed">
+            Your AI-powered travel companion for unforgettable journeys.
           </p>
-          <div className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-full border border-purple-500/30 inline-flex">
-            <Sparkles className="text-yellow-400" size={16} />
-            <span className="text-sm text-white font-medium">Your Smart Trip Planner</span>
+          <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+            <Sparkles className="text-blue-400" size={14} />
+            <span className="text-xs text-gray-300 font-medium">Smart Trip Planner</span>
           </div>
         </div>
 
         {/* Company Links */}
         <div>
-          <h4 className="text-white font-bold text-lg mb-6 border-b border-white/20 pb-2">Company</h4>
-          <ul className="space-y-3">
+          <h4 className="text-white font-semibold text-sm mb-4">Company</h4>
+          <ul className="space-y-2">
             <li>
-              <Link 
-                href="/about" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About Us
               </Link>
             </li>
             <li>
-              <Link 
-                href="/contact" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/contact" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Contact
               </Link>
             </li>
             <li>
-              <Link 
-                href="/careers" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/careers" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Careers
               </Link>
             </li>
             <li>
-              <Link 
-                href="/blog" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/blog" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Blog
               </Link>
             </li>
@@ -68,41 +52,25 @@ const Footer = () => (
 
         {/* Legal Links */}
         <div>
-          <h4 className="text-white font-bold text-lg mb-6 border-b border-white/20 pb-2">Legal</h4>
-          <ul className="space-y-3">
+          <h4 className="text-white font-semibold text-sm mb-4">Legal</h4>
+          <ul className="space-y-2">
             <li>
-              <Link 
-                href="/terms" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-pink-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Terms of Service
               </Link>
             </li>
             <li>
-              <Link 
-                href="/privacy" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-pink-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy Policy
               </Link>
             </li>
             <li>
-              <Link 
-                href="/cookies" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-pink-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Cookie Policy
               </Link>
             </li>
             <li>
-              <Link 
-                href="/refund" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-center group"
-              >
-                <span className="w-1.5 h-1.5 bg-pink-500 rounded-full mr-3 group-hover:w-3 transition-all duration-300"></span>
+              <Link href="/refund" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Refund Policy
               </Link>
             </li>
@@ -111,48 +79,34 @@ const Footer = () => (
 
         {/* Contact Info */}
         <div>
-          <h4 className="text-white font-bold text-lg mb-6 border-b border-white/20 pb-2">Get in Touch</h4>
-          <ul className="space-y-4">
+          <h4 className="text-white font-semibold text-sm mb-4">Get in Touch</h4>
+          <ul className="space-y-3">
             <li>
-              <a 
-                href="mailto:gladystravelai@gmail.com" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-start group"
-              >
-                <Mail size={18} className="text-purple-400 mr-3 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm">gladystravelai@gmail.com</span>
+              <a href="mailto:gladystravelai@gmail.com" className="text-gray-400 hover:text-white text-sm flex items-start gap-2 transition-colors">
+                <Mail size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                <span className="text-xs break-all">gladystravelai@gmail.com</span>
               </a>
             </li>
             <li>
-              <a 
-                href="tel:+27645452236" 
-                className="text-gray-300 hover:text-white transition-all duration-300 flex items-start group"
-              >
-                <Phone size={18} className="text-purple-400 mr-3 mt-0.5 group-hover:scale-110 transition-transform" />
-                <span className="text-sm">+27 64 545 2236</span>
+              <a href="tel:+27645452236" className="text-gray-400 hover:text-white text-sm flex items-start gap-2 transition-colors">
+                <Phone size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                <span className="text-xs">+27 64 545 2236</span>
               </a>
             </li>
-            <li className="flex items-start text-gray-300">
-              <MapPin size={18} className="text-purple-400 mr-3 mt-0.5 flex-shrink-0" />
-              <span className="text-sm">Johannesburg<br />South Africa</span>
+            <li className="flex items-start gap-2 text-gray-400 text-sm">
+              <MapPin size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+              <span className="text-xs">Johannesburg, South Africa</span>
             </li>
           </ul>
-          
-          {/* Coming Soon Badge */}
-          <div className="mt-6 px-4 py-3 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
-            <p className="text-sm text-gray-300">
-              <span className="font-semibold text-white">🚀 Coming Soon:</span><br />
-              Follow us on social media for travel tips and updates!
-            </p>
-          </div>
         </div>
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-white/20 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-        <p className="text-gray-400 text-sm text-center md:text-left">
-          © 2025 GladysTravelAI. All rights reserved. Built with ❤️ and AI for travelers worldwide.
+      <div className="border-t border-gray-800 mt-8 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <p className="text-gray-400 text-xs text-center sm:text-left">
+          © 2025 GladysTravelAI. All rights reserved.
         </p>
-        <div className="flex items-center space-x-6 text-sm">
+        <div className="flex items-center space-x-4 text-xs">
           <Link href="/sitemap" className="text-gray-400 hover:text-white transition-colors">
             Sitemap
           </Link>
@@ -164,12 +118,6 @@ const Footer = () => (
           </Link>
         </div>
       </div>
-    </div>
-
-    {/* Decorative Background Elements */}
-    <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-      <div className="absolute top-10 left-10 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-pink-500/5 rounded-full blur-3xl"></div>
     </div>
   </footer>
 );
