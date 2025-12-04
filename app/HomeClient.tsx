@@ -315,73 +315,102 @@ export default function HomeClient() {
     if (isListening) recognition.stop(); 
     else recognition.start();
   };
+useEffect(() => {
+  // Top 50 world destinations - randomly selected each time
+  const topWorldDestinations = [
+    // Europe
+    "Paris, France",
+    "London, United Kingdom",
+    "Rome, Italy",
+    "Barcelona, Spain",
+    "Amsterdam, Netherlands",
+    "Prague, Czech Republic",
+    "Vienna, Austria",
+    "Istanbul, Turkey",
+    "Athens, Greece",
+    "Budapest, Hungary",
+    "Dublin, Ireland",
+    "Edinburgh, Scotland",
+    "Lisbon, Portugal",
+    "Copenhagen, Denmark",
+    "Berlin, Germany",
+    
+    // Asia
+    "Tokyo, Japan",
+    "Bangkok, Thailand",
+    "Singapore, Singapore",
+    "Dubai, UAE",
+    "Hong Kong, China",
+    "Seoul, South Korea",
+    "Bali, Indonesia",
+    "Shanghai, China",
+    "Kuala Lumpur, Malaysia",
+    "Osaka, Japan",
+    
+    // Americas
+    "New York, USA",
+    "Los Angeles, USA",
+    "Miami, USA",
+    "Las Vegas, USA",
+    "San Francisco, USA",
+    "Chicago, USA",
+    "Cancun, Mexico",
+    "Mexico City, Mexico",
+    "Rio de Janeiro, Brazil",
+    "Buenos Aires, Argentina",
+    "Vancouver, Canada",
+    "Toronto, Canada",
+    
+    // Africa & Middle East
+    "Cape Town, South Africa",
+    "Marrakech, Morocco",
+    "Cairo, Egypt",
+    "Nairobi, Kenya",
+    "Johannesburg, South Africa",
+    "Tel Aviv, Israel",
+    
+    // Oceania
+    "Sydney, Australia",
+    "Melbourne, Australia",
+    "Auckland, New Zealand",
+    "Queenstown, New Zealand",
+    "Bora Bora, French Polynesia",
+    "Fiji Islands, Fiji"
+  ];
 
-  useEffect(() => {
-    // Expanded destination pool with sacred places
-    const destinationPool = [
-      "Thohoyandou, South Africa",
-      "Lake Fundudzi, South Africa",
-      "Mapungubwe, South Africa",
-      "Lalibela, Ethiopia",
-      "Great Zimbabwe, Zimbabwe",
-      "Timbuktu, Mali",
-      "Varanasi, India",
-      "Kyoto, Japan",
-      "Jerusalem, Israel",
-      "Petra, Jordan",
-      "Machu Picchu, Peru",
-      "Uluru, Australia",
-      "Paris, France",
-      "Tokyo, Japan",
-      "Dubai, UAE",
-      "Barcelona, Spain",
-      "Cape Town, South Africa",
-      "New York, USA"
-    ];
-
-    // Mix: sacred sites + modern destinations
-    const sacredSites = destinationPool.filter(dest => 
-      !["Paris", "Tokyo", "Dubai", "Barcelona", "New York", "Cape Town"].some(modern => dest.includes(modern))
-    );
-    
-    const modernSites = destinationPool.filter(dest => 
-      ["Paris", "Tokyo", "Dubai", "Barcelona", "New York", "Cape Town"].some(modern => dest.includes(modern))
-    );
-    
-    const selectedSacred = sacredSites.sort(() => 0.5 - Math.random()).slice(0, 5);
-    const selectedModern = modernSites.sort(() => 0.5 - Math.random()).slice(0, 3);
-    
-    const randomDestinations = [...selectedSacred, ...selectedModern]
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 8)
-      .map((destination) => {
-        const [city, country] = destination.split(", ");
-        return { city, country, image: "" };
-      });
-    
-    setSuggestedDestinations(randomDestinations);
-
-    randomDestinations.forEach(async (dest, index) => {
-      try {
-        const res = await fetch("/api/images", { 
-          method: "POST", 
-          headers: { "Content-Type": "application/json" }, 
-          body: JSON.stringify({ destination: `${dest.city} ${dest.country}` }) 
-        });
-        const data = await res.json();
-        
-        if (res.ok && data.images?.[0]) {
-          setSuggestedDestinations((prev) => {
-            const newArray = [...prev];
-            newArray[index] = { ...newArray[index], image: data.images[0] };
-            return newArray;
-          });
-        }
-      } catch (error) {
-        console.error(`Failed to load image for ${dest.city}`);
-      }
+  // Randomly select 8 destinations
+  const randomDestinations = topWorldDestinations
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 8)
+    .map((destination) => {
+      const [city, country] = destination.split(", ");
+      return { city, country, image: "" };
     });
-  }, []);
+  
+  setSuggestedDestinations(randomDestinations);
+
+  // Load images for each destination
+  randomDestinations.forEach(async (dest, index) => {
+    try {
+      const res = await fetch("/api/images", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ destination: `${dest.city} ${dest.country}` }) 
+      });
+      const data = await res.json();
+      
+      if (res.ok && data.images?.[0]) {
+        setSuggestedDestinations((prev) => {
+          const newArray = [...prev];
+          newArray[index] = { ...newArray[index], image: data.images[0] };
+          return newArray;
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to load image for ${dest.city}`);
+    }
+  });
+}, []);
 
   return (
     <main className="min-h-screen bg-white">
