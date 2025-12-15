@@ -71,14 +71,14 @@ export default function GladysAICompanion({
       if (context.name) {
         const greetings = [
           `Hey ${context.name}! 👋 Ready to plan your next adventure?`,
-          `Welcome back, ${context.name}! 😊 Let's make some travel magic!`,
-          `Hi ${context.name}! ✨ Where should we explore today?`,
+          `Welcome back, ${context.name}! ✨ Let's make some travel magic!`,
+          `Hi ${context.name}! ✈️ Where should we explore today?`,
         ];
         greeting = greetings[Math.floor(Math.random() * greetings.length)];
       } else if (context.conversationCount > 0) {
-        greeting = `Welcome back! 😊 Ready to explore more amazing places?`;
+        greeting = `Welcome back! ✨ Ready to explore more amazing places?`;
       } else {
-        greeting = `Hey there! 👋 I'm Gladys, your AI travel companion!\n\nI can help you:\n✈️ Plan trips and find hotels\n🎟️ Find events and tickets\n🗺️ Create perfect itineraries\n\nWhat's your name? I'd love to get to know you! 😊`;
+        greeting = `Hey there! 👋 I'm Gladys, your AI travel companion!\n\nI can help you:\n✈️ Plan trips and find hotels\n🎫 Find events and tickets\n🗺️ Create perfect itineraries\n\nWhat's your name? I'd love to get to know you! 😊`;
       }
 
       setMessages([
@@ -149,7 +149,7 @@ export default function GladysAICompanion({
       return;
     }
 
-    console.log(`🤖 Executing tool: ${name}`, args);
+    console.log(`🔧 Executing tool: ${name}`, args);
 
     switch (name) {
       case 'navigate_to_page':
@@ -257,31 +257,31 @@ export default function GladysAICompanion({
 
   return (
     <>
-      {/* Siri-Style Floating Orb Button */}
+      {/* Siri-Style Floating Orb Button - MOBILE OPTIMIZED */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-8 right-8 z-50 group"
+          className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-50 group"
           aria-label="Open Gladys AI Assistant"
         >
           {/* Outer glow rings */}
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 opacity-75 blur-xl animate-pulse-slow"></div>
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 opacity-60 blur-2xl animate-pulse-slower"></div>
-          
-          {/* Main orb */}
-          <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 via-pink-500 to-blue-600 shadow-2xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
+
+          {/* Main orb - Responsive sizing: 56px mobile, 80px desktop */}
+          <div className="relative w-14 h-14 md:w-20 md:h-20 rounded-full bg-gradient-to-br from-purple-600 via-pink-500 to-blue-600 shadow-2xl flex items-center justify-center transform transition-all duration-300 group-hover:scale-110 group-hover:rotate-12">
             {/* Inner gradient layers */}
             <div className="absolute inset-2 rounded-full bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 opacity-70 animate-spin-slow"></div>
-            <div className="absolute inset-4 rounded-full bg-gradient-to-br from-white/40 to-transparent backdrop-blur-sm"></div>
-            
-            {/* Sparkle Icon */}
-            <Sparkles className="relative z-10 text-white drop-shadow-lg" size={36} />
+            <div className="absolute inset-3 md:inset-4 rounded-full bg-gradient-to-br from-white/40 to-transparent backdrop-blur-sm"></div>
+
+            {/* Sparkle Icon - Responsive sizing */}
+            <Sparkles className="relative z-10 text-white drop-shadow-lg w-6 h-6 md:w-9 md:h-9" />
           </div>
-          
-          {/* Floating particles */}
-          <div className="absolute -top-1 -left-1 w-3 h-3 bg-purple-400 rounded-full animate-float-1 opacity-60"></div>
-          <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full animate-float-2 opacity-60"></div>
-          <div className="absolute top-1/2 -left-2 w-2 h-2 bg-blue-400 rounded-full animate-float-3 opacity-60"></div>
+
+          {/* Floating particles - Hidden on mobile */}
+          <div className="hidden md:block absolute -top-1 -left-1 w-3 h-3 bg-purple-400 rounded-full animate-float-1 opacity-60"></div>
+          <div className="hidden md:block absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full animate-float-2 opacity-60"></div>
+          <div className="hidden md:block absolute top-1/2 -left-2 w-2 h-2 bg-blue-400 rounded-full animate-float-3 opacity-60"></div>
         </button>
       )}
 
@@ -289,15 +289,15 @@ export default function GladysAICompanion({
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-md animate-fade-in">
           <div className="relative w-full max-w-2xl h-[85vh] flex flex-col">
-            
+
             {/* Glassmorphic Card */}
             <div className="flex-1 flex flex-col bg-white/80 dark:bg-gray-900/80 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
-              
+
               {/* Header */}
               <div className="relative p-6 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-blue-500/10 border-b border-white/10">
                 {/* Animated background orb */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 opacity-20 blur-3xl rounded-full animate-pulse-slow"></div>
-                
+
                 <div className="relative flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     {/* Siri Orb Avatar */}
@@ -308,7 +308,7 @@ export default function GladysAICompanion({
                         <Sparkles className="relative z-10 text-white" size={28} />
                       </div>
                     </div>
-                    
+
                     <div>
                       <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
                         Gladys AI
@@ -318,7 +318,7 @@ export default function GladysAICompanion({
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setVoiceEnabled(!voiceEnabled)}
@@ -331,7 +331,7 @@ export default function GladysAICompanion({
                         <VolumeX size={20} className="text-gray-400" />
                       )}
                     </button>
-                    
+
                     <button
                       onClick={() => setIsOpen(false)}
                       className="p-3 rounded-full bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-800/70 backdrop-blur-sm transition-all"
@@ -366,7 +366,7 @@ export default function GladysAICompanion({
                     </div>
                   </div>
                 ))}
-                
+
                 {loading && (
                   <div className="flex justify-start animate-message-in">
                     <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-md rounded-3xl px-6 py-4 shadow-md border border-white/20">
@@ -381,7 +381,7 @@ export default function GladysAICompanion({
                     </div>
                   </div>
                 )}
-                
+
                 <div ref={messagesEndRef} />
               </div>
 
@@ -401,7 +401,7 @@ export default function GladysAICompanion({
                   >
                     {isListening ? <MicOff size={22} /> : <Mic size={22} />}
                   </button>
-                  
+
                   {/* Input Field */}
                   <div className="flex-1 relative">
                     <input
@@ -409,12 +409,12 @@ export default function GladysAICompanion({
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                      placeholder={isListening ? "🎤 Listening..." : "Ask me anything..."}
+                      placeholder={isListening ? "🎙️ Listening..." : "Ask me anything..."}
                       className="w-full h-14 px-6 bg-white/70 dark:bg-gray-800/70 backdrop-blur-md border-2 border-white/20 rounded-2xl focus:border-purple-400 focus:ring-4 focus:ring-purple-200/50 outline-none text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 transition-all"
                       disabled={loading || isListening}
                     />
                   </div>
-                  
+
                   {/* Send Button */}
                   <button
                     onClick={() => handleSend()}
@@ -424,7 +424,7 @@ export default function GladysAICompanion({
                     <Send size={22} />
                   </button>
                 </div>
-                
+
                 {/* Footer Info */}
                 <div className="flex items-center justify-between mt-3 text-xs text-gray-500 dark:text-gray-400">
                   {isSpeaking && (
@@ -438,8 +438,8 @@ export default function GladysAICompanion({
                   )}
                   <div className="ml-auto flex items-center gap-3">
                     {messages.length > 2 && (
-                      <button 
-                        onClick={clearHistory} 
+                      <button
+                        onClick={clearHistory}
                         className="hover:text-purple-600 transition-colors font-medium"
                       >
                         Clear Chat
@@ -452,7 +452,7 @@ export default function GladysAICompanion({
           </div>
         </div>
       )}
-      
+
       <style jsx global>{`
         @keyframes fade-in {
           from {
@@ -473,7 +473,7 @@ export default function GladysAICompanion({
             transform: translateY(0);
           }
         }
-        
+
         .animate-fade-in {
           animation: fade-in 0.2s ease-out;
         }
