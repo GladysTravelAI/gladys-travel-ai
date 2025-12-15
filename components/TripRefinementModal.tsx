@@ -49,6 +49,8 @@ export default function TripRefinementModal({
     { value: 'cultural', label: 'Cultural', icon: '🏛️' },
     { value: 'relaxation', label: 'Relaxation', icon: '🧘' },
     { value: 'foodie', label: 'Foodie', icon: '🍽️' },
+    { value: 'beach', label: 'Beach', icon: '🏖️' },
+    { value: 'nightlife', label: 'Nightlife', icon: '🎉' },
   ];
 
   const groupOptions = [
@@ -137,7 +139,7 @@ export default function TripRefinementModal({
           {/* Travel Style */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Travel Style</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {styleOptions.map((option) => (
                 <button
                   key={option.value}
