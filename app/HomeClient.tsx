@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils } from "lucide-react";
+import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils, Cloud, Star, Trophy } from "lucide-react";
 import { motion } from "framer-motion";
 
 // Components
@@ -22,7 +22,10 @@ import LocationAutoComplete from "@/components/LocationAutoComplete";
 import TripPreview from "@/components/TripPreview";
 import TripSummary from "@/components/TripSummary";
 import InsuranceView from "@/components/InsuranceView";
+import WeatherWidget from "@/components/WeatherWidget";
+import FeedbackModal from "@/components/FeedbackModal";
 import { ItineraryData } from "@/lib/mock-itinerary";
+import { profileManager } from "@/lib/userProfile";
 
 // shadcn/ui
 import { Button } from "@/components/ui/button";
@@ -76,6 +79,12 @@ export default function HomeClient() {
   const [showPreview, setShowPreview] = useState(false);
   const [tripPreferences, setTripPreferences] = useState<TripPreferences | null>(null);
   const [estimatedTripCost, setEstimatedTripCost] = useState(2000);
+
+  // NEW: Weather & Smart Features
+  const [currentWeather, setCurrentWeather] = useState<any>(null);
+  const [sportsEvents, setSportsEvents] = useState<any[]>([]);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [completedTrip, setCompletedTrip] = useState<any>(null);
 
   const [savedItems, setSavedItems] = useState<{
     hotels: SavedItem[];
@@ -160,7 +169,9 @@ export default function HomeClient() {
         activitiesRes, 
         imagesRes,
         flightsRes,
-        transportRes
+        transportRes,
+        weatherRes, // ✅ NEW: Weather
+        eventsRes    // ✅ NEW: Events
       ] = await Promise.all([
         fetch("/api/itinerary", { 
           method: "POST", 
@@ -209,6 +220,22 @@ export default function HomeClient() {
             origin: prefs?.origin || origin
           }) 
         }),
+        // ✅ NEW: Fetch weather
+        fetch("/api/weather", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ location })
+        }).catch(() => null),
+        // ✅ NEW: Fetch sports events
+        fetch("/api/sports-events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            sport: 'Football', 
+            city: location,
+            year: 2026
+          })
+        }).catch(() => null)
       ]);
 
       const [
@@ -218,7 +245,9 @@ export default function HomeClient() {
         activitiesData, 
         imagesData,
         flightsData,
-        transportData
+        transportData,
+        weatherData,  // ✅ NEW
+        eventsData    // ✅ NEW
       ] = await Promise.all([
         itineraryRes.json(), 
         restaurantsRes.json(), 
@@ -226,7 +255,9 @@ export default function HomeClient() {
         activitiesRes.json(), 
         imagesRes.json(),
         flightsRes.json(),
-        transportRes.json()
+        transportRes.json(),
+        weatherRes ? weatherRes.json() : null,
+        eventsRes ? eventsRes.json() : null
       ]);
 
       if (!itineraryRes.ok) {
@@ -243,9 +274,36 @@ export default function HomeClient() {
       setFirstDestination(location);
       setDays(prefs?.days || days);
       
+      // ✅ NEW: Set weather data
+      if (weatherData?.weather) {
+        setCurrentWeather(weatherData.weather);
+        
+        // ✅ Weather-based recommendations
+        const isRainy = weatherData.weather.current.condition.toLowerCase().includes('rain');
+        const isCold = weatherData.weather.current.temp < 15;
+        
+        if (isRainy) {
+          console.log('☔ Rainy weather detected - prioritizing indoor activities');
+          // You can auto-switch to restaurants/museums tab here if you want
+        } else if (isCold) {
+          console.log('🧥 Cold weather - recommending warm activities');
+        } else {
+          console.log('☀️ Perfect weather for outdoor exploration!');
+        }
+      }
+
+      // ✅ NEW: Set events data
+      if (eventsData?.events) {
+        setSportsEvents(eventsData.events.slice(0, 5));
+        console.log(`🏆 Found ${eventsData.events.length} events in ${location}`);
+      }
+      
       const flightCost = flightsData.flights?.[0]?.price || 800;
       const hotelCost = (hotelsData.hotels?.[0]?.price || 150) * (prefs?.days || days);
       setEstimatedTripCost(flightCost + hotelCost + 500);
+      
+      // ✅ NEW: Track search in user profile
+      await profileManager.trackSearch('current_user', location);
       
       if (flightsData.flights?.length > 0 && hotelsData.hotels?.length > 0) {
         setShowPreview(true);
@@ -315,102 +373,142 @@ export default function HomeClient() {
     if (isListening) recognition.stop(); 
     else recognition.start();
   };
-useEffect(() => {
-  // Top 50 world destinations - randomly selected each time
-  const topWorldDestinations = [
-    // Europe
-    "Paris, France",
-    "London, United Kingdom",
-    "Rome, Italy",
-    "Barcelona, Spain",
-    "Amsterdam, Netherlands",
-    "Prague, Czech Republic",
-    "Vienna, Austria",
-    "Istanbul, Turkey",
-    "Athens, Greece",
-    "Budapest, Hungary",
-    "Dublin, Ireland",
-    "Edinburgh, Scotland",
-    "Lisbon, Portugal",
-    "Copenhagen, Denmark",
-    "Berlin, Germany",
-    
-    // Asia
-    "Tokyo, Japan",
-    "Bangkok, Thailand",
-    "Singapore, Singapore",
-    "Dubai, UAE",
-    "Hong Kong, China",
-    "Seoul, South Korea",
-    "Bali, Indonesia",
-    "Shanghai, China",
-    "Kuala Lumpur, Malaysia",
-    "Osaka, Japan",
-    
-    // Americas
-    "New York, USA",
-    "Los Angeles, USA",
-    "Miami, USA",
-    "Las Vegas, USA",
-    "San Francisco, USA",
-    "Chicago, USA",
-    "Cancun, Mexico",
-    "Mexico City, Mexico",
-    "Rio de Janeiro, Brazil",
-    "Buenos Aires, Argentina",
-    "Vancouver, Canada",
-    "Toronto, Canada",
-    
-    // Africa & Middle East
-    "Cape Town, South Africa",
-    "Marrakech, Morocco",
-    "Cairo, Egypt",
-    "Nairobi, Kenya",
-    "Johannesburg, South Africa",
-    "Tel Aviv, Israel",
-    
-    // Oceania
-    "Sydney, Australia",
-    "Melbourne, Australia",
-    "Auckland, New Zealand",
-    "Queenstown, New Zealand",
-    "Bora Bora, French Polynesia",
-    "Fiji Islands, Fiji"
-  ];
 
-  // Randomly select 8 destinations
-  const randomDestinations = topWorldDestinations
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 8)
-    .map((destination) => {
-      const [city, country] = destination.split(", ");
-      return { city, country, image: "" };
-    });
-  
-  setSuggestedDestinations(randomDestinations);
-
-  // Load images for each destination
-  randomDestinations.forEach(async (dest, index) => {
-    try {
-      const res = await fetch("/api/images", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ destination: `${dest.city} ${dest.country}` }) 
-      });
-      const data = await res.json();
+  useEffect(() => {
+    // Top 50 world destinations - randomly selected each time
+    const topWorldDestinations = [
+      // Europe
+      "Paris, France",
+      "London, United Kingdom",
+      "Rome, Italy",
+      "Barcelona, Spain",
+      "Amsterdam, Netherlands",
+      "Prague, Czech Republic",
+      "Vienna, Austria",
+      "Istanbul, Turkey",
+      "Athens, Greece",
+      "Budapest, Hungary",
+      "Dublin, Ireland",
+      "Edinburgh, Scotland",
+      "Lisbon, Portugal",
+      "Copenhagen, Denmark",
+      "Berlin, Germany",
       
-      if (res.ok && data.images?.[0]) {
-        setSuggestedDestinations((prev) => {
-          const newArray = [...prev];
-          newArray[index] = { ...newArray[index], image: data.images[0] };
-          return newArray;
+      // Asia
+      "Tokyo, Japan",
+      "Bangkok, Thailand",
+      "Singapore, Singapore",
+      "Dubai, UAE",
+      "Hong Kong, China",
+      "Seoul, South Korea",
+      "Bali, Indonesia",
+      "Shanghai, China",
+      "Kuala Lumpur, Malaysia",
+      "Osaka, Japan",
+      
+      // Americas
+      "New York, USA",
+      "Los Angeles, USA",
+      "Miami, USA",
+      "Las Vegas, USA",
+      "San Francisco, USA",
+      "Chicago, USA",
+      "Cancun, Mexico",
+      "Mexico City, Mexico",
+      "Rio de Janeiro, Brazil",
+      "Buenos Aires, Argentina",
+      "Vancouver, Canada",
+      "Toronto, Canada",
+      
+      // Africa & Middle East
+      "Cape Town, South Africa",
+      "Marrakech, Morocco",
+      "Cairo, Egypt",
+      "Nairobi, Kenya",
+      "Johannesburg, South Africa",
+      "Tel Aviv, Israel",
+      
+      // Oceania
+      "Sydney, Australia",
+      "Melbourne, Australia",
+      "Auckland, New Zealand",
+      "Queenstown, New Zealand",
+      "Bora Bora, French Polynesia",
+      "Fiji Islands, Fiji"
+    ];
+
+    // Randomly select 8 destinations
+    const randomDestinations = topWorldDestinations
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 8)
+      .map((destination) => {
+        const [city, country] = destination.split(", ");
+        return { city, country, image: "" };
+      });
+    
+    setSuggestedDestinations(randomDestinations);
+
+    // Load images for each destination
+    randomDestinations.forEach(async (dest, index) => {
+      try {
+        const res = await fetch("/api/images", { 
+          method: "POST", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify({ destination: `${dest.city} ${dest.country}` }) 
         });
+        const data = await res.json();
+        
+        if (res.ok && data.images?.[0]) {
+          setSuggestedDestinations((prev) => {
+            const newArray = [...prev];
+            newArray[index] = { ...newArray[index], image: data.images[0] };
+            return newArray;
+          });
+        }
+      } catch (error) {
+        console.error(`Failed to load image for ${dest.city}`);
       }
+    });
+
+    // ✅ NEW: Load user profile on mount
+    const loadUserProfile = async () => {
+      const profile = await profileManager.loadProfile('current_user');
+      if (profile) {
+        console.log('✅ User profile loaded:', profile);
+        
+        // Pre-fill preferences
+        if (profile.budgetRange) {
+          setSelectedBudget(profile.budgetRange);
+        }
+        
+        // Add wishlist to suggestions
+        if (profile.wishlist.length > 0) {
+          console.log('📍 User wishlist:', profile.wishlist);
+        }
+      }
+    };
+    
+    loadUserProfile();
+  }, []);
+
+  // ✅ NEW: Handle feedback submission
+  const handleFeedbackSubmit = async (feedback: any) => {
+    try {
+      // Save to backend (you can create this endpoint)
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(feedback)
+      });
+      
+      // Save to user profile
+      await profileManager.saveFeedback('current_user', feedback);
+      
+      console.log('✅ Feedback saved:', feedback);
     } catch (error) {
-      console.error(`Failed to load image for ${dest.city}`);
+      console.error('❌ Failed to save feedback:', error);
     }
-  });
-}, []);
+  };
 
   return (
     <main className="min-h-screen bg-white">
@@ -619,6 +717,12 @@ useEffect(() => {
                   <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
                     Itinerary
                   </TabsTrigger>
+                  <TabsTrigger value="weather" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
+                    🌤️ Weather
+                  </TabsTrigger>
+                  <TabsTrigger value="events" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
+                    🏆 Events
+                  </TabsTrigger>
                   <TabsTrigger value="flights" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
                     Flights
                   </TabsTrigger>
@@ -648,6 +752,8 @@ useEffect(() => {
 
               {/* Tab Content */}
               <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 min-h-[400px]">
+                
+                {/* Itinerary Tab */}
                 <TabsContent value="itinerary" className="mt-0">
                   {loading && (
                     <div className="space-y-3">
@@ -676,6 +782,131 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* ✅ NEW: Weather Tab */}
+                <TabsContent value="weather" className="mt-0">
+                  {currentWeather ? (
+                    <WeatherWidget 
+                      destination={firstDestination}
+                      showRecommendations={true}
+                    />
+                  ) : (
+                    <div className="text-center py-16 text-gray-500">
+                      <Cloud className="mx-auto mb-4 text-gray-300" size={48} />
+                      <p className="font-semibold text-lg text-gray-900 mb-2">Weather Forecast</p>
+                      <p className="text-sm">Search a destination to see weather conditions</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ✅ NEW: Events Tab */}
+                <TabsContent value="events" className="mt-0">
+                  {sportsEvents.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                          <Trophy className="text-amber-500" size={28} />
+                          Upcoming Events in {firstDestination}
+                        </h3>
+                      </div>
+                      
+                      {sportsEvents.map((event, i) => (
+                        <div key={i} className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 hover:border-blue-300 hover:shadow-lg transition-all">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h4 className="text-xl font-bold text-gray-900 mb-2">
+                                {event.name}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <Calendar size={16} />
+                                  {event.date}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MapPin size={16} />
+                                  {event.location.venue}, {event.location.city}
+                                </div>
+                              </div>
+                            </div>
+                            {event.ticketInfo && (
+                              <div className="text-right">
+                                <p className="text-sm text-gray-500">Est. Price</p>
+                                <p className="text-lg font-bold text-green-600">
+                                  {event.ticketInfo.estimatedPrice}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {event.travelPackage && (
+                            <div className="bg-white rounded-xl p-4 mb-4 border border-blue-200">
+                              <p className="text-sm font-semibold text-blue-900 mb-2">
+                                🎫 Travel Package Available
+                              </p>
+                              <div className="flex gap-4 text-xs text-blue-700">
+                                {event.travelPackage.flights && <span>✈️ Flights</span>}
+                                {event.travelPackage.hotels && <span>🏨 Hotels</span>}
+                                {event.travelPackage.tickets && <span>🎟️ Tickets</span>}
+                                <span className="font-bold ml-auto text-base text-green-600">
+                                  {event.travelPackage.estimatedCost}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          <button 
+                            onClick={() => {
+                              // Plan trip around this event
+                              const eventDate = new Date(event.date);
+                              const start = new Date(eventDate);
+                              start.setDate(start.getDate() - 2);
+                              const end = new Date(eventDate);
+                              end.setDate(end.getDate() + 2);
+                              
+                              setStartDate(start);
+                              setEndDate(end);
+                              setDays(5);
+                              setSearchQuery(event.location.city);
+                              setShowRefinement(true);
+                            }}
+                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+                          >
+                            <Calendar size={18} />
+                            Plan Trip Around This Event
+                          </button>
+                        </div>
+                      ))}
+
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+                        <p className="text-amber-800">
+                          <strong>Note:</strong> Event names are generic to avoid trademark issues. 
+                          Visit official organizing body websites for trademarked names and official ticket sales.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-16 text-gray-500">
+                      <Trophy className="mx-auto mb-4 text-gray-300" size={48} />
+                      <p className="font-semibold text-lg text-gray-900 mb-2">No Major Events Found</p>
+                      <p className="text-sm">Try searching cities in USA, Canada, or Mexico for 2026 football tournament matches</p>
+                      <div className="mt-6 flex flex-wrap justify-center gap-2">
+                        {['Los Angeles', 'Miami', 'New York', 'Dallas', 'Toronto', 'Vancouver'].map(city => (
+                          <button
+                            key={city}
+                            onClick={() => {
+                              setSearchQuery(city);
+                              setShowRefinement(true);
+                            }}
+                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                          >
+                            {city}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Flights Tab */}
                 <TabsContent value="flights" className="mt-0">
                   {flights?.length > 0 ? (
                     <FlightResults 
@@ -690,6 +921,7 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* Hotels Tab */}
                 <TabsContent value="hotels" className="mt-0">
                   {hotels?.length > 0 ? (
                     <HotelResults hotels={hotels} onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')} />
@@ -698,6 +930,7 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* Restaurants Tab */}
                 <TabsContent value="restaurants" className="mt-0">
                   {restaurants?.length > 0 ? (
                     <RestaurantResults restaurants={restaurants} onSaveItem={(restaurant) => handleSaveItem(restaurant, 'restaurant')} />
@@ -709,6 +942,7 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* Activities Tab */}
                 <TabsContent value="activities" className="mt-0">
                   {activities?.length > 0 ? (
                     <ActivityResults activities={activities} onSaveItem={(activity) => handleSaveItem(activity, 'activity')} />
@@ -717,6 +951,7 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* Insurance Tab */}
                 <TabsContent value="insurance" className="mt-0">
                   <InsuranceView
                     destination={firstDestination}
@@ -727,6 +962,7 @@ useEffect(() => {
                   />
                 </TabsContent>
 
+                {/* Transport Tab */}
                 <TabsContent value="transport" className="mt-0">
                   {transport ? (
                     <TransportResults transport={transport} />
@@ -738,8 +974,8 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
-                
-                    <TabsContent value="maps" className="mt-0">
+                {/* Maps Tab */}
+                <TabsContent value="maps" className="mt-0">
                   {firstDestination ? (
                     <MapsDirections destination={firstDestination} />
                   ) : (
@@ -750,6 +986,7 @@ useEffect(() => {
                   )}
                 </TabsContent>
 
+                {/* Photos Tab */}
                 <TabsContent value="photos" className="mt-0">
                   {images?.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3">
@@ -787,6 +1024,18 @@ useEffect(() => {
         </button>
       )}
 
+      {/* ✅ NEW: Floating Feedback Button */}
+      {itineraryData && (
+        <button
+          onClick={() => setShowFeedback(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-green-600 rounded-full shadow-2xl flex items-center justify-center z-40 hover:scale-110 transition-transform"
+          title="Rate your trip"
+        >
+          <Star className="text-white" size={22} />
+        </button>
+      )}
+
+      {/* Trip Summary Modal */}
       <TripSummary
         isOpen={showTripSummary}
         onClose={() => setShowTripSummary(false)}
@@ -795,6 +1044,20 @@ useEffect(() => {
         destination={firstDestination}
       />
 
+      {/* ✅ NEW: Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        tripData={completedTrip || {
+          destination: firstDestination,
+          startDate: startDate?.toISOString() || new Date().toISOString(),
+          endDate: endDate?.toISOString() || new Date().toISOString(),
+          tripId: 'trip_' + Date.now()
+        }}
+        onSubmit={handleFeedbackSubmit}
+      />
+
+      {/* Gladys AI Companion */}
       <GladysAICompanion currentDestination={firstDestination || "Paris"} />
     </main>
   );
