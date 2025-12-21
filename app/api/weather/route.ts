@@ -264,7 +264,7 @@ export async function GET() {
     service: "Weather API with AI Recommendations",
     features: {
       current_weather: true,
-      7_day_forecast: true,
+      day_forecast: true,
       ai_recommendations: hasOpenAI,
       real_time_data: hasOpenWeather
     },

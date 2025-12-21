@@ -27,7 +27,6 @@ async function generateItineraryWithRetry(prompt: string, maxRetries = 3): Promi
         response_format: { type: "json_object" },
         temperature: 0.8,
         max_tokens: 6000, // ✅ INCREASED from 4000
-        timeout: 30000, // ✅ ADD 30 second timeout
       });
 
       const raw = response.choices[0].message?.content || "{}";
