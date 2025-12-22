@@ -1,383 +1,326 @@
-"use client";
-
 import { useState } from "react";
-import {
-  Download, Share2, MapPin, CalendarDays, Users, Flag, Building, Plane,
-  BadgeDollarSign, ShieldCheck, Clock, Utensils, Ticket, Coffee, Sun, Moon,
-  ChevronDown, ChevronUp, Star, TrendingUp, Camera, Map
-} from "lucide-react";
-
-interface ActivityBlock {
-  time: string;
-  activities: string;
-  location: string;
-  transportTime: string;
-  cost: string;
-}
-
-interface Meal {
-  meal: string;
-  recommendation: string;
-  cuisine: string;
-  location: string;
-  priceRange: string;
-}
-
-interface DayPlan {
-  day: number;
-  date: string;
-  city: string;
-  theme: string;
-  morning: ActivityBlock;
-  afternoon: ActivityBlock;
-  evening: ActivityBlock;
-  mealsAndDining?: Meal[];
-  transportation?: {
-    method: string;
-    totalTime: string;
-    totalCost: string;
-  };
-  tips?: string[];
-}
+import { Download, Share2, MapPin, Calendar, Users, DollarSign, Star, Coffee, Sun, Moon, Utensils, Camera, Play, Heart, Bookmark } from "lucide-react";
 
 interface ItineraryData {
   overview: string;
-  tripSummary: {
-    totalDays: number;
-    cities: string[];
-    highlights?: string[];
-  };
-  budget: {
-    totalBudget: string;
-    dailyAverage: string;
-  };
-  days: DayPlan[];
+  tripSummary: { totalDays: number; cities: string[]; highlights?: string[]; };
+  budget: { totalBudget: string; dailyAverage: string; };
+  days: Array<{
+    day: number;
+    date: string;
+    city: string;
+    theme: string;
+    morning: { time: string; activities: string; location: string; cost: string; };
+    afternoon: { time: string; activities: string; location: string; cost: string; };
+    evening: { time: string; activities: string; location: string; cost: string; };
+    mealsAndDining?: Array<{ meal: string; recommendation: string; priceRange: string; location: string; }>;
+    tips?: string[];
+  }>;
   accommodations?: any[];
   metadata?: any;
 }
 
-export default function ItineraryView({ data }: { data?: ItineraryData }) {
-  const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]));
+export default function StunningItineraryView({ data }: { data?: ItineraryData }) {
+  const [selectedDay, setSelectedDay] = useState(1);
+  const [savedDays, setSavedDays] = useState<Set<number>>(new Set());
 
   if (!data || !data.days || data.days.length === 0) {
     return (
-      <div className="min-h-[500px] flex items-center justify-center p-8">
+      <div className="min-h-[500px] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-            <MapPin className="text-gray-400" size={40} />
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+            <MapPin className="text-purple-600" size={48} />
           </div>
-          <h3 className="text-2xl font-semibold text-gray-900 mb-2">No Itinerary Yet</h3>
-          <p className="text-gray-600">Generate your trip to see your personalized itinerary</p>
+          <h3 className="text-3xl font-bold text-gray-900 mb-2">Your Adventure Awaits</h3>
+          <p className="text-gray-600 text-lg">Generate your trip to see your personalized itinerary</p>
         </div>
       </div>
     );
   }
 
-  const totalDays = data.days.length;
+  const currentDay = data.days[selectedDay - 1];
   const firstCity = data.tripSummary?.cities?.[0] || 'Your Destination';
 
-  const toggleDay = (dayNumber: number) => {
-    const newExpanded = new Set(expandedDays);
-    if (newExpanded.has(dayNumber)) {
-      newExpanded.delete(dayNumber);
-    } else {
-      newExpanded.add(dayNumber);
-    }
-    setExpandedDays(newExpanded);
+  const toggleSaveDay = (day: number) => {
+    const newSaved = new Set(savedDays);
+    if (newSaved.has(day)) newSaved.delete(day);
+    else newSaved.add(day);
+    setSavedDays(newSaved);
   };
 
   return (
     <div className="space-y-6">
-      {/* Luxurious Hero Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 md:p-12">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <MapPin className="text-white" size={28} />
+      
+      {/* Epic Hero Section */}
+      <div className="relative overflow-hidden rounded-3xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yIDItNCAyLTRzMiAyIDIgNHYyYzAgMi0yIDQtMiA0cy0yLTItMi00di0yem0wLTMwYzAtMiAyLTQgMi00czIgMiAyIDR2MmMwIDItMiA0LTIgNHMtMi0yLTItNFY0eiIvPjwvZz48L2c+PC9zdmc+')] opacity-20"></div>
+        
+        <div className="relative p-8 md:p-12">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                <MapPin className="text-white" size={32} />
+              </div>
+              <div>
+                <p className="text-white/90 text-sm font-medium uppercase tracking-wide">Your Journey To</p>
+                <h1 className="text-5xl font-bold text-white">{firstCity}</h1>
+              </div>
             </div>
-            <div>
-              <p className="text-white/80 text-sm font-medium">Your Journey To</p>
-              <h1 className="text-4xl md:text-5xl font-bold text-white">
-                {firstCity}
-              </h1>
+            
+            <div className="flex gap-3">
+              <button className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-white/30 transition-all">
+                <Download className="text-white" size={20} />
+              </button>
+              <button className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-white/30 transition-all">
+                <Share2 className="text-white" size={20} />
+              </button>
             </div>
           </div>
-          
-          <p className="text-white/90 text-lg mb-6 max-w-2xl leading-relaxed">
+
+          <p className="text-white/95 text-lg mb-8 max-w-3xl leading-relaxed">
             {data.overview}
           </p>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatCard icon={CalendarDays} label="Duration" value={`${totalDays} Days`} />
-            <StatCard icon={Users} label="Travelers" value={data.metadata?.groupSize || "1"} />
-            <StatCard icon={BadgeDollarSign} label="Budget" value={data.budget?.totalBudget || "N/A"} />
-            <StatCard icon={Star} label="Highlights" value={data.tripSummary?.highlights?.length || "5+"} />
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-3">
-            <button className="px-6 py-3 bg-white text-purple-600 rounded-2xl font-semibold hover:bg-white/90 transition-all shadow-lg flex items-center gap-2">
-              <Download size={20} />
-              Export PDF
-            </button>
-            <button className="px-6 py-3 bg-white/20 backdrop-blur-sm text-white rounded-2xl font-semibold hover:bg-white/30 transition-all flex items-center gap-2">
-              <Share2 size={20} />
-              Share Trip
-            </button>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <QuickStat icon={Calendar} label="Days" value={data.tripSummary.totalDays.toString()} />
+            <QuickStat icon={Users} label="Travelers" value={data.metadata?.groupSize || "1"} />
+            <QuickStat icon={DollarSign} label="Budget" value={data.budget.totalBudget.replace('USD', '')} />
+            <QuickStat icon={Star} label="Highlights" value={data.tripSummary.highlights?.length.toString() || "5+"} />
           </div>
         </div>
       </div>
 
-      {/* Highlights Section */}
-      {data.tripSummary?.highlights && data.tripSummary.highlights.length > 0 && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl p-6 border border-amber-200">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <TrendingUp className="text-amber-600" size={28} />
-            Trip Highlights
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {data.tripSummary.highlights.map((highlight: string, idx: number) => (
-              <div key={idx} className="flex items-start gap-3 bg-white rounded-2xl p-4 border border-amber-100">
-                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Star className="text-amber-600" size={16} />
-                </div>
-                <p className="text-gray-700 font-medium">{highlight}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Day-by-Day Timeline */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <CalendarDays className="text-purple-600" size={28} />
-          Day-by-Day Itinerary
-        </h2>
-
-        {data.days.map((day) => {
-          const isExpanded = expandedDays.has(day.day);
-
-          return (
-            <div
+      {/* Day Navigator - Carousel Style */}
+      <div className="relative">
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+          {data.days.map((day) => (
+            <button
               key={day.day}
-              className="bg-white rounded-3xl border-2 border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => setSelectedDay(day.day)}
+              className={`flex-shrink-0 group ${
+                selectedDay === day.day ? 'w-64' : 'w-20'
+              } transition-all duration-300`}
             >
-              {/* Day Header - Always Visible */}
-              <button
-                onClick={() => toggleDay(day.day)}
-                className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 text-white flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl font-bold">{day.day}</span>
-                  </div>
-                  <div className="text-left">
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                      {day.theme}
-                    </h3>
-                    <p className="text-gray-500 text-sm">{day.date} • {day.city}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500 hidden md:inline">
-                    {isExpanded ? 'Hide Details' : 'View Details'}
-                  </span>
-                  {isExpanded ? (
-                    <ChevronUp className="text-gray-400" size={24} />
-                  ) : (
-                    <ChevronDown className="text-gray-400" size={24} />
-                  )}
-                </div>
-              </button>
-
-              {/* Day Content - Expandable */}
-              {isExpanded && (
-                <div className="px-6 pb-6 space-y-4 border-t border-gray-100">
-                  
-                  {/* Morning */}
-                  <TimeBlock
-                    icon={Coffee}
-                    title="Morning"
-                    time={day.morning.time}
-                    activities={day.morning.activities}
-                    location={day.morning.location}
-                    cost={day.morning.cost}
-                    color="from-yellow-400 to-orange-400"
-                    bgColor="bg-gradient-to-br from-yellow-50 to-orange-50"
-                    borderColor="border-yellow-200"
-                  />
-
-                  {/* Afternoon */}
-                  <TimeBlock
-                    icon={Sun}
-                    title="Afternoon"
-                    time={day.afternoon.time}
-                    activities={day.afternoon.activities}
-                    location={day.afternoon.location}
-                    cost={day.afternoon.cost}
-                    color="from-orange-400 to-red-400"
-                    bgColor="bg-gradient-to-br from-orange-50 to-red-50"
-                    borderColor="border-orange-200"
-                  />
-
-                  {/* Evening */}
-                  <TimeBlock
-                    icon={Moon}
-                    title="Evening"
-                    time={day.evening.time}
-                    activities={day.evening.activities}
-                    location={day.evening.location}
-                    cost={day.evening.cost}
-                    color="from-indigo-400 to-purple-400"
-                    bgColor="bg-gradient-to-br from-indigo-50 to-purple-50"
-                    borderColor="border-indigo-200"
-                  />
-
-                  {/* Dining */}
-                  {day.mealsAndDining && day.mealsAndDining.length > 0 && (
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-200">
-                      <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <Utensils className="text-green-600" size={20} />
-                        Where to Eat
-                      </h4>
-                      <div className="space-y-3">
-                        {day.mealsAndDining.map((meal, idx) => (
-                          <div key={idx} className="bg-white rounded-xl p-4 border border-green-100">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-bold text-gray-900">{meal.meal}</p>
-                                <p className="text-sm text-gray-600">{meal.cuisine}</p>
-                              </div>
-                              <span className="text-sm font-semibold text-green-600">{meal.priceRange}</span>
-                            </div>
-                            <p className="text-sm font-semibold text-gray-900 mb-1">{meal.recommendation}</p>
-                            <p className="text-xs text-gray-500 flex items-center gap-1">
-                              <MapPin size={12} />
-                              {meal.location}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+              <div className={`relative overflow-hidden rounded-2xl ${
+                selectedDay === day.day
+                  ? 'bg-gradient-to-br from-blue-600 to-purple-600 shadow-2xl'
+                  : 'bg-white border-2 border-gray-200 hover:border-blue-300'
+              } p-4 h-24 transition-all`}>
+                
+                {selectedDay === day.day ? (
+                  <div className="text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-3xl font-bold">Day {day.day}</span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); toggleSaveDay(day.day); }}
+                        className="ml-auto"
+                      >
+                        <Heart 
+                          size={20} 
+                          className={savedDays.has(day.day) ? 'fill-white' : ''} 
+                        />
+                      </button>
                     </div>
-                  )}
-
-                  {/* Tips */}
-                  {day.tips && day.tips.length > 0 && (
-                    <div className="bg-blue-50 rounded-2xl p-5 border border-blue-200">
-                      <h4 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-                        <Camera className="text-blue-600" size={20} />
-                        Insider Tips
-                      </h4>
-                      <ul className="space-y-2">
-                        {day.tips.map((tip, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
-                            <span className="text-blue-600 mt-0.5">•</span>
-                            <span>{tip}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Accommodations */}
-      {data.accommodations && data.accommodations.length > 0 && (
-        <div className="bg-white rounded-3xl p-6 border-2 border-gray-100 shadow-sm">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Building className="text-purple-600" size={28} />
-            Where to Stay
-          </h2>
-          <div className="space-y-3">
-            {data.accommodations.map((acc, idx) => (
-              <div key={idx} className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-5 border border-purple-200">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900">{acc.name}</h3>
-                    <p className="text-sm text-gray-600">{acc.location}</p>
+                    <p className="text-sm text-white/90 truncate">{day.theme}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-purple-600">{acc.priceRange?.total}</p>
-                    <p className="text-xs text-gray-500">{acc.nights} nights</p>
+                ) : (
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900 mb-1">{day.day}</div>
+                    <div className="text-xs text-gray-500">Day</div>
                   </div>
-                </div>
-                <p className="text-sm text-gray-700 mb-3">{acc.description}</p>
-                <a
-                  href={acc.bookingUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors"
-                >
-                  View & Book
-                  <Plane size={16} />
-                </a>
+                )}
               </div>
-            ))}
-          </div>
+            </button>
+          ))}
         </div>
-      )}
-    </div>
-  );
-}
-
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
-  return (
-    <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="text-white/80" size={18} />
-        <p className="text-white/80 text-xs font-medium">{label}</p>
       </div>
-      <p className="text-white text-xl font-bold">{value}</p>
+
+      {/* Current Day - Visual Story */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Timeline - Left Column */}
+        <div className="lg:col-span-2 space-y-4">
+          
+          {/* Day Header */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900 mb-1">{currentDay.theme}</h2>
+                <p className="text-gray-600">{currentDay.date} • {currentDay.city}</p>
+              </div>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2">
+                <Play size={16} />
+                Start Day
+              </button>
+            </div>
+          </div>
+
+          {/* Morning */}
+          <TimeBlock
+            icon={Coffee}
+            title="Morning"
+            emoji="☀️"
+            time={currentDay.morning.time}
+            activities={currentDay.morning.activities}
+            location={currentDay.morning.location}
+            cost={currentDay.morning.cost}
+            gradient="from-amber-400 to-orange-500"
+            bgColor="from-amber-50 to-orange-50"
+          />
+
+          {/* Afternoon */}
+          <TimeBlock
+            icon={Sun}
+            title="Afternoon"
+            emoji="🌤️"
+            time={currentDay.afternoon.time}
+            activities={currentDay.afternoon.activities}
+            location={currentDay.afternoon.location}
+            cost={currentDay.afternoon.cost}
+            gradient="from-orange-400 to-red-500"
+            bgColor="from-orange-50 to-red-50"
+          />
+
+          {/* Evening */}
+          <TimeBlock
+            icon={Moon}
+            title="Evening"
+            emoji="🌙"
+            time={currentDay.evening.time}
+            activities={currentDay.evening.activities}
+            location={currentDay.evening.location}
+            cost={currentDay.evening.cost}
+            gradient="from-indigo-500 to-purple-600"
+            bgColor="from-indigo-50 to-purple-50"
+          />
+        </div>
+
+        {/* Sidebar - Right Column */}
+        <div className="space-y-4">
+          
+          {/* Dining Recommendations */}
+          {currentDay.mealsAndDining && currentDay.mealsAndDining.length > 0 && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-200 shadow-sm">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Utensils className="text-green-600" size={20} />
+                Where to Eat
+              </h3>
+              <div className="space-y-3">
+                {currentDay.mealsAndDining.map((meal, i) => (
+                  <div key={i} className="bg-white rounded-xl p-4 border border-green-100">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-gray-900 text-sm">{meal.meal}</p>
+                        <p className="text-xs text-gray-600">{meal.recommendation}</p>
+                      </div>
+                      <span className="text-xs font-bold text-green-600">{meal.priceRange}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                      <MapPin size={10} />
+                      {meal.location}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pro Tips */}
+          {currentDay.tips && currentDay.tips.length > 0 && (
+            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-5 border border-blue-200 shadow-sm">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Camera className="text-blue-600" size={20} />
+                Pro Tips
+              </h3>
+              <div className="space-y-2">
+                {currentDay.tips.map((tip, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="text-blue-600 mt-0.5">💡</span>
+                    <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Daily Budget */}
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+            <h3 className="font-bold text-gray-900 mb-3">Today's Budget</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Morning</span>
+                <span className="font-semibold">{currentDay.morning.cost}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Afternoon</span>
+                <span className="font-semibold">{currentDay.afternoon.cost}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Evening</span>
+                <span className="font-semibold">{currentDay.evening.cost}</span>
+              </div>
+              <div className="pt-2 border-t flex justify-between">
+                <span className="font-bold">Total</span>
+                <span className="font-bold text-purple-600">{data.budget.dailyAverage}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
 
-function TimeBlock({
-  icon: Icon,
-  title,
-  time,
-  activities,
-  location,
-  cost,
-  color,
-  bgColor,
-  borderColor
-}: {
-  icon: any;
-  title: string;
-  time: string;
-  activities: string;
-  location: string;
-  cost: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-}) {
+function QuickStat({ icon: Icon, label, value }: any) {
   return (
-    <div className={`${bgColor} rounded-2xl p-5 border ${borderColor}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center`}>
-            <Icon className="text-white" size={20} />
+    <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/20">
+      <Icon className="text-white/90 mb-2" size={24} />
+      <p className="text-3xl font-bold text-white mb-1">{value}</p>
+      <p className="text-white/80 text-sm">{label}</p>
+    </div>
+  );
+}
+
+function TimeBlock({ icon: Icon, title, emoji, time, activities, location, cost, gradient, bgColor }: any) {
+  return (
+    <div className={`bg-gradient-to-br ${bgColor} rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg transition-all group`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
+            <span className="text-2xl">{emoji}</span>
           </div>
           <div>
-            <h4 className="text-lg font-bold text-gray-900">{title}</h4>
-            <p className="text-xs text-gray-600">{time}</p>
+            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-600">{time}</p>
           </div>
         </div>
-        <span className="text-lg font-bold text-gray-900">{cost}</span>
+        <span className="text-2xl font-bold text-gray-900">{cost}</span>
       </div>
-      <p className="text-gray-800 leading-relaxed mb-3">{activities}</p>
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <MapPin size={14} />
-        <span>{location}</span>
+      
+      <p className="text-gray-800 leading-relaxed mb-4">{activities}</p>
+      
+      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <MapPin size={16} />
+          <span>{location}</span>
+        </div>
+        <button className="px-4 py-2 bg-white rounded-xl font-semibold hover:shadow-md transition-all flex items-center gap-2 group-hover:scale-105">
+          <MapPin size={14} />
+          Navigate
+        </button>
       </div>
     </div>
   );
