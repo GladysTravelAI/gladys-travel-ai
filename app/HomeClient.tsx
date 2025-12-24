@@ -9,6 +9,8 @@ import { motion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GladysAICompanion from '@/components/GladysAICompanion';
+import EventsBanner from '@/components/EventsBanner';
+import EventNotificationToast from '@/components/EventNotificationToast';
 import HotelResults from "@/components/HotelResults";
 import ItineraryView from "@/components/ItineraryView";
 import RestaurantResults from "@/components/RestaurantResults";
@@ -26,6 +28,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import FeedbackModal from "@/components/FeedbackModal";
 import { ItineraryData } from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
+import { useAuth } from "@/lib/AuthContext";
 
 // shadcn/ui
 import { Button } from "@/components/ui/button";
@@ -54,6 +57,8 @@ interface SavedItem {
 
 export default function HomeClient() {
   const router = useRouter();
+  const { user, userProfile, updateUserProfile } = useAuth();
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [tripType, setTripType] = useState("");
   const [selectedBudget, setSelectedBudget] = useState("Mid-range");
@@ -80,7 +85,7 @@ export default function HomeClient() {
   const [tripPreferences, setTripPreferences] = useState<TripPreferences | null>(null);
   const [estimatedTripCost, setEstimatedTripCost] = useState(2000);
 
-  // NEW: Weather & Smart Features
+  // Weather & Smart Features
   const [currentWeather, setCurrentWeather] = useState<any>(null);
   const [sportsEvents, setSportsEvents] = useState<any[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -99,7 +104,8 @@ export default function HomeClient() {
   });
   const [showTripSummary, setShowTripSummary] = useState(false);
 
-  const handleSaveItem = (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
+  // ✅ Track saved items in user profile
+  const handleSaveItem = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
     const savedItem: SavedItem = {
       id: item.id?.toString() || Math.random().toString(),
       type: type,
@@ -124,6 +130,19 @@ export default function HomeClient() {
         return { ...prev, [typeKey]: [...currentItems, savedItem] };
       }
     });
+
+    // ✅ Track booking in user profile
+    if (user) {
+      await profileManager.trackBooking(user.uid, {
+        type: type,
+        name: savedItem.name,
+        price: parseFloat(savedItem.price.replace(/[^0-9.]/g, '')) || 0,
+        rating: item.rating || 0,
+        timestamp: new Date().toISOString(),
+        destination: firstDestination
+      });
+      console.log('✅ Booking tracked in profile');
+    }
   };
 
   const handleRemoveItem = (type: string, id: string) => {
@@ -170,8 +189,8 @@ export default function HomeClient() {
         imagesRes,
         flightsRes,
         transportRes,
-        weatherRes, // ✅ NEW: Weather
-        eventsRes    // ✅ NEW: Events
+        weatherRes,
+        eventsRes
       ] = await Promise.all([
         fetch("/api/itinerary", { 
           method: "POST", 
@@ -220,13 +239,11 @@ export default function HomeClient() {
             origin: prefs?.origin || origin
           }) 
         }),
-        // ✅ NEW: Fetch weather
         fetch("/api/weather", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ location })
         }).catch(() => null),
-        // ✅ NEW: Fetch sports events
         fetch("/api/sports-events", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -246,8 +263,8 @@ export default function HomeClient() {
         imagesData,
         flightsData,
         transportData,
-        weatherData,  // ✅ NEW
-        eventsData    // ✅ NEW
+        weatherData,
+        eventsData
       ] = await Promise.all([
         itineraryRes.json(), 
         restaurantsRes.json(), 
@@ -274,17 +291,14 @@ export default function HomeClient() {
       setFirstDestination(location);
       setDays(prefs?.days || days);
       
-      // ✅ NEW: Set weather data
       if (weatherData?.weather) {
         setCurrentWeather(weatherData.weather);
         
-        // ✅ Weather-based recommendations
         const isRainy = weatherData.weather.current.condition.toLowerCase().includes('rain');
         const isCold = weatherData.weather.current.temp < 15;
         
         if (isRainy) {
           console.log('☔ Rainy weather detected - prioritizing indoor activities');
-          // You can auto-switch to restaurants/museums tab here if you want
         } else if (isCold) {
           console.log('🧥 Cold weather - recommending warm activities');
         } else {
@@ -292,7 +306,6 @@ export default function HomeClient() {
         }
       }
 
-      // ✅ NEW: Set events data
       if (eventsData?.events) {
         setSportsEvents(eventsData.events.slice(0, 5));
         console.log(`🏆 Found ${eventsData.events.length} events in ${location}`);
@@ -302,8 +315,25 @@ export default function HomeClient() {
       const hotelCost = (hotelsData.hotels?.[0]?.price || 150) * (prefs?.days || days);
       setEstimatedTripCost(flightCost + hotelCost + 500);
       
-      // ✅ NEW: Track search in user profile
-      await profileManager.trackSearch('current_user', location);
+      // ✅ Track search in user profile
+      if (user) {
+        await profileManager.trackSearch(user.uid, location);
+        
+        // ✅ Track trip planning
+        await profileManager.trackTripPlanned(user.uid, location);
+        
+        // ✅ Update preferences based on search
+        if (prefs) {
+          await updateUserProfile({
+            preferredTripTypes: prefs.tripType ? [prefs.tripType] : userProfile?.preferredTripTypes || [],
+            budgetRange: prefs.budget as any,
+            typicalGroupSize: prefs.groupSize || 1,
+            typicalGroupType: prefs.groupType as any
+          });
+        }
+        
+        console.log('✅ Search and trip planning tracked');
+      }
       
       if (flightsData.flights?.length > 0 && hotelsData.hotels?.length > 0) {
         setShowPreview(true);
@@ -377,67 +407,21 @@ export default function HomeClient() {
   useEffect(() => {
     // Top 50 world destinations - randomly selected each time
     const topWorldDestinations = [
-      // Europe
-      "Paris, France",
-      "London, United Kingdom",
-      "Rome, Italy",
-      "Barcelona, Spain",
-      "Amsterdam, Netherlands",
-      "Prague, Czech Republic",
-      "Vienna, Austria",
-      "Istanbul, Turkey",
-      "Athens, Greece",
-      "Budapest, Hungary",
-      "Dublin, Ireland",
-      "Edinburgh, Scotland",
-      "Lisbon, Portugal",
-      "Copenhagen, Denmark",
-      "Berlin, Germany",
-      
-      // Asia
-      "Tokyo, Japan",
-      "Bangkok, Thailand",
-      "Singapore, Singapore",
-      "Dubai, UAE",
-      "Hong Kong, China",
-      "Seoul, South Korea",
-      "Bali, Indonesia",
-      "Shanghai, China",
-      "Kuala Lumpur, Malaysia",
-      "Osaka, Japan",
-      
-      // Americas
-      "New York, USA",
-      "Los Angeles, USA",
-      "Miami, USA",
-      "Las Vegas, USA",
-      "San Francisco, USA",
-      "Chicago, USA",
-      "Cancun, Mexico",
-      "Mexico City, Mexico",
-      "Rio de Janeiro, Brazil",
-      "Buenos Aires, Argentina",
-      "Vancouver, Canada",
-      "Toronto, Canada",
-      
-      // Africa & Middle East
-      "Cape Town, South Africa",
-      "Marrakech, Morocco",
-      "Cairo, Egypt",
-      "Nairobi, Kenya",
-      "Johannesburg, South Africa",
-      "Tel Aviv, Israel",
-      
-      // Oceania
-      "Sydney, Australia",
-      "Melbourne, Australia",
-      "Auckland, New Zealand",
-      "Queenstown, New Zealand",
-      "Bora Bora, French Polynesia",
-      "Fiji Islands, Fiji"
+      "Paris, France", "London, United Kingdom", "Rome, Italy", "Barcelona, Spain",
+      "Amsterdam, Netherlands", "Prague, Czech Republic", "Vienna, Austria", "Istanbul, Turkey",
+      "Athens, Greece", "Budapest, Hungary", "Dublin, Ireland", "Edinburgh, Scotland",
+      "Lisbon, Portugal", "Copenhagen, Denmark", "Berlin, Germany", "Tokyo, Japan",
+      "Bangkok, Thailand", "Singapore, Singapore", "Dubai, UAE", "Hong Kong, China",
+      "Seoul, South Korea", "Bali, Indonesia", "Shanghai, China", "Kuala Lumpur, Malaysia",
+      "Osaka, Japan", "New York, USA", "Los Angeles, USA", "Miami, USA",
+      "Las Vegas, USA", "San Francisco, USA", "Chicago, USA", "Cancun, Mexico",
+      "Mexico City, Mexico", "Rio de Janeiro, Brazil", "Buenos Aires, Argentina",
+      "Vancouver, Canada", "Toronto, Canada", "Cape Town, South Africa", "Marrakech, Morocco",
+      "Cairo, Egypt", "Nairobi, Kenya", "Johannesburg, South Africa", "Tel Aviv, Israel",
+      "Sydney, Australia", "Melbourne, Australia", "Auckland, New Zealand",
+      "Queenstown, New Zealand", "Bora Bora, French Polynesia", "Fiji Islands, Fiji"
     ];
 
-    // Randomly select 8 destinations
     const randomDestinations = topWorldDestinations
       .sort(() => 0.5 - Math.random())
       .slice(0, 8)
@@ -448,7 +432,6 @@ export default function HomeClient() {
     
     setSuggestedDestinations(randomDestinations);
 
-    // Load images for each destination
     randomDestinations.forEach(async (dest, index) => {
       try {
         const res = await fetch("/api/images", { 
@@ -470,41 +453,44 @@ export default function HomeClient() {
       }
     });
 
-    // ✅ NEW: Load user profile on mount
-    const loadUserProfile = async () => {
-      const profile = await profileManager.loadProfile('current_user');
-      if (profile) {
-        console.log('✅ User profile loaded:', profile);
-        
-        // Pre-fill preferences
-        if (profile.budgetRange) {
-          setSelectedBudget(profile.budgetRange);
-        }
-        
-        // Add wishlist to suggestions
-        if (profile.wishlist.length > 0) {
-          console.log('📍 User wishlist:', profile.wishlist);
-        }
+    // ✅ Load user profile preferences on mount
+    if (userProfile) {
+      console.log('✅ User profile loaded:', userProfile);
+      
+      // Pre-fill preferences from profile
+      if (userProfile.budgetRange) {
+        setSelectedBudget(userProfile.budgetRange);
       }
-    };
-    
-    loadUserProfile();
-  }, []);
+      
+      // Show wishlist destinations
+      if (userProfile.wishlist.length > 0) {
+        console.log('📍 User wishlist:', userProfile.wishlist);
+      }
+      
+      // Set origin from profile location
+      if (userProfile.location) {
+        setOrigin(userProfile.location);
+      }
+    }
+  }, [userProfile]);
 
-  // ✅ NEW: Handle feedback submission
+  // ✅ Handle feedback submission
   const handleFeedbackSubmit = async (feedback: any) => {
     try {
-      // Save to backend (you can create this endpoint)
+      // Save to backend
       await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(feedback)
       });
       
-      // Save to user profile
-      await profileManager.saveFeedback('current_user', feedback);
+      // ✅ Save to user profile
+      if (user) {
+        await profileManager.saveFeedback(user.uid, feedback);
+        console.log('✅ Feedback saved to profile');
+      }
       
-      console.log('✅ Feedback saved:', feedback);
+      console.log('✅ Feedback submitted:', feedback);
     } catch (error) {
       console.error('❌ Failed to save feedback:', error);
     }
@@ -514,7 +500,10 @@ export default function HomeClient() {
     <main className="min-h-screen bg-white">
       <Navbar />
       
-      {/* Hero Section - MOBILE OPTIMIZED */}
+      {/* Featured Events Banner - New! */}
+      <EventsBanner />
+      
+      {/* Hero Section */}
       <section className="relative pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div 
@@ -522,18 +511,19 @@ export default function HomeClient() {
             animate={{ opacity: 1, y: 0 }} 
             transition={{ duration: 0.6 }}
           >
+            {/* ✅ Personalized greeting */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-gray-900 mb-4 leading-tight">
-              Your journey begins
+              {userProfile?.name ? `Welcome back, ${userProfile.name.split(' ')[0]}!` : 'Your journey begins'}
               <br />
-              with Gladys.
+              {userProfile?.name ? 'Where to next?' : 'with Gladys.'}
             </h1>
             
             <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-              AI‑powered travel planning for the modern explorer.
+              {userProfile ? `${userProfile.status} • ${userProfile.totalTripsPlanned} trips planned` : 'AI‑powered travel planning for the modern explorer.'}
             </p>
           </motion.div>
 
-          {/* Search Card - MOBILE OPTIMIZED */}
+          {/* Search Card */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }} 
             animate={{ opacity: 1, y: 0 }} 
@@ -610,19 +600,18 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* Trending Destinations - MOBILE HORIZONTAL SCROLL */}
+      {/* Trending Destinations */}
       <section className="relative py-12 px-0">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8 px-4">
             <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-gray-900 mb-2">
-              Trending destinations.
+              {userProfile?.wishlist.length ? 'Your wishlist & trending destinations' : 'Trending destinations.'}
             </h2>
             <p className="text-lg text-gray-600">
               Explore popular and sacred places.
             </p>
           </div>
 
-          {/* Horizontal Scroll Container */}
           <div className="overflow-x-auto pb-6 scrollbar-hide">
             <div className="flex gap-4 px-4" style={{ width: 'max-content' }}>
               {suggestedDestinations.map((destination, idx) => (
@@ -706,12 +695,11 @@ export default function HomeClient() {
         </section>
       )}
 
-      {/* Results Section - MOBILE OPTIMIZED TABS */}
+      {/* Results Section */}
       {(itineraryData || hotels?.length > 0 || loading) && !showPreview && (
         <section id="results-section" className="px-4 py-12 bg-gray-50">
           <div className="max-w-7xl mx-auto">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              {/* Mobile-friendly Tab Navigation */}
               <div className="overflow-x-auto scrollbar-hide">
                 <TabsList className="inline-flex bg-white border border-gray-200 p-1 rounded-xl shadow-sm min-w-max">
                   <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
@@ -750,10 +738,8 @@ export default function HomeClient() {
                 </TabsList>
               </div>
 
-              {/* Tab Content */}
               <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 min-h-[400px]">
                 
-                {/* Itinerary Tab */}
                 <TabsContent value="itinerary" className="mt-0">
                   {loading && (
                     <div className="space-y-3">
@@ -782,7 +768,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* ✅ NEW: Weather Tab */}
                 <TabsContent value="weather" className="mt-0">
                   {currentWeather ? (
                     <WeatherWidget 
@@ -798,7 +783,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* ✅ NEW: Events Tab */}
                 <TabsContent value="events" className="mt-0">
                   {sportsEvents.length > 0 ? (
                     <div className="space-y-4">
@@ -855,7 +839,6 @@ export default function HomeClient() {
 
                           <button 
                             onClick={() => {
-                              // Plan trip around this event
                               const eventDate = new Date(event.date);
                               const start = new Date(eventDate);
                               start.setDate(start.getDate() - 2);
@@ -875,38 +858,16 @@ export default function HomeClient() {
                           </button>
                         </div>
                       ))}
-
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
-                        <p className="text-amber-800">
-                          <strong>Note:</strong> Event names are generic to avoid trademark issues. 
-                          Visit official organizing body websites for trademarked names and official ticket sales.
-                        </p>
-                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-16 text-gray-500">
                       <Trophy className="mx-auto mb-4 text-gray-300" size={48} />
                       <p className="font-semibold text-lg text-gray-900 mb-2">No Major Events Found</p>
-                      <p className="text-sm">Try searching cities in USA, Canada, or Mexico for 2026 football tournament matches</p>
-                      <div className="mt-6 flex flex-wrap justify-center gap-2">
-                        {['Los Angeles', 'Miami', 'New York', 'Dallas', 'Toronto', 'Vancouver'].map(city => (
-                          <button
-                            key={city}
-                            onClick={() => {
-                              setSearchQuery(city);
-                              setShowRefinement(true);
-                            }}
-                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                          >
-                            {city}
-                          </button>
-                        ))}
-                      </div>
+                      <p className="text-sm">Try searching cities for major sporting events</p>
                     </div>
                   )}
                 </TabsContent>
 
-                {/* Flights Tab */}
                 <TabsContent value="flights" className="mt-0">
                   {flights?.length > 0 ? (
                     <FlightResults 
@@ -921,7 +882,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Hotels Tab */}
                 <TabsContent value="hotels" className="mt-0">
                   {hotels?.length > 0 ? (
                     <HotelResults hotels={hotels} onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')} />
@@ -930,7 +890,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Restaurants Tab */}
                 <TabsContent value="restaurants" className="mt-0">
                   {restaurants?.length > 0 ? (
                     <RestaurantResults restaurants={restaurants} onSaveItem={(restaurant) => handleSaveItem(restaurant, 'restaurant')} />
@@ -942,7 +901,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Activities Tab */}
                 <TabsContent value="activities" className="mt-0">
                   {activities?.length > 0 ? (
                     <ActivityResults activities={activities} onSaveItem={(activity) => handleSaveItem(activity, 'activity')} />
@@ -951,7 +909,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Insurance Tab */}
                 <TabsContent value="insurance" className="mt-0">
                   <InsuranceView
                     destination={firstDestination}
@@ -962,7 +919,6 @@ export default function HomeClient() {
                   />
                 </TabsContent>
 
-                {/* Transport Tab */}
                 <TabsContent value="transport" className="mt-0">
                   {transport ? (
                     <TransportResults transport={transport} />
@@ -974,7 +930,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Maps Tab */}
                 <TabsContent value="maps" className="mt-0">
                   {firstDestination ? (
                     <MapsDirections destination={firstDestination} />
@@ -986,7 +941,6 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
-                {/* Photos Tab */}
                 <TabsContent value="photos" className="mt-0">
                   {images?.length > 0 ? (
                     <div className="grid grid-cols-2 gap-3">
@@ -1024,7 +978,7 @@ export default function HomeClient() {
         </button>
       )}
 
-      {/* ✅ NEW: Floating Feedback Button */}
+      {/* Floating Feedback Button */}
       {itineraryData && (
         <button
           onClick={() => setShowFeedback(true)}
@@ -1044,7 +998,7 @@ export default function HomeClient() {
         destination={firstDestination}
       />
 
-      {/* ✅ NEW: Feedback Modal */}
+      {/* Feedback Modal */}
       <FeedbackModal
         isOpen={showFeedback}
         onClose={() => setShowFeedback(false)}
@@ -1059,6 +1013,9 @@ export default function HomeClient() {
 
       {/* Gladys AI Companion */}
       <GladysAICompanion currentDestination={firstDestination || "Paris"} />
+
+      {/* Event Notification Toast */}
+      <EventNotificationToast userLocation={origin} />
     </main>
   );
 }

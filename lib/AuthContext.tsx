@@ -15,14 +15,19 @@ import {
   browserLocalPersistence,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { UserPreferences, profileManager, createDefaultProfile } from '@/lib/userProfile';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  userProfile: UserPreferences | null;
+  profileLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  updateUserProfile: (updates: Partial<UserPreferences>) => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +35,54 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserPreferences | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // Load user profile when user changes
+  const loadUserProfile = async (firebaseUser: User | null) => {
+    setProfileLoading(true);
+    
+    if (!firebaseUser) {
+      setUserProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    try {
+      // Try to load existing profile
+      let profile = await profileManager.loadProfile(firebaseUser.uid);
+      
+      // If no profile exists, create a default one
+      if (!profile) {
+        profile = createDefaultProfile(
+          firebaseUser.uid,
+          firebaseUser.email || undefined,
+          firebaseUser.displayName || undefined
+        );
+        
+        // Save the new profile
+        await profileManager.saveProfile(profile);
+      } else {
+        // Update last login time
+        profile.lastLogin = new Date().toISOString();
+        profile.lastActive = new Date().toISOString();
+        await profileManager.saveProfile(profile);
+      }
+      
+      setUserProfile(profile);
+    } catch (error) {
+      console.error('Failed to load user profile:', error);
+      // Create a fallback profile
+      const fallbackProfile = createDefaultProfile(
+        firebaseUser.uid,
+        firebaseUser.email || undefined,
+        firebaseUser.displayName || undefined
+      );
+      setUserProfile(fallbackProfile);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Set persistence
@@ -51,10 +104,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     
     // Listen for auth state changes
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log('Auth state changed:', user ? 'Logged in' : 'Logged out');
       setUser(user);
       setLoading(false);
+      
+      // Load profile when user changes
+      await loadUserProfile(user);
     });
 
     return unsubscribe;
@@ -62,7 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      // Profile will be loaded by onAuthStateChanged
     } catch (error: any) {
       console.error('❌ Login error:', error);
       throw error;
@@ -71,7 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = async (email: string, password: string) => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      // Profile will be created by loadUserProfile via onAuthStateChanged
     } catch (error: any) {
       console.error('❌ Signup error:', error);
       throw error;
@@ -121,14 +179,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      setUserProfile(null); // Clear profile on logout
     } catch (error: any) {
       console.error('❌ Logout error:', error);
       throw error;
     }
   };
 
+  const updateUserProfile = async (updates: Partial<UserPreferences>): Promise<boolean> => {
+    if (!user || !userProfile) {
+      console.error('No user logged in or profile not loaded');
+      return false;
+    }
+
+    try {
+      const success = await profileManager.updateProfile(user.uid, updates);
+      
+      if (success) {
+        // Reload the profile to reflect changes
+        await refreshProfile();
+      }
+      
+      return success;
+    } catch (error) {
+      console.error('Failed to update user profile:', error);
+      return false;
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (user) {
+      await loadUserProfile(user);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithGoogle }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      userProfile,
+      profileLoading,
+      login, 
+      signup, 
+      logout, 
+      loginWithGoogle,
+      updateUserProfile,
+      refreshProfile
+    }}>
       {children}
     </AuthContext.Provider>
   );
