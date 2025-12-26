@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
+import { AuthProvider } from "@/lib/AuthContext";
+import Navbar from "@/components/Navbar";
 
 // Apple uses SF Pro, but Inter is the closest web-safe alternative
 const inter = Inter({
@@ -11,8 +13,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Gladys Travel AI",
-  description: "Your intelligent travel companion",
+  title: "Gladys Travel AI - Your Smart Travel Companion",
+  description: "AI-powered travel planning for sports events and destinations worldwide",
 };
 
 export default function RootLayout({
@@ -23,7 +25,12 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} font-sans antialiased bg-white text-gray-900`}>
-        <Providers>{children}</Providers>
+        <AuthProvider>
+          <Providers>
+            <Navbar />
+            {children}
+          </Providers>
+        </AuthProvider>
       </body>
     </html>
   );
