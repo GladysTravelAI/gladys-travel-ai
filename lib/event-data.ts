@@ -1,4 +1,4 @@
-// lib/eventsData.ts - Trademark-Safe Events Database
+// lib/event-data.ts - Trademark-Safe Events Database
 
 export interface EventTicket {
   category: string;
@@ -43,7 +43,7 @@ export interface Event {
   name: string;
   genericName: string;
   type: 'sports' | 'music' | 'festival' | 'cultural' | 'exhibition';
-  sport?: 'football' | 'american-football' | 'basketball' | 'tennis' | 'racing' | 'rugby' | 'multi-sport';
+  sport?: 'football' | 'american-football' | 'basketball' | 'baseball' | 'tennis' | 'racing' | 'rugby' | 'multi-sport' | 'golf' | 'hockey' | 'boxing-mma' | 'cricket';
   
   // Dates & Location
   startDate: string;
@@ -100,7 +100,7 @@ export interface Event {
 export const FEATURED_EVENTS: Event[] = [
   {
     id: 'intl-football-2026',
-    name: '2026 International Football Championship',
+    name: '2026 FIFA World Cup',
     genericName: 'North America Football Tournament',
     type: 'sports',
     sport: 'football',
@@ -115,12 +115,12 @@ export const FEATURED_EVENTS: Event[] = [
       coordinates: { lat: 40.7128, lng: -74.0060 }
     },
     images: [
-      '/events/football-2026-1.jpg',
-      '/events/football-2026-2.jpg',
-      '/events/football-2026-3.jpg'
+      'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800',
+      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
+      'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=800'
     ],
-    heroImage: '/events/football-2026-hero.jpg',
-    thumbnail: '/events/football-2026-thumb.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1200',
+    thumbnail: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600',
     description: 'Experience the world\'s premier international football tournament featuring 48 national teams competing across 16 host cities in North America. Witness history as the beautiful game comes to the USA, Canada, and Mexico in June-July 2026.',
     highlights: [
       '48 teams competing for glory',
@@ -136,7 +136,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Match ticket', 'Stadium access'],
         available: true,
-        affiliateUrl: 'https://stubhub.com/...',
+        affiliateUrl: 'https://stubhub.com/world-cup-tickets',
         partner: 'StubHub'
       },
       {
@@ -145,7 +145,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Premium seating', 'Hospitality lounge', 'Food & beverages'],
         available: true,
-        affiliateUrl: 'https://vividseats.com/...',
+        affiliateUrl: 'https://vividseats.com/world-cup',
         partner: 'Vivid Seats'
       },
       {
@@ -154,7 +154,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Best seats', 'Meet & greet', 'Exclusive lounge', 'Premium dining'],
         available: true,
-        affiliateUrl: 'https://seatgeek.com/...',
+        affiliateUrl: 'https://seatgeek.com/world-cup',
         partner: 'SeatGeek'
       }
     ],
@@ -173,7 +173,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 4500,
         duration: 5,
-        affiliateUrl: 'https://booking.com/...',
+        affiliateUrl: 'https://booking.com/world-cup',
         partner: 'Booking.com'
       },
       {
@@ -189,7 +189,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 3800,
         duration: 4,
-        affiliateUrl: 'https://expedia.com/...',
+        affiliateUrl: 'https://expedia.com/world-cup',
         partner: 'Expedia'
       }
     ],
@@ -208,14 +208,14 @@ export const FEATURED_EVENTS: Event[] = [
     },
     featured: true,
     priority: 1,
-    tags: ['football', 'soccer', 'international', 'north-america', '2026'],
+    tags: ['football', 'soccer', 'international', 'north-america', '2026', 'world-cup'],
     disclaimer: 'This is an independent travel planning service. We are not affiliated with FIFA or the official tournament organizers. All trademarks belong to their respective owners.'
   },
   
   {
-    id: 'championship-game-feb-2025',
-    name: 'February Championship Game 2025',
-    genericName: 'Professional Football Final',
+    id: 'super-bowl-2025',
+    name: 'Super Bowl LIX',
+    genericName: 'NFL Championship Game 2025',
     type: 'sports',
     sport: 'american-football',
     startDate: '2025-02-09',
@@ -229,11 +229,11 @@ export const FEATURED_EVENTS: Event[] = [
       coordinates: { lat: 29.9511, lng: -90.0812 }
     },
     images: [
-      '/events/championship-2025-1.jpg',
-      '/events/championship-2025-2.jpg'
+      'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=800',
+      'https://images.unsplash.com/photo-1508754854856-b3e0bc215f2e?w=800'
     ],
-    heroImage: '/events/championship-2025-hero.jpg',
-    thumbnail: '/events/championship-2025-thumb.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=1200',
+    thumbnail: 'https://images.unsplash.com/photo-1560272564-c83b66b1ad12?w=600',
     description: 'The biggest game in American football returns to New Orleans! Experience the ultimate championship showdown in the vibrant city of NOLA with incredible parties, concerts, and once-in-a-lifetime football action.',
     highlights: [
       'Championship game tickets',
@@ -249,7 +249,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Game ticket', 'Stadium access'],
         available: true,
-        affiliateUrl: 'https://stubhub.com/...',
+        affiliateUrl: 'https://stubhub.com/super-bowl',
         partner: 'StubHub'
       },
       {
@@ -258,7 +258,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Premium seating', 'Club lounge', 'All-inclusive food & drinks'],
         available: true,
-        affiliateUrl: 'https://vividseats.com/...',
+        affiliateUrl: 'https://vividseats.com/super-bowl',
         partner: 'Vivid Seats'
       }
     ],
@@ -277,7 +277,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 12000,
         duration: 4,
-        affiliateUrl: 'https://booking.com/...',
+        affiliateUrl: 'https://booking.com/super-bowl',
         partner: 'Booking.com'
       }
     ],
@@ -288,14 +288,14 @@ export const FEATURED_EVENTS: Event[] = [
     },
     featured: true,
     priority: 2,
-    tags: ['american-football', 'championship', 'new-orleans', '2025'],
+    tags: ['american-football', 'nfl', 'super-bowl', 'new-orleans', '2025', 'championship'],
     disclaimer: 'Independent travel service not affiliated with the NFL or official event organizers.'
   },
 
   {
-    id: 'la-summer-games-2028',
-    name: '2028 Los Angeles International Games',
-    genericName: 'LA Summer Games',
+    id: 'la-olympics-2028',
+    name: 'LA 2028 Summer Olympics',
+    genericName: 'Los Angeles Olympic Games',
     type: 'sports',
     sport: 'multi-sport',
     startDate: '2028-07-21',
@@ -309,11 +309,11 @@ export const FEATURED_EVENTS: Event[] = [
       coordinates: { lat: 34.0522, lng: -118.2437 }
     },
     images: [
-      '/events/la-2028-1.jpg',
-      '/events/la-2028-2.jpg'
+      'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800',
+      'https://images.unsplash.com/photo-1551958219-acbc608c6377?w=800'
     ],
-    heroImage: '/events/la-2028-hero.jpg',
-    thumbnail: '/events/la-2028-thumb.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200',
+    thumbnail: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600',
     description: 'Los Angeles hosts the world\'s premier multi-sport competition featuring athletes from over 200 nations competing in 50+ sports. Experience the magic of global athletic excellence in the City of Angels.',
     highlights: [
       '50+ sports competitions',
@@ -329,7 +329,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Single session access', 'Stadium entry'],
         available: true,
-        affiliateUrl: 'https://ticketmaster.com/...',
+        affiliateUrl: 'https://ticketmaster.com/olympics',
         partner: 'Ticketmaster'
       },
       {
@@ -338,7 +338,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['Multiple sessions', 'Priority entry', 'Souvenir'],
         available: true,
-        affiliateUrl: 'https://stubhub.com/...',
+        affiliateUrl: 'https://stubhub.com/olympics',
         partner: 'StubHub'
       }
     ],
@@ -346,7 +346,7 @@ export const FEATURED_EVENTS: Event[] = [
     packages: [
       {
         id: 'pkg-la-games',
-        name: 'LA Games Complete Package',
+        name: 'LA Olympics Complete Package',
         description: '10-day experience with multiple event tickets and hotel',
         includes: {
           flights: true,
@@ -357,7 +357,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 8500,
         duration: 10,
-        affiliateUrl: 'https://expedia.com/...',
+        affiliateUrl: 'https://expedia.com/olympics',
         partner: 'Expedia'
       }
     ],
@@ -368,7 +368,7 @@ export const FEATURED_EVENTS: Event[] = [
     },
     featured: true,
     priority: 3,
-    tags: ['multi-sport', 'international', 'los-angeles', '2028', 'summer'],
+    tags: ['multi-sport', 'olympics', 'international', 'los-angeles', '2028', 'summer-games'],
     disclaimer: 'Independent travel service. Not affiliated with the IOC or official organizing committee.'
   },
 
@@ -388,11 +388,11 @@ export const FEATURED_EVENTS: Event[] = [
       coordinates: { lat: 33.6803, lng: -116.2374 }
     },
     images: [
-      '/events/coachella-2025-1.jpg',
-      '/events/coachella-2025-2.jpg'
+      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800',
+      'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800'
     ],
-    heroImage: '/events/coachella-2025-hero.jpg',
-    thumbnail: '/events/coachella-2025-thumb.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=1200',
+    thumbnail: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=600',
     description: 'The ultimate music and arts festival in the California desert. Experience world-class performances, incredible art installations, and unforgettable moments under the stars.',
     highlights: [
       '150+ musical acts',
@@ -408,7 +408,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['3-day pass', 'All stages access'],
         available: true,
-        affiliateUrl: 'https://stubhub.com/...',
+        affiliateUrl: 'https://stubhub.com/coachella',
         partner: 'StubHub'
       },
       {
@@ -417,7 +417,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'USD',
         perks: ['VIP areas', 'Premium viewing', 'Air-conditioned restrooms', 'Food vouchers'],
         available: true,
-        affiliateUrl: 'https://vividseats.com/...',
+        affiliateUrl: 'https://vividseats.com/coachella',
         partner: 'Vivid Seats'
       }
     ],
@@ -436,7 +436,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 2800,
         duration: 4,
-        affiliateUrl: 'https://booking.com/...',
+        affiliateUrl: 'https://booking.com/coachella',
         partner: 'Booking.com'
       }
     ],
@@ -447,7 +447,7 @@ export const FEATURED_EVENTS: Event[] = [
     },
     featured: true,
     priority: 4,
-    tags: ['music', 'festival', 'california', 'coachella', 'desert'],
+    tags: ['music', 'festival', 'california', 'coachella', 'desert', 'indie'],
     disclaimer: 'Independent travel service. Coachella is a trademark of Goldenvoice LLC.'
   },
 
@@ -468,11 +468,11 @@ export const FEATURED_EVENTS: Event[] = [
       coordinates: { lat: 43.7384, lng: 7.4246 }
     },
     images: [
-      '/events/monaco-gp-2025-1.jpg',
-      '/events/monaco-gp-2025-2.jpg'
+      'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800',
+      'https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=800'
     ],
-    heroImage: '/events/monaco-gp-hero.jpg',
-    thumbnail: '/events/monaco-gp-thumb.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=1200',
+    thumbnail: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600',
     description: 'The most prestigious motor racing event on the calendar. Experience the glamour of Monaco as the world\'s fastest cars race through the iconic streets of Monte Carlo.',
     highlights: [
       'Street circuit racing',
@@ -488,7 +488,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'EUR',
         perks: ['3-day pass', 'Covered seating'],
         available: true,
-        affiliateUrl: 'https://f1experiences.com/...',
+        affiliateUrl: 'https://f1experiences.com/monaco',
         partner: 'F1 Experiences'
       },
       {
@@ -497,7 +497,7 @@ export const FEATURED_EVENTS: Event[] = [
         currency: 'EUR',
         perks: ['Paddock access', 'Gourmet dining', 'Pit lane walk', 'Driver appearances'],
         available: true,
-        affiliateUrl: 'https://f1experiences.com/...',
+        affiliateUrl: 'https://f1experiences.com/monaco-vip',
         partner: 'F1 Experiences'
       }
     ],
@@ -516,7 +516,7 @@ export const FEATURED_EVENTS: Event[] = [
         },
         price: 18000,
         duration: 5,
-        affiliateUrl: 'https://booking.com/...',
+        affiliateUrl: 'https://booking.com/monaco-f1',
         partner: 'Booking.com'
       }
     ],
@@ -525,9 +525,9 @@ export const FEATURED_EVENTS: Event[] = [
       averageHotelPrice: 800,
       transportation: ['Walk', 'Taxi', 'Helicopter', 'Yacht']
     },
-    featured: false,
+    featured: true,
     priority: 5,
-    tags: ['racing', 'formula1', 'monaco', 'luxury', 'motorsport'],
+    tags: ['racing', 'formula-1', 'f1', 'monaco', 'luxury', 'motorsport'],
     disclaimer: 'Independent travel service. Not affiliated with Formula 1 or Monaco Grand Prix organizers.'
   }
 ];
@@ -544,6 +544,10 @@ export const getEventById = (id: string): Event | undefined => {
 
 export const getEventsByType = (type: Event['type']): Event[] => {
   return FEATURED_EVENTS.filter(event => event.type === type);
+};
+
+export const getEventsBySport = (sport: Event['sport']): Event[] => {
+  return FEATURED_EVENTS.filter(event => event.sport === sport);
 };
 
 export const getUpcomingEvents = (): Event[] => {

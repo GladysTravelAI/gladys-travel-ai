@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils, Cloud, Star, Trophy } from "lucide-react";
+import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils, Cloud, Star, Trophy, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 // Components
@@ -29,6 +29,8 @@ import FeedbackModal from "@/components/FeedbackModal";
 import { ItineraryData } from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
 import { useAuth } from "@/lib/AuthContext";
+import { eventService } from "@/lib/eventService";
+import { getFeaturedEvents } from "@/lib/event-data";
 
 // shadcn/ui
 import { Button } from "@/components/ui/button";
@@ -87,7 +89,8 @@ export default function HomeClient() {
 
   // Weather & Smart Features
   const [currentWeather, setCurrentWeather] = useState<any>(null);
-  const [sportsEvents, setSportsEvents] = useState<any[]>([]);
+  const [liveEvents, setLiveEvents] = useState<any[]>([]);
+  const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
   const [completedTrip, setCompletedTrip] = useState<any>(null);
 
@@ -181,6 +184,9 @@ export default function HomeClient() {
         endDate: endDate?.toISOString(),
       };
 
+      // 🔥 Search live events from API
+      const liveEventsPromise = eventService.universalSearch(location).catch(() => []);
+
       const [
         itineraryRes, 
         restaurantsRes, 
@@ -190,7 +196,7 @@ export default function HomeClient() {
         flightsRes,
         transportRes,
         weatherRes,
-        eventsRes
+        liveEventsData
       ] = await Promise.all([
         fetch("/api/itinerary", { 
           method: "POST", 
@@ -244,15 +250,7 @@ export default function HomeClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ location })
         }).catch(() => null),
-        fetch("/api/sports-events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            sport: 'Football', 
-            city: location,
-            year: 2026
-          })
-        }).catch(() => null)
+        liveEventsPromise
       ]);
 
       const [
@@ -263,8 +261,7 @@ export default function HomeClient() {
         imagesData,
         flightsData,
         transportData,
-        weatherData,
-        eventsData
+        weatherData
       ] = await Promise.all([
         itineraryRes.json(), 
         restaurantsRes.json(), 
@@ -273,8 +270,7 @@ export default function HomeClient() {
         imagesRes.json(),
         flightsRes.json(),
         transportRes.json(),
-        weatherRes ? weatherRes.json() : null,
-        eventsRes ? eventsRes.json() : null
+        weatherRes ? weatherRes.json() : null
       ]);
 
       if (!itineraryRes.ok) {
@@ -291,6 +287,14 @@ export default function HomeClient() {
       setFirstDestination(location);
       setDays(prefs?.days || days);
       
+      // 🔥 Set live events from Ticketmaster/SeatGeek
+      if (liveEventsData && liveEventsData.length > 0) {
+        setLiveEvents(liveEventsData.slice(0, 10));
+        console.log(`🎉 Found ${liveEventsData.length} live events in ${location}`);
+      } else {
+        setLiveEvents([]);
+      }
+      
       if (weatherData?.weather) {
         setCurrentWeather(weatherData.weather);
         
@@ -305,11 +309,6 @@ export default function HomeClient() {
           console.log('☀️ Perfect weather for outdoor exploration!');
         }
       }
-
-      if (eventsData?.events) {
-        setSportsEvents(eventsData.events.slice(0, 5));
-        console.log(`🏆 Found ${eventsData.events.length} events in ${location}`);
-      }
       
       const flightCost = flightsData.flights?.[0]?.price || 800;
       const hotelCost = (hotelsData.hotels?.[0]?.price || 150) * (prefs?.days || days);
@@ -318,11 +317,8 @@ export default function HomeClient() {
       // ✅ Track search in user profile
       if (user) {
         await profileManager.trackSearch(user.uid, location);
-        
-        // ✅ Track trip planning
         await profileManager.trackTripPlanned(user.uid, location);
         
-        // ✅ Update preferences based on search
         if (prefs) {
           await updateUserProfile({
             preferredTripTypes: prefs.tripType ? [prefs.tripType] : userProfile?.preferredTripTypes || [],
@@ -405,6 +401,10 @@ export default function HomeClient() {
   };
 
   useEffect(() => {
+    // Load featured events from our curated list
+    const featured = getFeaturedEvents().slice(0, 5);
+    setFeaturedEvents(featured);
+
     // Top 50 world destinations - randomly selected each time
     const topWorldDestinations = [
       "Paris, France", "London, United Kingdom", "Rome, Italy", "Barcelona, Spain",
@@ -457,17 +457,14 @@ export default function HomeClient() {
     if (userProfile) {
       console.log('✅ User profile loaded:', userProfile);
       
-      // Pre-fill preferences from profile
       if (userProfile.budgetRange) {
         setSelectedBudget(userProfile.budgetRange);
       }
       
-      // Show wishlist destinations
       if (userProfile.wishlist.length > 0) {
         console.log('📍 User wishlist:', userProfile.wishlist);
       }
       
-      // Set origin from profile location
       if (userProfile.location) {
         setOrigin(userProfile.location);
       }
@@ -477,14 +474,12 @@ export default function HomeClient() {
   // ✅ Handle feedback submission
   const handleFeedbackSubmit = async (feedback: any) => {
     try {
-      // Save to backend
       await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(feedback)
       });
       
-      // ✅ Save to user profile
       if (user) {
         await profileManager.saveFeedback(user.uid, feedback);
         console.log('✅ Feedback saved to profile');
@@ -500,12 +495,18 @@ export default function HomeClient() {
     <main className="min-h-screen bg-white">
       <Navbar />
       
-      {/* Featured Events Banner - New! */}
+      {/* Featured Events Banner - Dynamic! */}
       <EventsBanner />
       
       {/* Hero Section */}
       <section className="relative pt-24 pb-12 px-4">
-        <div className="max-w-4xl mx-auto text-center">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200 rounded-full blur-3xl opacity-20 animate-pulse-slow" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-br from-blue-200 via-purple-200 to-pink-200 rounded-full blur-3xl opacity-20 animate-pulse-slower" />
+        </div>
+
+        <div className="relative max-w-4xl mx-auto text-center">
           <motion.div 
             initial={{ opacity: 0, y: 20 }} 
             animate={{ opacity: 1, y: 0 }} 
@@ -519,7 +520,18 @@ export default function HomeClient() {
             </h1>
             
             <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-              {userProfile ? `${userProfile.status} • ${userProfile.totalTripsPlanned} trips planned` : 'AI‑powered travel planning for the modern explorer.'}
+              {userProfile ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+                    <Star size={14} className="fill-current" />
+                    {userProfile.status}
+                  </span>
+                  <span className="text-gray-400">•</span>
+                  <span>{userProfile.totalTripsPlanned} trips planned</span>
+                </span>
+              ) : (
+                'AI‑powered travel planning for the modern explorer.'
+              )}
             </p>
           </motion.div>
 
@@ -530,7 +542,7 @@ export default function HomeClient() {
             transition={{ duration: 0.6, delay: 0.2 }} 
             className="max-w-2xl mx-auto"
           >
-            <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-lg">
+            <div className="bg-white border-2 border-gray-200 rounded-3xl p-6 shadow-xl">
               <div className="space-y-5">
                 <LocationAutoComplete
                   value={origin}
@@ -540,23 +552,23 @@ export default function HomeClient() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Where to?
                   </label>
                   <div className="flex gap-2">
                     <Input 
-                      placeholder="Paris, Tokyo, Thohoyandou..." 
+                      placeholder="Paris, Tokyo, or search events..." 
                       value={searchQuery} 
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && setShowRefinement(true)}
-                      className="flex-1 border-gray-300 focus:border-blue-500 rounded-xl px-4 py-3"
+                      className="flex-1 border-2 border-gray-300 focus:border-blue-500 rounded-xl px-4 py-3 text-base"
                     />
                     <Button 
                       onClick={toggleVoiceInput} 
                       variant="outline"
                       size="icon"
-                      className={`rounded-xl border-gray-300 ${
-                        isListening ? 'bg-red-500 text-white border-red-500' : ''
+                      className={`rounded-xl border-2 ${
+                        isListening ? 'bg-red-500 text-white border-red-500' : 'border-gray-300'
                       }`}
                     >
                       {isListening ? <MicOff size={18} /> : <Mic size={18} />}
@@ -577,10 +589,13 @@ export default function HomeClient() {
                 <Button 
                   onClick={() => searchQuery.trim() && setShowRefinement(true)} 
                   disabled={!searchQuery.trim() || loading}
-                  className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold shadow-sm disabled:opacity-50"
+                  className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {loading ? (
-                    <span>Planning...</span>
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Planning your adventure...
+                    </span>
                   ) : (
                     <>
                       Continue
@@ -590,8 +605,8 @@ export default function HomeClient() {
                 </Button>
 
                 {isListening && (
-                  <div className="text-center py-2 text-sm text-gray-500">
-                    Listening...
+                  <div className="text-center py-2 text-sm text-red-600 animate-pulse font-medium">
+                    🎤 Listening...
                   </div>
                 )}
               </div>
@@ -626,23 +641,23 @@ export default function HomeClient() {
                   }}
                   className="flex-shrink-0 w-72 cursor-pointer group"
                 >
-                  <div className="relative h-96 overflow-hidden rounded-2xl bg-gray-100 border border-gray-200">
+                  <div className="relative h-96 overflow-hidden rounded-2xl bg-gray-100 border border-gray-200 shadow-lg hover:shadow-2xl transition-all">
                     {destination.image ? (
                       <img 
                         src={destination.image} 
                         alt={destination.city} 
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                       />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 flex items-center justify-center">
                         <Globe2 className="text-gray-400" size={48} />
                       </div>
                     )}
                     
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                     
                     <div className="absolute bottom-0 left-0 right-0 p-6">
-                      <h3 className="text-white font-semibold text-2xl mb-1">
+                      <h3 className="text-white font-bold text-2xl mb-1">
                         {destination.city}
                       </h3>
                       <p className="text-white/90 text-base">
@@ -650,8 +665,8 @@ export default function HomeClient() {
                       </p>
                     </div>
 
-                    <div className="absolute top-4 right-4 w-9 h-9 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ArrowRight className="text-gray-900" size={18} />
+                    <div className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
+                      <ArrowRight className="text-gray-900" size={20} />
                     </div>
                   </div>
                 </motion.div>
@@ -705,11 +720,11 @@ export default function HomeClient() {
                   <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
                     Itinerary
                   </TabsTrigger>
+                  <TabsTrigger value="events" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
+                    🎉 Events
+                  </TabsTrigger>
                   <TabsTrigger value="weather" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
                     🌤️ Weather
-                  </TabsTrigger>
-                  <TabsTrigger value="events" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
-                    🏆 Events
                   </TabsTrigger>
                   <TabsTrigger value="flights" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">
                     Flights
@@ -768,6 +783,125 @@ export default function HomeClient() {
                   )}
                 </TabsContent>
 
+                <TabsContent value="events" className="mt-0">
+                  {liveEvents.length > 0 ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                            <Trophy className="text-amber-500" size={28} />
+                            Live Events in {firstDestination}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Powered by Ticketmaster • Real-time data
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          LIVE
+                        </div>
+                      </div>
+                      
+                      {liveEvents.map((event, i) => (
+                        <div key={i} className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 hover:border-blue-400 hover:shadow-xl transition-all">
+                          <div className="flex items-start gap-4">
+                            {event.image && (
+                              <img
+                                src={event.image}
+                                alt={event.name}
+                                className="w-24 h-24 rounded-xl object-cover border-2 border-white shadow-md"
+                              />
+                            )}
+                            
+                            <div className="flex-1">
+                              <h4 className="text-xl font-bold text-gray-900 mb-2">
+                                {event.name}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
+                                <div className="flex items-center gap-1">
+                                  <Calendar size={16} />
+                                  {new Date(event.startDate).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    year: 'numeric' 
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MapPin size={16} />
+                                  {event.venue?.name || event.venue?.city}
+                                </div>
+                                {event.source && (
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">
+                                    via {event.source}
+                                  </span>
+                                )}
+                              </div>
+
+                              {event.priceRange && event.priceRange.min > 0 && (
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="text-sm text-gray-600">From</span>
+                                  <span className="text-lg font-bold text-green-600">
+                                    {event.priceRange.currency} ${event.priceRange.min.toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+
+                              {event.description && (
+                                <p className="text-sm text-gray-600 line-clamp-2 mb-4">
+                                  {event.description}
+                                </p>
+                              )}
+
+                              <div className="flex gap-3">
+                                {event.url && (
+                                  <a
+                                    href={event.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 text-sm"
+                                  >
+                                    Buy Tickets
+                                    <ArrowRight size={16} />
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    const eventDate = new Date(event.startDate);
+                                    const start = new Date(eventDate);
+                                    start.setDate(start.getDate() - 2);
+                                    const end = new Date(eventDate);
+                                    end.setDate(end.getDate() + 1);
+                                    
+                                    setStartDate(start);
+                                    setEndDate(end);
+                                    setDays(4);
+                                    handleSearch(firstDestination);
+                                  }}
+                                  className="px-6 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-600 transition-all text-sm"
+                                >
+                                  Plan Trip
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-16 text-gray-500">
+                      <Trophy className="mx-auto mb-4 text-gray-300" size={48} />
+                      <p className="font-semibold text-lg text-gray-900 mb-2">No Events Found</p>
+                      <p className="text-sm mb-4">Search a destination to find live events</p>
+                      <Button
+                        onClick={() => router.push('/events')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl"
+                      >
+                        Browse All Events
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+
                 <TabsContent value="weather" className="mt-0">
                   {currentWeather ? (
                     <WeatherWidget 
@@ -779,91 +913,6 @@ export default function HomeClient() {
                       <Cloud className="mx-auto mb-4 text-gray-300" size={48} />
                       <p className="font-semibold text-lg text-gray-900 mb-2">Weather Forecast</p>
                       <p className="text-sm">Search a destination to see weather conditions</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="events" className="mt-0">
-                  {sportsEvents.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                          <Trophy className="text-amber-500" size={28} />
-                          Upcoming Events in {firstDestination}
-                        </h3>
-                      </div>
-                      
-                      {sportsEvents.map((event, i) => (
-                        <div key={i} className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 hover:border-blue-300 hover:shadow-lg transition-all">
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex-1">
-                              <h4 className="text-xl font-bold text-gray-900 mb-2">
-                                {event.name}
-                              </h4>
-                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={16} />
-                                  {event.date}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin size={16} />
-                                  {event.location.venue}, {event.location.city}
-                                </div>
-                              </div>
-                            </div>
-                            {event.ticketInfo && (
-                              <div className="text-right">
-                                <p className="text-sm text-gray-500">Est. Price</p>
-                                <p className="text-lg font-bold text-green-600">
-                                  {event.ticketInfo.estimatedPrice}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
-                          {event.travelPackage && (
-                            <div className="bg-white rounded-xl p-4 mb-4 border border-blue-200">
-                              <p className="text-sm font-semibold text-blue-900 mb-2">
-                                🎫 Travel Package Available
-                              </p>
-                              <div className="flex gap-4 text-xs text-blue-700">
-                                {event.travelPackage.flights && <span>✈️ Flights</span>}
-                                {event.travelPackage.hotels && <span>🏨 Hotels</span>}
-                                {event.travelPackage.tickets && <span>🎟️ Tickets</span>}
-                                <span className="font-bold ml-auto text-base text-green-600">
-                                  {event.travelPackage.estimatedCost}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-
-                          <button 
-                            onClick={() => {
-                              const eventDate = new Date(event.date);
-                              const start = new Date(eventDate);
-                              start.setDate(start.getDate() - 2);
-                              const end = new Date(eventDate);
-                              end.setDate(end.getDate() + 2);
-                              
-                              setStartDate(start);
-                              setEndDate(end);
-                              setDays(5);
-                              setSearchQuery(event.location.city);
-                              setShowRefinement(true);
-                            }}
-                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
-                          >
-                            <Calendar size={18} />
-                            Plan Trip Around This Event
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Trophy className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p className="font-semibold text-lg text-gray-900 mb-2">No Major Events Found</p>
-                      <p className="text-sm">Try searching cities for major sporting events</p>
                     </div>
                   )}
                 </TabsContent>
@@ -959,6 +1008,84 @@ export default function HomeClient() {
                 </TabsContent>
               </div>
             </Tabs>
+          </div>
+        </section>
+      )}
+
+      {/* Quick Access to Events */}
+      {featuredEvents.length > 0 && (
+        <section className="py-12 px-4 bg-gradient-to-b from-gray-50 to-white">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <Sparkles className="text-purple-600" />
+                  Featured Events
+                </h2>
+                <p className="text-gray-600 mt-2">Plan your trip around these major events</p>
+              </div>
+              <Button
+                onClick={() => router.push('/events')}
+                variant="outline"
+                className="rounded-xl border-2"
+              >
+                View All Events
+                <ArrowRight size={16} className="ml-2" />
+              </Button>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {featuredEvents.slice(0, 3).map((event, idx) => (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  onClick={() => router.push(`/events/${event.id}`)}
+                  className="group cursor-pointer"
+                >
+                  <div className="relative h-64 rounded-2xl overflow-hidden mb-4 border-2 border-gray-200 hover:border-purple-300 transition-all shadow-lg hover:shadow-xl">
+                    <img
+                      src={event.thumbnail}
+                      alt={event.name}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                    
+                    <div className="absolute top-4 right-4 px-3 py-1.5 bg-purple-600 text-white rounded-full text-xs font-bold flex items-center gap-1.5">
+                      <Sparkles size={12} />
+                      Featured
+                    </div>
+
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h3 className="text-white font-bold text-lg mb-1 line-clamp-2">
+                        {event.name}
+                      </h3>
+                      <div className="flex items-center gap-2 text-white/90 text-sm">
+                        <Calendar size={14} />
+                        {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-gray-600 text-sm">
+                      <MapPin size={14} />
+                      {event.venue.city}, {event.venue.country}
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/events/${event.id}`);
+                      }}
+                    >
+                      View Event Details
+                    </Button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
       )}
