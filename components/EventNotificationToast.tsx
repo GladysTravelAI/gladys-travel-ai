@@ -24,18 +24,20 @@ const EventNotificationToast = ({ userLocation, onDismiss }: EventNotificationTo
     // Don't show if dismissed within last 24 hours
     if (hoursSinceDismissed < 24) return;
 
-    // Find relevant event based on user location or upcoming dates
-    let relevantEvent = null;
+    // 🎯 Always prioritize 2026 tournament
+    let relevantEvent = FEATURED_EVENTS.find(e => e.id === 'intl-football-2026');
+    // If 2026 tournament already passed, fall back to other logic
+    if (relevantEvent && new Date(relevantEvent.startDate) < new Date()) 
 
-    if (userLocation) {
-      // Try to match location
+    // If no 2026, try location match
+    if (!relevantEvent && userLocation) {
       relevantEvent = FEATURED_EVENTS.find(event =>
         event.venue.city.toLowerCase().includes(userLocation.toLowerCase()) ||
         event.venue.country.toLowerCase().includes(userLocation.toLowerCase())
       );
     }
 
-    // If no location match, show next upcoming event
+    // If still no match, show next upcoming event
     if (!relevantEvent) {
       const upcomingEvents = FEATURED_EVENTS
         .filter(event => new Date(event.startDate) > new Date())
@@ -148,7 +150,7 @@ const EventNotificationToast = ({ userLocation, onDismiss }: EventNotificationTo
                   onClick={() => setShowNotification(false)}
                   className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all group"
                 >
-                  View Event Details
+                  Plan My Trip
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>

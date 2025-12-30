@@ -99,118 +99,119 @@ export interface Event {
 
 export const FEATURED_EVENTS: Event[] = [
   {
-    id: 'intl-football-2026',
-    name: '2026 FIFA World Cup',
-    genericName: 'North America Football Tournament',
-    type: 'sports',
-    sport: 'football',
-    startDate: '2026-06-11',
-    endDate: '2026-07-19',
-    venue: {
-      name: 'Multiple Venues',
-      city: 'USA, Canada, Mexico',
-      country: 'North America',
-      capacity: 80000,
-      address: '16 host cities',
-      coordinates: { lat: 40.7128, lng: -74.0060 }
-    },
-    images: [
-      'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800',
-      'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
-      'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=800'
-    ],
-    heroImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1200',
-    thumbnail: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600',
-    description: 'Experience the world\'s premier international football tournament featuring 48 national teams competing across 16 host cities in North America. Witness history as the beautiful game comes to the USA, Canada, and Mexico in June-July 2026.',
-    highlights: [
-      '48 teams competing for glory',
-      '104 matches across 16 cities',
-      'Historic three-nation tournament',
-      'World-class stadiums',
-      'Incredible fan experiences'
-    ],
-    tickets: [
-      {
-        category: 'Standard Seating',
-        price: 250,
-        currency: 'USD',
-        perks: ['Match ticket', 'Stadium access'],
-        available: true,
-        affiliateUrl: 'https://stubhub.com/world-cup-tickets',
-        partner: 'StubHub'
-      },
-      {
-        category: 'Premium View',
-        price: 800,
-        currency: 'USD',
-        perks: ['Premium seating', 'Hospitality lounge', 'Food & beverages'],
-        available: true,
-        affiliateUrl: 'https://vividseats.com/world-cup',
-        partner: 'Vivid Seats'
-      },
-      {
-        category: 'VIP Experience',
-        price: 2500,
-        currency: 'USD',
-        perks: ['Best seats', 'Meet & greet', 'Exclusive lounge', 'Premium dining'],
-        available: true,
-        affiliateUrl: 'https://seatgeek.com/world-cup',
-        partner: 'SeatGeek'
-      }
-    ],
-    estimatedTicketPrice: { min: 250, max: 5000, currency: 'USD' },
-    packages: [
-      {
-        id: 'pkg-football-la',
-        name: 'Los Angeles Experience Package',
-        description: '5 days including flights, hotel, match tickets, and city tours',
-        includes: {
-          flights: true,
-          hotel: true,
-          tickets: true,
-          transfers: true,
-          extras: ['City tour', 'Welcome dinner', 'Fan zone access']
-        },
-        price: 4500,
-        duration: 5,
-        affiliateUrl: 'https://booking.com/world-cup',
-        partner: 'Booking.com'
-      },
-      {
-        id: 'pkg-football-miami',
-        name: 'Miami Beach Football Trip',
-        description: '4 days of football and beach relaxation',
-        includes: {
-          flights: true,
-          hotel: true,
-          tickets: true,
-          transfers: true,
-          extras: ['Beach access', 'Restaurant vouchers']
-        },
-        price: 3800,
-        duration: 4,
-        affiliateUrl: 'https://expedia.com/world-cup',
-        partner: 'Expedia'
-      }
-    ],
-    schedule: [
-      { date: '2026-06-11', time: '14:00', event: 'Opening Match' },
-      { date: '2026-07-19', time: '15:00', event: 'Final' }
-    ],
-    fanZone: {
-      location: 'Times Square, NYC',
-      activities: ['Live viewing', 'Food trucks', 'Music performances', 'Fan meetups']
-    },
-    localInfo: {
-      nearbyHotels: 150,
-      averageHotelPrice: 350,
-      transportation: ['Metro', 'Uber', 'Team buses', 'Walking']
-    },
-    featured: true,
-    priority: 1,
-    tags: ['football', 'soccer', 'international', 'north-america', '2026', 'world-cup'],
-    disclaimer: 'This is an independent travel planning service. We are not affiliated with FIFA or the official tournament organizers. All trademarks belong to their respective owners.'
+    
+  id: 'intl-football-2026',
+  name: 'North America 2026 Football Championship',
+  genericName: '2026 International Football Tournament',
+  type: 'sports',
+  sport: 'football',
+  startDate: '2026-06-11',
+  endDate: '2026-07-19',
+  venue: {
+    name: 'Multiple Venues',
+    city: 'USA, Canada, Mexico',
+    country: 'North America',
+    capacity: 80000,
+    address: '16 host cities',
+    coordinates: { lat: 40.7128, lng: -74.0060 }
   },
+  images: [
+    'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800',
+    'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
+    'https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=800'
+  ],
+  heroImage: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1200',
+  thumbnail: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=600',
+  description: 'Follow your national team across multiple cities. The world\'s premier international football tournament features 48 teams competing in 16 host cities across USA, Canada, and Mexico. We handle tickets, flights, hotels, and cross-border travel.',
+  highlights: [
+    'Follow your team across multiple cities',
+    '48 teams, 104 matches, 16 host cities',
+    'Tickets, flights, hotels — handled',
+    'Cross-border travel expertise',
+    'AI updates your trip as teams advance'
+  ],
+  tickets: [
+    {
+      category: 'Standard Seating',
+      price: 250,
+      currency: 'USD',
+      perks: ['Match ticket', 'Stadium access'],
+      available: true,
+      affiliateUrl: 'https://stubhub.com/world-cup-tickets',
+      partner: 'StubHub'
+    },
+    {
+      category: 'Premium View',
+      price: 800,
+      currency: 'USD',
+      perks: ['Premium seating', 'Hospitality lounge', 'Food & beverages'],
+      available: true,
+      affiliateUrl: 'https://vividseats.com/world-cup',
+      partner: 'Vivid Seats'
+    },
+    {
+      category: 'VIP Experience',
+      price: 2500,
+      currency: 'USD',
+      perks: ['Best seats', 'Meet & greet', 'Exclusive lounge', 'Premium dining'],
+      available: true,
+      affiliateUrl: 'https://seatgeek.com/world-cup',
+      partner: 'SeatGeek'
+      }
+  ],
+  estimatedTicketPrice: { min: 250, max: 5000, currency: 'USD' },
+  packages: [
+    {
+      id: 'pkg-football-la',
+      name: 'Los Angeles Experience Package',
+      description: '5 days including flights, hotel, match tickets, and city tours',
+      includes: {
+        flights: true,
+        hotel: true,
+        tickets: true,
+        transfers: true,
+        extras: ['City tour', 'Welcome dinner', 'Fan zone access']
+      },
+      price: 4500,
+      duration: 5,
+      affiliateUrl: 'https://booking.com/world-cup',
+      partner: 'Booking.com'
+    },
+    {
+      id: 'pkg-football-miami',
+      name: 'Miami Beach Football Trip',
+      description: '4 days of football and beach relaxation',
+      includes: {
+        flights: true,
+        hotel: true,
+        tickets: true,
+        transfers: true,
+        extras: ['Beach access', 'Restaurant vouchers']
+      },
+      price: 3800,
+      duration: 4,
+      affiliateUrl: 'https://expedia.com/world-cup',
+      partner: 'Expedia'
+    }
+  ],
+  schedule: [
+    { date: '2026-06-11', time: '14:00', event: 'Opening Match' },
+    { date: '2026-07-19', time: '15:00', event: 'Final' }
+  ],
+  fanZone: {
+    location: 'Times Square, NYC',
+    activities: ['Live viewing', 'Food trucks', 'Music performances', 'Fan meetups']
+  },
+  localInfo: {
+    nearbyHotels: 150,
+    averageHotelPrice: 350,
+    transportation: ['Metro', 'Uber', 'Team buses', 'Walking']
+  },
+  featured: true,
+  priority: 1,
+  tags: ['football', 'soccer', 'international', 'north-america', '2026', 'world-cup'],
+  disclaimer: 'This is an independent travel planning service. We are not affiliated with FIFA or the official tournament organizers. All trademarks belong to their respective owners.'
+},
   
   {
     id: 'super-bowl-2025',

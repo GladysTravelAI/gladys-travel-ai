@@ -13,7 +13,17 @@ const EventsBanner = () => {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const featuredEvents = getFeaturedEvents();
+    let featuredEvents = getFeaturedEvents();
+    
+    // 🎯 ALWAYS show 2026 tournament first
+    const tournament2026 = featuredEvents.find(e => e.id === 'intl-football-2026');
+    if (tournament2026) {
+      featuredEvents = [
+        tournament2026,
+        ...featuredEvents.filter(e => e.id !== 'intl-football-2026')
+      ];
+    }
+    
     setEvents(featuredEvents);
   }, []);
 
@@ -74,11 +84,11 @@ const EventsBanner = () => {
           <div className="flex items-center justify-center gap-3 mb-3">
             <Sparkles className="text-purple-600" size={32} />
             <h2 className="text-4xl md:text-6xl font-semibold tracking-tight text-gray-900">
-              Featured Events
+              Plan Around Major Events
             </h2>
           </div>
           <p className="text-center text-xl md:text-2xl text-gray-600 font-normal">
-            Experience unforgettable moments.
+            Sports. Concerts. Festivals. We handle everything.
           </p>
         </div>
 
@@ -193,7 +203,7 @@ const EventsBanner = () => {
                       href={`/events/${currentEvent.id}`}
                       className="group flex items-center gap-2 px-8 py-4 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all shadow-xl"
                     >
-                      Explore Event
+                      Plan My Trip
                       <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
                     <Link

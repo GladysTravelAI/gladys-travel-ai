@@ -513,26 +513,27 @@ export default function HomeClient() {
             transition={{ duration: 0.6 }}
           >
             {/* ✅ Personalized greeting */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-gray-900 mb-4 leading-tight">
-              {userProfile?.name ? `Welcome back, ${userProfile.name.split(' ')[0]}!` : 'Your journey begins'}
-              <br />
-              {userProfile?.name ? 'Where to next?' : 'with Gladys.'}
-            </h1>
-            
-            <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
-              {userProfile ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-                    <Star size={14} className="fill-current" />
-                    {userProfile.status}
-                  </span>
-                  <span className="text-gray-400">•</span>
-                  <span>{userProfile.totalTripsPlanned} trips planned</span>
-                </span>
-              ) : (
-                'AI‑powered travel planning for the modern explorer.'
-              )}
-            </p>
+            {/* ✅ Personalized greeting */}
+<h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight text-gray-900 mb-4 leading-tight">
+  {userProfile?.name ? `Welcome back, ${userProfile.name.split(' ')[0]}!` : 'Follow Your Team Across'}
+  <br />
+  {userProfile?.name ? 'Where to next?' : 'North America — Summer 2026'}
+</h1>
+
+<p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+  {userProfile ? (
+    <span className="flex items-center justify-center gap-2">
+      <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+        <Star size={14} className="fill-current" />
+        {userProfile.status}
+      </span>
+      <span className="text-gray-400">•</span>
+      <span>{userProfile.totalTripsPlanned} trips planned</span>
+    </span>
+  ) : (
+    'The world\'s biggest football tournament. 48 teams. 16 cities. AI plans your entire journey.'
+  )}
+</p>
           </motion.div>
 
           {/* Search Card */}
