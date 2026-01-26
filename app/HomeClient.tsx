@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 // Components
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import GladysAICompanion from '@/components/GladysAICompanion';
+import GladysAIAgent from '@/components/GladysAIAgent';
 import EventsBanner from '@/components/EventsBanner';
 import EventNotificationToast from '@/components/EventNotificationToast';
 import HotelResults from "@/components/HotelResults";
@@ -405,6 +405,32 @@ export default function HomeClient() {
       console.error('❌ Failed to save feedback:', error);
     }
   };
+  const handleAgentBookingComplete = async (cart: any[]) => {
+  console.log('🎉 Agent booking completed:', cart);
+  
+  if (user) {
+    for (const item of cart) {
+      await profileManager.trackBooking(user.uid, {
+        type: item.type,
+        name: item.name,
+        price: item.price,
+        rating: 5,
+        timestamp: new Date().toISOString(),
+        destination: firstDestination || 'Unknown'
+      });
+    }
+  }
+  
+  const newSavedItems = { ...savedItems };
+  cart.forEach(item => {
+    const typeKey = `${item.type}s` as keyof typeof savedItems;
+    if (newSavedItems[typeKey]) {
+      newSavedItems[typeKey] = [...newSavedItems[typeKey], item];
+    }
+  });
+  setSavedItems(newSavedItems);
+  setShowTripSummary(true);
+};
 
   return (
     <main className="min-h-screen bg-white">
@@ -1018,7 +1044,10 @@ export default function HomeClient() {
 
       <TripSummary isOpen={showTripSummary} onClose={() => setShowTripSummary(false)} savedItems={savedItems} onRemoveItem={handleRemoveItem} destination={firstDestination} />
       <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} tripData={completedTrip || { destination: firstDestination, startDate: startDate?.toISOString() || new Date().toISOString(), endDate: endDate?.toISOString() || new Date().toISOString(), tripId: 'trip_' + Date.now() }} onSubmit={handleFeedbackSubmit} />
-      <GladysAICompanion currentDestination={firstDestination || "Paris"} />
+      <GladysAIAgent 
+  currentDestination={firstDestination || "Paris"}
+  onBookingComplete={handleAgentBookingComplete}
+/>
       <EventNotificationToast userLocation={origin} />
     </main>
   );
