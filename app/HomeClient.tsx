@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ArrowRight, Search, Sparkles, ChevronDown, Play } from "lucide-react";
+import { Mic, MicOff, ArrowRight, Search, Sparkles, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Components
@@ -50,7 +50,7 @@ interface SavedItem {
 
 export default function HomeClient() {
   const router = useRouter();
-  const { user, userProfile, updateUserProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   
   // Search & Trip State
   const [searchQuery, setSearchQuery] = useState("");
@@ -102,7 +102,7 @@ export default function HomeClient() {
   });
   const [showTripSummary, setShowTripSummary] = useState(false);
 
-  // Search handler (keeping your existing logic)
+  // Your existing handlers (keeping ALL your logic)
   const handleSearch = async (query?: string, preferences?: TripPreferences) => {
     const location = query || searchQuery;
     if (!location.trim()) return;
@@ -311,27 +311,24 @@ export default function HomeClient() {
   }, [userProfile]);
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white dark:bg-black">
       <Navbar />
       
-      {/* ============================================
-          HERO SECTION - CLEAN & FOCUSED
-          Apple-style: One clear message
-          ============================================ */}
+      {/* HERO SECTION - Clean & Simple */}
       <section className="relative min-h-screen flex items-center justify-center px-6">
         <div className="max-w-4xl mx-auto text-center">
-          {/* Small intro badge */}
+          {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 border border-blue-200 mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 mb-8"
           >
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-medium text-blue-900">Your AI Travel Agent</span>
+            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Your AI Travel Agent</span>
           </motion.div>
 
-          {/* Main headline - MUCH clearer */}
+          {/* Headline */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -339,44 +336,59 @@ export default function HomeClient() {
             className="text-5xl sm:text-6xl lg:text-7xl font-semibold mb-6 tracking-tight leading-tight"
           >
             Going to a concert?{" "}
-            <span className="text-apple-blue">We'll handle everything.</span>
+            <span className="text-blue-600 dark:text-blue-400">We'll handle everything.</span>
           </motion.h1>
 
-          {/* Simple explanation */}
+          {/* Description */}
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed"
+            className="text-xl sm:text-2xl text-gray-600 dark:text-gray-400 mb-12 max-w-2xl mx-auto leading-relaxed"
           >
             Just tell us which event. Our AI books tickets, flights, and hotels in one go.
           </motion.p>
 
-          {/* TWO clear CTAs */}
+          {/* CTAs */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
+            className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16"
           >
-            <Button 
-              onClick={() => {
-                const searchSection = document.getElementById('search-section');
-                searchSection?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="btn-apple text-lg px-10 py-6"
+            <button 
+              onClick={() => document.getElementById('search-section')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-10 py-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-xl text-lg transition-all shadow-lg hover:shadow-xl"
             >
               Get Started
-            </Button>
-            <Button 
-              onClick={() => {
-                const howSection = document.getElementById('how-it-works');
-                howSection?.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="btn-apple-secondary text-lg px-10 py-6"
+            </button>
+            <button 
+              onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-10 py-4 bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white font-semibold rounded-xl text-lg transition-all"
             >
               See How It Works
-            </Button>
+            </button>
+          </motion.div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="flex justify-center gap-12"
+          >
+            <div>
+              <div className="text-3xl font-semibold text-blue-600 dark:text-blue-400">10,000+</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Events</div>
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-blue-600 dark:text-blue-400">150+</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Countries</div>
+            </div>
+            <div>
+              <div className="text-3xl font-semibold text-blue-600 dark:text-blue-400">24/7</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Support</div>
+            </div>
           </motion.div>
 
           {/* Scroll indicator */}
@@ -391,18 +403,15 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ============================================
-          SEARCH SECTION - SEPARATE FROM HERO
-          Clean, focused, no distractions
-          ============================================ */}
-      <section id="search-section" className="py-24 px-6 bg-gray-50">
+      {/* SEARCH SECTION - Dedicated & Clean */}
+      <section id="search-section" className="py-24 px-6 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-semibold mb-4">Where are you headed?</h2>
-            <p className="text-xl text-gray-600">Tell us the event or destination</p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">Tell us the event or destination</p>
           </div>
 
-          <div className="card-apple p-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 shadow-lg p-8">
             <div className="relative mb-6">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
               <Input 
@@ -410,18 +419,16 @@ export default function HomeClient() {
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && handleSearch()}
-                className="w-full h-16 pl-14 pr-16 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500"
+                className="w-full h-16 pl-14 pr-16 text-lg border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:border-blue-500 dark:focus:border-blue-500"
               />
-              <Button 
+              <button 
                 onClick={toggleVoiceInput} 
-                variant="ghost"
-                size="icon"
-                className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl ${
-                  isListening ? 'bg-blue-600 text-white' : ''
+                className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl transition-all ${
+                  isListening ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-              </Button>
+              </button>
             </div>
 
             <div className="flex gap-4 mb-6">
@@ -429,64 +436,63 @@ export default function HomeClient() {
                 type="date"
                 value={startDate?.toISOString().split('T')[0] || ''}
                 onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-                className="flex-1 h-14 px-4 border-2 border-gray-200 rounded-xl focus:border-blue-500"
+                className="flex-1 h-14 px-4 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-700 rounded-xl focus:border-blue-500 dark:focus:border-blue-500"
               />
               <div className="flex items-center text-gray-400">→</div>
               <input
                 type="date"
                 value={endDate?.toISOString().split('T')[0] || ''}
                 onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-                className="flex-1 h-14 px-4 border-2 border-gray-200 rounded-xl focus:border-blue-500"
+                className="flex-1 h-14 px-4 border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-700 rounded-xl focus:border-blue-500 dark:focus:border-blue-500"
               />
             </div>
 
-            <Button 
+            <button 
               onClick={() => searchQuery.trim() && handleSearch()} 
               disabled={!searchQuery.trim() || loading}
-              className="btn-apple w-full h-14 text-lg"
+              className="w-full h-14 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-xl text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   Searching...
                 </span>
               ) : (
-                <>Search <ArrowRight size={20} className="ml-2" /></>
+                <span className="flex items-center justify-center gap-2">
+                  Search <ArrowRight size={20} />
+                </span>
               )}
-            </Button>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ============================================
-          HOW IT WORKS - SIMPLE & CLEAR
-          Apple-style storytelling
-          ============================================ */}
+      {/* HOW IT WORKS */}
       <section id="how-it-works" className="py-32 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-4xl sm:text-5xl font-semibold mb-6">
-              Here's how <span className="text-apple-blue">Gladys works</span>
+              Here's how <span className="text-blue-600 dark:text-blue-400">Gladys works</span>
             </h2>
-            <p className="text-xl text-gray-600">Three simple steps. Done in minutes.</p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">Three simple steps. Done in minutes.</p>
           </div>
 
           <div className="space-y-24">
             {/* Step 1 */}
             <div className="flex flex-col md:flex-row items-center gap-16">
               <div className="flex-1">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-apple-blue text-white font-semibold text-lg mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 dark:bg-blue-500 text-white font-semibold text-lg mb-6">
                   1
                 </div>
                 <h3 className="text-3xl font-semibold mb-4">Tell us which event</h3>
-                <p className="text-xl text-gray-600 leading-relaxed">
+                <p className="text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
                   "I want to see Taylor Swift in Los Angeles" or "Take me to the Super Bowl"
                 </p>
               </div>
               <div className="flex-1">
-                <div className="card-apple p-8 shadow-apple-lg">
-                  <div className="h-48 bg-gradient-opulent-subtle rounded-xl flex items-center justify-center">
-                    <Search className="w-16 h-16 text-apple-blue" />
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-8 shadow-lg">
+                  <div className="h-48 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 rounded-xl flex items-center justify-center">
+                    <Search className="w-16 h-16 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </div>
@@ -495,28 +501,28 @@ export default function HomeClient() {
             {/* Step 2 */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-16">
               <div className="flex-1">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-apple-blue text-white font-semibold text-lg mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 dark:bg-blue-500 text-white font-semibold text-lg mb-6">
                   2
                 </div>
                 <h3 className="text-3xl font-semibold mb-4">We find the best deals</h3>
-                <p className="text-xl text-gray-600 leading-relaxed">
-                  AI compares prices across 50+ platforms. Tickets, flights, hotels—all optimized for you.
+                <p className="text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
+                  AI compares prices across 50+ platforms. Tickets, flights, hotels—all optimized.
                 </p>
               </div>
               <div className="flex-1">
-                <div className="card-apple p-8 shadow-apple-lg">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-8 shadow-lg">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl">
+                    <div className="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
                       <span className="font-medium">Tickets</span>
-                      <span className="text-apple-blue font-semibold">$245</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">$245</span>
                     </div>
-                    <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl">
+                    <div className="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
                       <span className="font-medium">Flights</span>
-                      <span className="text-apple-blue font-semibold">$180</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">$180</span>
                     </div>
-                    <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl">
+                    <div className="flex justify-between items-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl">
                       <span className="font-medium">Hotel (2 nights)</span>
-                      <span className="text-apple-blue font-semibold">$320</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">$320</span>
                     </div>
                   </div>
                 </div>
@@ -526,20 +532,22 @@ export default function HomeClient() {
             {/* Step 3 */}
             <div className="flex flex-col md:flex-row items-center gap-16">
               <div className="flex-1">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-apple-blue text-white font-semibold text-lg mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 dark:bg-blue-500 text-white font-semibold text-lg mb-6">
                   3
                 </div>
                 <h3 className="text-3xl font-semibold mb-4">Book everything at once</h3>
-                <p className="text-xl text-gray-600 leading-relaxed">
+                <p className="text-xl text-gray-600 dark:text-gray-400 leading-relaxed">
                   Review your complete package. One click to book. Trip confirmed in 60 seconds.
                 </p>
               </div>
               <div className="flex-1">
-                <div className="card-apple p-8 shadow-apple-lg">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-8 shadow-lg">
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">Total Trip Cost</p>
-                    <p className="text-4xl font-semibold text-apple-blue mb-6">$745</p>
-                    <button className="btn-apple w-full">Book Complete Trip</button>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Total Trip Cost</p>
+                    <p className="text-4xl font-semibold text-blue-600 dark:text-blue-400 mb-6">$745</p>
+                    <button className="w-full h-14 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-semibold rounded-xl transition-all">
+                      Book Complete Trip
+                    </button>
                   </div>
                 </div>
               </div>
@@ -548,39 +556,39 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ============================================
-          SOCIAL PROOF - TRUST SIGNALS
-          ============================================ */}
-      <section className="py-32 px-6 bg-gray-50">
+      {/* SOCIAL PROOF */}
+      <section className="py-32 px-6 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl sm:text-5xl font-semibold mb-6">Join 10,000+ travelers</h2>
-          <p className="text-xl text-gray-600 mb-16">People are already using Gladys for their event trips</p>
+          <p className="text-xl text-gray-600 dark:text-gray-400 mb-16">
+            People are already using Gladys for their event trips
+          </p>
 
           <div className="grid md:grid-cols-3 gap-12">
             <div>
-              <div className="text-5xl font-semibold text-apple-blue mb-2">$2.4M</div>
-              <p className="text-gray-600">Saved for travelers</p>
+              <div className="text-5xl font-semibold text-blue-600 dark:text-blue-400 mb-2">$2.4M</div>
+              <p className="text-gray-600 dark:text-gray-400">Saved for travelers</p>
             </div>
             <div>
-              <div className="text-5xl font-semibold text-apple-blue mb-2">15,000+</div>
-              <p className="text-gray-600">Trips booked</p>
+              <div className="text-5xl font-semibold text-blue-600 dark:text-blue-400 mb-2">15,000+</div>
+              <p className="text-gray-600 dark:text-gray-400">Trips booked</p>
             </div>
             <div>
-              <div className="text-5xl font-semibold text-apple-blue mb-2">4.9★</div>
-              <p className="text-gray-600">Average rating</p>
+              <div className="text-5xl font-semibold text-blue-600 dark:text-blue-400 mb-2">4.9★</div>
+              <p className="text-gray-600 dark:text-gray-400">Average rating</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ============================================
-          FEATURED EVENTS - INSPIRATION
-          ============================================ */}
+      {/* FEATURED EVENTS */}
       <section className="py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-semibold mb-6">Popular events right now</h2>
-            <p className="text-xl text-gray-600">Thousands of events. One simple booking.</p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">
+              Thousands of events. One simple booking.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -592,21 +600,34 @@ export default function HomeClient() {
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1 }}
                 onClick={() => router.push(`/events/${event.id}`)}
-                className="card-apple overflow-hidden group cursor-pointer"
+                className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 overflow-hidden hover:border-blue-500 dark:hover:border-blue-500 transition-all hover:shadow-xl cursor-pointer group"
               >
-                <div className="relative h-64 img-zoom">
+                <div className="relative h-64 overflow-hidden">
                   <img 
                     src={event.thumbnail} 
                     alt={event.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                  <div className="absolute top-4 right-4">
-                    <span className="badge-featured">Featured</span>
+                  <div className="absolute top-4 right-4 px-3 py-1.5 bg-blue-600 dark:bg-blue-500 text-white rounded-full text-xs font-semibold">
+                    Featured
                   </div>
                   <div className="absolute bottom-4 left-4 right-4">
-                    <h3 className="text-2xl font-semibold text-white mb-2">{event.name}</h3>
-                    <p className="text-white/90 text-sm">From ${event.estimatedTicketPrice.min}</p>
+                    <h3 className="text-white font-semibold text-xl mb-1">{event.name}</h3>
+                    <p className="text-white/90 text-sm">
+                      {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {event.venue.city}
+                    </p>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">From</p>
+                      <p className="text-2xl font-semibold text-blue-600 dark:text-blue-400">
+                        ${event.estimatedTicketPrice?.min || 549}
+                      </p>
+                    </div>
+                    <ArrowRight className="text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
                   </div>
                 </div>
               </motion.div>
@@ -614,40 +635,33 @@ export default function HomeClient() {
           </div>
 
           <div className="text-center mt-12">
-            <Button 
+            <button 
               onClick={() => router.push('/events')} 
-              className="btn-apple-secondary"
+              className="px-8 h-12 border-2 border-gray-300 dark:border-gray-700 hover:border-blue-600 dark:hover:border-blue-600 rounded-xl font-semibold transition-all"
             >
               Browse All Events
-            </Button>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ============================================
-          FINAL CTA - SIMPLE & CLEAR
-          ============================================ */}
-      <section className="py-32 px-6 bg-apple-blue text-white">
+      {/* FINAL CTA */}
+      <section className="py-32 px-6 bg-blue-600 dark:bg-blue-500 text-white">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl sm:text-5xl font-semibold mb-6">Ready to start planning?</h2>
           <p className="text-xl mb-12 opacity-90">
             Tell us where you want to go. We'll handle the rest.
           </p>
           <button 
-            onClick={() => {
-              const searchSection = document.getElementById('search-section');
-              searchSection?.scrollIntoView({ behavior: 'smooth' });
-            }}
-            className="bg-white text-apple-blue hover:bg-gray-100 font-semibold text-lg px-12 py-5 rounded-2xl transition-all shadow-lg"
+            onClick={() => document.getElementById('search-section')?.scrollIntoView({ behavior: 'smooth' })}
+            className="bg-white text-blue-600 dark:text-blue-500 hover:bg-gray-100 font-semibold text-lg px-12 py-5 rounded-xl transition-all shadow-lg"
           >
             Get Started Free
           </button>
         </div>
       </section>
 
-      {/* ============================================
-          RESULTS SECTION - ONLY SHOWS AFTER SEARCH
-          ============================================ */}
+      {/* RESULTS SECTION - Only shows after search */}
       <AnimatePresence>
         {(itineraryData || hotels?.length > 0 || loading) && !showPreview && (
           <motion.section 
@@ -655,28 +669,33 @@ export default function HomeClient() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="px-4 py-12 bg-gray-50"
+            className="px-4 py-12 bg-gray-50 dark:bg-gray-900"
           >
             <div className="max-w-7xl mx-auto">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="inline-flex bg-white border-2 border-gray-200 p-1 rounded-xl shadow-sm">
-                  <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2">Itinerary</TabsTrigger>
-                  <TabsTrigger value="events" className="rounded-lg px-4 py-2">Events</TabsTrigger>
-                  <TabsTrigger value="flights" className="rounded-lg px-4 py-2">Flights</TabsTrigger>
-                  <TabsTrigger value="hotels" className="rounded-lg px-4 py-2">Hotels</TabsTrigger>
-                  <TabsTrigger value="restaurants" className="rounded-lg px-4 py-2">Dining</TabsTrigger>
-                  <TabsTrigger value="activities" className="rounded-lg px-4 py-2">Activities</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto scrollbar-hide">
+                  <TabsList className="inline-flex bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 p-1 rounded-xl shadow-sm min-w-max">
+                    <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2">Itinerary</TabsTrigger>
+                    <TabsTrigger value="events" className="rounded-lg px-4 py-2">Events</TabsTrigger>
+                    <TabsTrigger value="flights" className="rounded-lg px-4 py-2">Flights</TabsTrigger>
+                    <TabsTrigger value="hotels" className="rounded-lg px-4 py-2">Hotels</TabsTrigger>
+                    <TabsTrigger value="restaurants" className="rounded-lg px-4 py-2">Dining</TabsTrigger>
+                    <TabsTrigger value="activities" className="rounded-lg px-4 py-2">Activities</TabsTrigger>
+                  </TabsList>
+                </div>
 
-                <div className="card-apple p-6">
-                  <TabsContent value="itinerary">{itineraryData && <ItineraryView data={itineraryData} />}</TabsContent>
-                  <TabsContent value="events">
+                <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-6 min-h-[400px]">
+                  <TabsContent value="itinerary" className="mt-0">
+                    {itineraryData && <ItineraryView data={itineraryData} />}
+                  </TabsContent>
+                  
+                  <TabsContent value="events" className="mt-0">
                     {liveEvents.length > 0 ? (
                       <div className="space-y-4">
                         {liveEvents.map((event, i) => (
-                          <div key={i} className="card-apple p-6">
+                          <div key={i} className="bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/30 dark:to-gray-800 border-2 border-blue-200 dark:border-blue-800 rounded-2xl p-6">
                             <h4 className="text-xl font-bold mb-2">{event.name}</h4>
-                            <p className="text-gray-600">{event.venue?.city}</p>
+                            <p className="text-gray-600 dark:text-gray-400">{event.venue?.city}</p>
                           </div>
                         ))}
                       </div>
@@ -684,10 +703,38 @@ export default function HomeClient() {
                       <p className="text-center text-gray-500 py-12">No events found</p>
                     )}
                   </TabsContent>
-                  <TabsContent value="flights">{flights?.length > 0 ? <FlightResults flights={flights} onSaveItem={(f) => handleSaveItem(f, 'flight')} /> : <p className="text-center text-gray-500 py-12">No flights found</p>}</TabsContent>
-                  <TabsContent value="hotels">{hotels?.length > 0 ? <HotelResults hotels={hotels} onSaveItem={(h) => handleSaveItem(h, 'hotel')} /> : <p className="text-center text-gray-500 py-12">No hotels found</p>}</TabsContent>
-                  <TabsContent value="restaurants">{restaurants?.length > 0 ? <RestaurantResults restaurants={restaurants} onSaveItem={(r) => handleSaveItem(r, 'restaurant')} /> : <p className="text-center text-gray-500 py-12">No restaurants found</p>}</TabsContent>
-                  <TabsContent value="activities">{activities?.length > 0 ? <ActivityResults activities={activities} onSaveItem={(a) => handleSaveItem(a, 'activity')} /> : <p className="text-center text-gray-500 py-12">No activities found</p>}</TabsContent>
+                  
+                  <TabsContent value="flights" className="mt-0">
+                    {flights?.length > 0 ? (
+                      <FlightResults flights={flights} onSaveItem={(f) => handleSaveItem(f, 'flight')} />
+                    ) : (
+                      <p className="text-center text-gray-500 py-12">No flights found</p>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="hotels" className="mt-0">
+                    {hotels?.length > 0 ? (
+                      <HotelResults hotels={hotels} onSaveItem={(h) => handleSaveItem(h, 'hotel')} />
+                    ) : (
+                      <p className="text-center text-gray-500 py-12">No hotels found</p>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="restaurants" className="mt-0">
+                    {restaurants?.length > 0 ? (
+                      <RestaurantResults restaurants={restaurants} onSaveItem={(r) => handleSaveItem(r, 'restaurant')} />
+                    ) : (
+                      <p className="text-center text-gray-500 py-12">No restaurants found</p>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="activities" className="mt-0">
+                    {activities?.length > 0 ? (
+                      <ActivityResults activities={activities} onSaveItem={(a) => handleSaveItem(a, 'activity')} />
+                    ) : (
+                      <p className="text-center text-gray-500 py-12">No activities found</p>
+                    )}
+                  </TabsContent>
                 </div>
               </Tabs>
             </div>
@@ -697,17 +744,60 @@ export default function HomeClient() {
 
       <Footer />
 
-      {/* Modals & Floating Components */}
-      <TripRefinementModal isOpen={showRefinement} onClose={() => setShowRefinement(false)} onGenerate={(prefs) => { setTripPreferences(prefs); setShowRefinement(false); handleSearch(searchQuery, prefs); }} destination={searchQuery} isLoading={loading} />
-      <TripSummary isOpen={showTripSummary} onClose={() => setShowTripSummary(false)} savedItems={savedItems} onRemoveItem={handleRemoveItem} destination={firstDestination} />
-      <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} tripData={completedTrip || { destination: firstDestination, startDate: startDate?.toISOString() || new Date().toISOString(), endDate: endDate?.toISOString() || new Date().toISOString(), tripId: 'trip_' + Date.now() }} onSubmit={handleFeedbackSubmit} />
-      <GladysAIAgent currentDestination={firstDestination || "Paris"} onBookingComplete={handleAgentBookingComplete} />
+      {/* Modals & Components */}
+      <TripRefinementModal 
+        isOpen={showRefinement} 
+        onClose={() => setShowRefinement(false)} 
+        onGenerate={(prefs) => { 
+          setTripPreferences(prefs); 
+          setShowRefinement(false); 
+          handleSearch(searchQuery, prefs); 
+        }} 
+        destination={searchQuery} 
+        isLoading={loading} 
+      />
+      
+      <TripSummary 
+        isOpen={showTripSummary} 
+        onClose={() => setShowTripSummary(false)} 
+        savedItems={savedItems} 
+        onRemoveItem={handleRemoveItem} 
+        destination={firstDestination} 
+      />
+      
+      <FeedbackModal 
+        isOpen={showFeedback} 
+        onClose={() => setShowFeedback(false)} 
+        tripData={completedTrip || { 
+          destination: firstDestination, 
+          startDate: startDate?.toISOString() || new Date().toISOString(), 
+          endDate: endDate?.toISOString() || new Date().toISOString(), 
+          tripId: 'trip_' + Date.now() 
+        }} 
+        onSubmit={handleFeedbackSubmit} 
+      />
+      
+      <GladysAIAgent 
+        currentDestination={firstDestination || "Paris"} 
+        onBookingComplete={handleAgentBookingComplete} 
+      />
+      
       <EventNotificationToast userLocation={origin} />
       
       {showPreview && flights?.length > 0 && hotels?.length > 0 && !loading && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="card-apple max-w-4xl w-full p-8">
-            <TripPreview destination={firstDestination} flights={flights} hotels={hotels} startDate={startDate} endDate={endDate} onViewDetails={() => { setShowPreview(false); setActiveTab("itinerary"); }} />
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-gray-200 dark:border-gray-700 max-w-4xl w-full p-8">
+            <TripPreview 
+              destination={firstDestination} 
+              flights={flights} 
+              hotels={hotels} 
+              startDate={startDate} 
+              endDate={endDate} 
+              onViewDetails={() => { 
+                setShowPreview(false); 
+                setActiveTab("itinerary"); 
+              }} 
+            />
           </div>
         </div>
       )}
