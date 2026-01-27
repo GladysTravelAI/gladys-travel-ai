@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Calendar, MapPin, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { FEATURED_EVENTS } from '@/lib/event-data';
+import { fetchLiveEvents } from '@/lib/eventService';
+import { getFeaturedEvents } from '@/lib/event-data';
 
 interface EventNotificationToastProps {
   userLocation?: string;
@@ -24,33 +25,65 @@ const EventNotificationToast = ({ userLocation, onDismiss }: EventNotificationTo
     // Don't show if dismissed within last 24 hours
     if (hoursSinceDismissed < 24) return;
 
-    // 🎯 Always prioritize 2026 tournament
-    let relevantEvent = FEATURED_EVENTS.find(e => e.id === 'intl-football-2026');
-    // If 2026 tournament already passed, fall back to other logic
-    if (relevantEvent && new Date(relevantEvent.startDate) < new Date()) 
+    // Fetch live events and show notification
+    async function loadSuggestedEvent() {
+      try {
+        console.log('🎫 Fetching live events for notification...');
+        const liveEvents = await fetchLiveEvents(10); // Get 10 events for better matching
+        
+        let relevantEvent = null;
 
-    // If no 2026, try location match
-    if (!relevantEvent && userLocation) {
-      relevantEvent = FEATURED_EVENTS.find(event =>
-        event.venue.city.toLowerCase().includes(userLocation.toLowerCase()) ||
-        event.venue.country.toLowerCase().includes(userLocation.toLowerCase())
-      );
+        // If user has location, try to find nearby event
+        if (userLocation && liveEvents.length > 0) {
+          relevantEvent = liveEvents.find(event =>
+            event.venue.city.toLowerCase().includes(userLocation.toLowerCase()) ||
+            event.venue.country.toLowerCase().includes(userLocation.toLowerCase())
+          );
+          
+          if (relevantEvent) {
+            console.log(`✅ Found event near ${userLocation}: ${relevantEvent.name}`);
+          }
+        }
+
+        // If no location match, get the soonest upcoming major event
+        if (!relevantEvent && liveEvents.length > 0) {
+          // Filter events that are at least 7 days away (not too soon)
+          const sevenDaysFromNow = new Date();
+          sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+          
+          const upcomingEvents = liveEvents.filter(event => {
+            const eventDate = new Date(event.startDate);
+            return eventDate >= sevenDaysFromNow;
+          });
+
+          relevantEvent = upcomingEvents[0] || liveEvents[0];
+          console.log(`✅ Showing upcoming event: ${relevantEvent.name}`);
+        }
+
+        // Fallback to curated events
+        if (!relevantEvent) {
+          console.log('⚠️ No live events, using curated');
+          const curated = getFeaturedEvents();
+          relevantEvent = curated[0];
+        }
+
+        if (relevantEvent) {
+          setSuggestedEvent(relevantEvent);
+          // Show notification after 5 seconds
+          setTimeout(() => setShowNotification(true), 5000);
+        }
+      } catch (error) {
+        console.error('❌ Error loading suggested event:', error);
+        // Fallback to curated events
+        const curated = getFeaturedEvents();
+        if (curated.length > 0) {
+          setSuggestedEvent(curated[0]);
+          setTimeout(() => setShowNotification(true), 5000);
+        }
+      }
     }
 
-    // If still no match, show next upcoming event
-    if (!relevantEvent) {
-      const upcomingEvents = FEATURED_EVENTS
-        .filter(event => new Date(event.startDate) > new Date())
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-      
-      relevantEvent = upcomingEvents[0];
-    }
-
-    if (relevantEvent) {
-      setSuggestedEvent(relevantEvent);
-      // Show notification after 3 seconds
-      setTimeout(() => setShowNotification(true), 3000);
-    }
+    loadSuggestedEvent();
   }, [userLocation]);
 
   const handleDismiss = () => {
@@ -145,14 +178,28 @@ const EventNotificationToast = ({ userLocation, onDismiss }: EventNotificationTo
                 </div>
 
                 {/* CTA */}
-                <Link
-                  href={`/events/${suggestedEvent.id}`}
-                  onClick={() => setShowNotification(false)}
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all group"
-                >
-                  Plan My Trip
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
+                {suggestedEvent.id.startsWith('tm-') ? (
+                  // For Ticketmaster events, link directly
+                  <a
+                    href={suggestedEvent.tickets[0]?.affiliateUrl || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShowNotification(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all group"
+                  >
+                    Get Tickets
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </a>
+                ) : (
+                  <Link
+                    href={`/events/${suggestedEvent.id}`}
+                    onClick={() => setShowNotification(false)}
+                    className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all group"
+                  >
+                    Plan My Trip
+                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                )}
               </div>
 
               {/* Decorative gradient orb */}

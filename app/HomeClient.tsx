@@ -29,7 +29,8 @@ import FeedbackModal from "@/components/FeedbackModal";
 import { ItineraryData } from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
 import { useAuth } from "@/lib/AuthContext";
-import { eventService } from "@/lib/eventService";
+import { fetchLiveEvents  } from "@/lib/eventService";
+import { Event } from "@/lib/event-data";
 import { getFeaturedEvents } from "@/lib/event-data";
 
 // shadcn/ui
@@ -189,8 +190,8 @@ export default function HomeClient() {
         endDate: endDate?.toISOString(),
       };
 
-      const liveEventsPromise = eventService.universalSearch(location).catch(() => []);
-
+      const liveEventsPromise = fetchLiveEvents(10).catch(() => []);
+// ✅ Actually calls the function!
       const [
         itineraryRes, restaurantsRes, hotelsRes, activitiesRes, imagesRes,
         flightsRes, transportRes, weatherRes, liveEventsData
@@ -222,6 +223,8 @@ export default function HomeClient() {
       setFirstDestination(location);
       setDays(prefs?.days || days);
       
+
+  
       if (liveEventsData && liveEventsData.length > 0) {
         setLiveEvents(liveEventsData.slice(0, 10));
       } else {
@@ -315,6 +318,7 @@ export default function HomeClient() {
   useEffect(() => {
     const featured = getFeaturedEvents().slice(0, 6);
     setFeaturedEvents(featured);
+    
 
     const topWorldDestinations = [
       "Paris, France", "London, United Kingdom", "Rome, Italy", "Barcelona, Spain",

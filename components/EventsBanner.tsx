@@ -4,27 +4,42 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { fetchLiveEvents } from '@/lib/eventService';
 import { getFeaturedEvents, type Event } from '@/lib/event-data';
 
 const EventsBanner = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    let featuredEvents = getFeaturedEvents();
-    
-    // 🎯 ALWAYS show 2026 tournament first
-    const tournament2026 = featuredEvents.find(e => e.id === 'intl-football-2026');
-    if (tournament2026) {
-      featuredEvents = [
-        tournament2026,
-        ...featuredEvents.filter(e => e.id !== 'intl-football-2026')
-      ];
+    // Fetch live events on component mount
+    async function loadEvents() {
+      try {
+        console.log('🎫 Loading live events...');
+        const liveEvents = await fetchLiveEvents(6); // Get 6 live upcoming events
+        
+        if (liveEvents && liveEvents.length > 0) {
+          console.log(`✅ Loaded ${liveEvents.length} live events`);
+          setEvents(liveEvents);
+        } else {
+          console.log('⚠️ No live events, using curated events');
+          const curated = getFeaturedEvents();
+          setEvents(curated);
+        }
+      } catch (error) {
+        console.error('❌ Error loading events:', error);
+        // Fallback to curated events
+        const curated = getFeaturedEvents();
+        setEvents(curated);
+      } finally {
+        setLoading(false);
+      }
     }
-    
-    setEvents(featuredEvents);
+
+    loadEvents();
   }, []);
 
   const resetAutoplay = () => {
@@ -55,6 +70,27 @@ const EventsBanner = () => {
     setCurrentIndex((prev) => (prev + 1) % events.length);
     resetAutoplay();
   };
+
+  if (loading) {
+    return (
+      <section className="relative w-full py-4 md:py-8 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 md:mb-12">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <Sparkles className="text-purple-600 animate-pulse" size={32} />
+              <h2 className="text-4xl md:text-6xl font-semibold tracking-tight text-gray-900">
+                Loading Live Events...
+              </h2>
+            </div>
+            <p className="text-center text-xl md:text-2xl text-gray-600 font-normal">
+              Fetching the latest upcoming events for you
+            </p>
+          </div>
+          <div className="relative h-[500px] md:h-[600px] rounded-3xl overflow-hidden bg-gray-100 animate-pulse" />
+        </div>
+      </section>
+    );
+  }
 
   if (events.length === 0) return null;
 
@@ -189,7 +225,7 @@ const EventsBanner = () => {
                     transition={{ delay: 0.5 }}
                     className="text-white/90 text-base md:text-lg leading-relaxed max-w-xl"
                   >
-                    {currentEvent.description.substring(0, 150)}...
+                    {currentEvent.description.substring(0, 180)}...
                   </motion.p>
 
                   {/* CTA Buttons */}
@@ -199,18 +235,31 @@ const EventsBanner = () => {
                     transition={{ delay: 0.6 }}
                     className="flex flex-wrap gap-4 pt-4"
                   >
+                    {currentEvent.id.startsWith('tm-') ? (
+                      // For Ticketmaster events, link directly to ticket URL
+                      <a
+                        href={currentEvent.tickets[0]?.affiliateUrl || '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-center gap-2 px-8 py-4 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all shadow-xl"
+                      >
+                        Get Tickets
+                        <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                      </a>
+                    ) : (
+                      <Link
+                        href={`/events/${currentEvent.id}`}
+                        className="group flex items-center gap-2 px-8 py-4 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all shadow-xl"
+                      >
+                        Plan My Trip
+                        <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                    )}
                     <Link
-                      href={`/events/${currentEvent.id}`}
-                      className="group flex items-center gap-2 px-8 py-4 bg-white text-gray-900 rounded-full font-semibold hover:bg-gray-100 transition-all shadow-xl"
-                    >
-                      Plan My Trip
-                      <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                    <Link
-                      href={`/events/${currentEvent.id}#packages`}
+                      href="/events"
                       className="px-8 py-4 bg-white/10 backdrop-blur-md text-white rounded-full font-semibold hover:bg-white/20 transition-all border-2 border-white/30"
                     >
-                      View Packages
+                      View All Events
                     </Link>
                   </motion.div>
                 </div>
