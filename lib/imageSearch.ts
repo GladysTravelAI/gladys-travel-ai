@@ -1,4 +1,6 @@
-import { unstable_cache as cache, revalidateTag } from 'next/cache';
+// lib/imageSearch.ts - Fixed to work in both server and client components
+// Removed server-only Next.js cache APIs and replaced with simple in-memory cache
+
 import type { PlaceImage } from '@/lib/Image';
 
 // --- TYPE DEFINITIONS for external APIs ---
@@ -79,7 +81,41 @@ const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const UNSPLASH_API_KEY = process.env.UNSPLASH_API_KEY;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
 
-// --- INTERNAL FETCHER FUNCTIONS (Your logic, just renamed and NOT exported) ---
+// --- IN-MEMORY CACHE (Replaces Next.js cache) ---
+
+interface CacheEntry {
+  data: PlaceImage[];
+  timestamp: number;
+}
+
+const imageCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 60 * 60 * 24 * 1000; // 24 hours in milliseconds
+
+function getCachedImages(destination: string): PlaceImage[] | null {
+  const cacheKey = `destination-images:${destination.toLowerCase()}`;
+  const cached = imageCache.get(cacheKey);
+  
+  if (!cached) return null;
+  
+  const isExpired = Date.now() - cached.timestamp > CACHE_DURATION;
+  if (isExpired) {
+    imageCache.delete(cacheKey);
+    return null;
+  }
+  
+  console.log(`CACHE_HIT: Using cached images for [${destination}]`);
+  return cached.data;
+}
+
+function setCachedImages(destination: string, images: PlaceImage[]): void {
+  const cacheKey = `destination-images:${destination.toLowerCase()}`;
+  imageCache.set(cacheKey, {
+    data: images,
+    timestamp: Date.now()
+  });
+}
+
+// --- INTERNAL FETCHER FUNCTIONS ---
 
 /**
  * Strategy 1: Fetch images from Google Places API
@@ -245,7 +281,7 @@ function _getFallbackImages(destination: string): PlaceImage[] {
 }
 
 // ---
-// 🚀 THE CACHED ORCHESTRATOR
+// 🚀 THE CACHED ORCHESTRATOR (Now with in-memory cache instead of Next.js cache)
 // ---
 
 /**
@@ -253,40 +289,42 @@ function _getFallbackImages(destination: string): PlaceImage[] {
  * and a final hard-coded fallback. Results are cached for 24 hours.
  * This is the primary function to be used by frontend components.
  */
-export const fetchImages = cache(
-  async (destination: string): Promise<PlaceImage[]> => {
-    console.log(`CACHE_MISS: Fetching fresh images for [${destination}]`);
-
-    let images: PlaceImage[] | null = null;
-
-    // Strategy 1: Google (Most relevant)
-    if (GOOGLE_API_KEY) {
-      images = await _fetchGoogleImages(destination, GOOGLE_API_KEY);
-    }
-
-    // Strategy 2: Unsplash (High quality)
-    if (!images && UNSPLASH_API_KEY) {
-      images = await _fetchUnsplashImages(destination, UNSPLASH_API_KEY);
-    }
-
-    // Strategy 3: Pexels (More high quality)
-    if (!images && PEXELS_API_KEY) {
-      images = await _fetchPexelsImages(destination, PEXELS_API_KEY);
-    }
-
-    // Strategy 4: Final Fallback (Guaranteed content)
-    if (!images || images.length === 0) {
-      images = _getFallbackImages(destination);
-    }
-
-    return images;
-  },
-  ['destination-images'], // Cache key prefix
-  {
-    revalidate: 60 * 60 * 24, // 24 hours
-    tags: ['destination-images'],
+export async function fetchImages(destination: string): Promise<PlaceImage[]> {
+  // Check cache first
+  const cachedImages = getCachedImages(destination);
+  if (cachedImages) {
+    return cachedImages;
   }
-);
+
+  console.log(`CACHE_MISS: Fetching fresh images for [${destination}]`);
+
+  let images: PlaceImage[] | null = null;
+
+  // Strategy 1: Google (Most relevant)
+  if (GOOGLE_API_KEY) {
+    images = await _fetchGoogleImages(destination, GOOGLE_API_KEY);
+  }
+
+  // Strategy 2: Unsplash (High quality)
+  if (!images && UNSPLASH_API_KEY) {
+    images = await _fetchUnsplashImages(destination, UNSPLASH_API_KEY);
+  }
+
+  // Strategy 3: Pexels (More high quality)
+  if (!images && PEXELS_API_KEY) {
+    images = await _fetchPexelsImages(destination, PEXELS_API_KEY);
+  }
+
+  // Strategy 4: Final Fallback (Guaranteed content)
+  if (!images || images.length === 0) {
+    images = _getFallbackImages(destination);
+  }
+
+  // Cache the results
+  setCachedImages(destination, images);
+
+  return images;
+}
 
 /**
  * ALIAS: Export as imageSearch for backward compatibility
@@ -294,10 +332,19 @@ export const fetchImages = cache(
 export const imageSearch = fetchImages;
 
 /**
- * OPTIONAL: You can create a simple API route (e.g., /api/revalidate)
- * that calls this function to manually clear the cache if you ever need to.
+ * Clear the image cache manually
  */
 export const clearImageCache = () => {
-  revalidateTag('destination-images');
+  imageCache.clear();
   console.log("MANUAL: Cleared destination image cache.");
+};
+
+/**
+ * Get cache statistics (useful for debugging)
+ */
+export const getImageCacheStats = () => {
+  return {
+    size: imageCache.size,
+    entries: Array.from(imageCache.keys()),
+  };
 };
