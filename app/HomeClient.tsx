@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils, Cloud, Star, Trophy, Sparkles, Ticket, TrendingUp, ShoppingBag, Search, Music, Flame, Clock } from "lucide-react";
-import { motion } from "framer-motion";
+import { Mic, MicOff, ArrowRight, Globe2, Calendar, Shield, Plane, MapPin, Car, Utensils, Cloud, Star, Trophy, Sparkles, Ticket, TrendingUp, ShoppingBag, Search, Music, Flame, Clock, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Components
+// Components (keep all your existing imports)
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import GladysAIAgent from '@/components/GladysAIAgent';
@@ -57,24 +57,18 @@ interface SavedItem {
   description?: string;
 }
 
-const ticketPartners = [
-  { name: "Ticketmaster", logo: "🎫", category: "Official Tickets" },
-  { name: "StubHub", logo: "🎟️", category: "Resale Marketplace" },
-  { name: "SeatGeek", logo: "💺", category: "Best Seats" },
-  { name: "Vivid Seats", logo: "✨", category: "Premium Options" },
-];
-
 const eventCategories = [
-  { name: "Sports", icon: Trophy, color: "from-blue-600 to-blue-800" },
-  { name: "Concerts", icon: Music, color: "from-purple-600 to-purple-800" },
-  { name: "Festivals", icon: Sparkles, color: "from-pink-600 to-pink-800" },
-  { name: "Championships", icon: Flame, color: "from-amber-500 to-yellow-600" },
+  { name: "Sports", icon: Trophy, gradient: "from-blue-500 to-blue-700" },
+  { name: "Concerts", icon: Music, gradient: "from-blue-600 to-blue-800" },
+  { name: "Festivals", icon: Sparkles, gradient: "from-blue-400 to-blue-600" },
+  { name: "Championships", icon: Flame, gradient: "from-amber-400 to-amber-600" }, // Gold accent
 ];
 
 export default function HomeClient() {
   const router = useRouter();
   const { user, userProfile, updateUserProfile } = useAuth();
   
+  // State management (keep all your existing state)
   const [searchQuery, setSearchQuery] = useState("");
   const [tripType, setTripType] = useState("");
   const [selectedBudget, setSelectedBudget] = useState("Mid-range");
@@ -120,6 +114,7 @@ export default function HomeClient() {
   });
   const [showTripSummary, setShowTripSummary] = useState(false);
 
+  // Keep ALL your existing handlers unchanged
   const handleSaveItem = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
     const savedItem: SavedItem = {
       id: item.id?.toString() || Math.random().toString(),
@@ -197,15 +192,8 @@ export default function HomeClient() {
       const liveEventsPromise = eventService.universalSearch(location).catch(() => []);
 
       const [
-        itineraryRes, 
-        restaurantsRes, 
-        hotelsRes, 
-        activitiesRes, 
-        imagesRes,
-        flightsRes,
-        transportRes,
-        weatherRes,
-        liveEventsData
+        itineraryRes, restaurantsRes, hotelsRes, activitiesRes, imagesRes,
+        flightsRes, transportRes, weatherRes, liveEventsData
       ] = await Promise.all([
         fetch("/api/itinerary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(itineraryPayload) }),
         fetch("/api/restaurants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, tripType: prefs?.tripType || tripType }) }),
@@ -236,24 +224,12 @@ export default function HomeClient() {
       
       if (liveEventsData && liveEventsData.length > 0) {
         setLiveEvents(liveEventsData.slice(0, 10));
-        console.log(`🎉 Found ${liveEventsData.length} live events in ${location}`);
       } else {
         setLiveEvents([]);
       }
       
       if (weatherData?.weather) {
         setCurrentWeather(weatherData.weather);
-        
-        const isRainy = weatherData.weather.current.condition.toLowerCase().includes('rain');
-        const isCold = weatherData.weather.current.temp < 15;
-        
-        if (isRainy) {
-          console.log('☔ Rainy weather detected - prioritizing indoor activities');
-        } else if (isCold) {
-          console.log('🧥 Cold weather - recommending warm activities');
-        } else {
-          console.log('☀️ Perfect weather for outdoor exploration!');
-        }
       }
       
       const flightCost = flightsData.flights?.[0]?.price || 800;
@@ -272,8 +248,6 @@ export default function HomeClient() {
             typicalGroupType: prefs.groupType as any
           });
         }
-        
-        console.log('✅ Search and trip planning tracked');
       }
       
       if (flightsData.flights?.length > 0 && hotelsData.hotels?.length > 0) {
@@ -386,9 +360,7 @@ export default function HomeClient() {
     });
 
     if (userProfile) {
-      console.log('✅ User profile loaded:', userProfile);
       if (userProfile.budgetRange) setSelectedBudget(userProfile.budgetRange);
-      if (userProfile.wishlist.length > 0) console.log('📍 User wishlist:', userProfile.wishlist);
       if (userProfile.location) setOrigin(userProfile.location);
     }
   }, [userProfile]);
@@ -398,17 +370,13 @@ export default function HomeClient() {
       await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(feedback) });
       if (user) {
         await profileManager.saveFeedback(user.uid, feedback);
-        console.log('✅ Feedback saved to profile');
       }
-      console.log('✅ Feedback submitted:', feedback);
     } catch (error) {
-      console.error('❌ Failed to save feedback:', error);
+      console.error('Failed to save feedback:', error);
     }
   };
 
   const handleAgentBookingComplete = async (cart: any[]) => {
-    console.log('🎉 Agent booking completed:', cart);
-    
     if (user) {
       for (const item of cart) {
         await profileManager.trackBooking(user.uid, {
@@ -439,158 +407,193 @@ export default function HomeClient() {
       
       <EventsBanner />
       
-      {/* Hero Section - Keeping YOUR original styling */}
-      <section className="relative pt-32 pb-24 px-6">
-        <div className="max-w-5xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-full mb-8">
-              <Star className="text-amber-500 fill-amber-500" size={14} />
-              <span className="text-sm font-semibold text-blue-900">AI-Powered Event Travel</span>
-            </div>
+      {/* HERO SECTION - Apple-style Clean & Spacious */}
+      <section className="relative min-h-screen flex items-center justify-center px-6 py-40">
+        <div className="max-w-5xl mx-auto text-center w-full">
+          {/* Badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50/80 backdrop-blur-sm border border-blue-100 mb-10"
+          >
+            <Sparkles className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-900 tracking-tight">AI-Powered Event Travel</span>
           </motion.div>
 
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-5xl sm:text-6xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight tracking-tight"
+          {/* Headline */}
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+            className="text-6xl sm:text-7xl lg:text-8xl font-semibold mb-8 tracking-tighter leading-[0.95]"
           >
-            Travel to<br />
-            <span className="bg-gradient-to-r from-blue-600 to-blue-900 bg-clip-text text-transparent">
+            Travel to{" "}
+            <br className="hidden sm:block" />
+            <span className="bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent">
               unforgettable events
             </span>
           </motion.h1>
 
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed"
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+            className="text-xl sm:text-2xl text-gray-600 mb-16 max-w-2xl mx-auto leading-relaxed tracking-tight"
           >
-            Book trips around concerts, sports, festivals.<br />
+            Book trips around concerts, sports, festivals.
+            <br className="hidden sm:block" />
             All tickets, flights, hotels in one place.
           </motion.p>
 
-          {/* Search Box - BIG & PROMINENT */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.5, delay: 0.3 }}
+          {/* Search Box - REFINED */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
             className="max-w-3xl mx-auto"
           >
-            <div className="bg-white rounded-3xl p-6 shadow-2xl border-2 border-blue-100">
-              <div className="relative mb-5">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
+            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/50">
+              <div className="relative mb-6">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={22} />
                 <Input 
                   placeholder="Search events, cities, teams, or artists..." 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && handleSearch()}
-                  className="w-full h-16 pl-16 pr-20 border-2 border-gray-200 focus:border-blue-500 rounded-2xl text-lg font-medium placeholder:text-gray-400"
+                  className="w-full h-16 pl-16 pr-20 border-none bg-gray-50/50 focus:bg-white rounded-2xl text-lg font-medium placeholder:text-gray-400 transition-all focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
                 />
-                <Button 
+                <button 
                   onClick={toggleVoiceInput} 
-                  variant="ghost"
-                  size="icon"
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl ${
-                    isListening ? 'bg-blue-600 text-white hover:bg-blue-700' : 'hover:bg-gray-100'
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-xl flex items-center justify-center transition-all ${
+                    isListening 
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
+                      : 'hover:bg-gray-100 text-gray-600'
                   }`}
                 >
                   {isListening ? <MicOff size={20} /> : <Mic size={20} />}
-                </Button>
+                </button>
               </div>
 
-              <div className="flex items-center gap-4 mb-5">
-                <div className="flex-1">
-                  <input
-                    type="date"
-                    value={startDate?.toISOString().split('T')[0] || ''}
-                    onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-                    className="w-full h-12 px-4 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div className="text-gray-400">→</div>
-                <div className="flex-1">
-                  <input
-                    type="date"
-                    value={endDate?.toISOString().split('T')[0] || ''}
-                    onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-                    className="w-full h-12 px-4 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500"
-                  />
-                </div>
+              <div className="flex items-center gap-3 mb-6">
+                <input
+                  type="date"
+                  value={startDate?.toISOString().split('T')[0] || ''}
+                  onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
+                  className="flex-1 h-14 px-4 border-none bg-gray-50/50 rounded-xl text-sm font-medium focus:bg-white transition-all focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+                />
+                <ArrowRight className="text-gray-300" size={20} />
+                <input
+                  type="date"
+                  value={endDate?.toISOString().split('T')[0] || ''}
+                  onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
+                  className="flex-1 h-14 px-4 border-none bg-gray-50/50 rounded-xl text-sm font-medium focus:bg-white transition-all focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+                />
               </div>
 
-              <Button 
+              <button 
                 onClick={() => searchQuery.trim() && handleSearch()} 
                 disabled={!searchQuery.trim() || loading}
-                className="w-full h-14 bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 rounded-xl text-white font-semibold text-lg shadow-lg disabled:opacity-50"
+                className="w-full h-16 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold rounded-2xl text-lg transition-all shadow-lg shadow-blue-200/50 hover:shadow-xl hover:shadow-blue-300/50 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
               >
                 {loading ? (
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     Searching...
                   </span>
                 ) : (
-                  <>Plan Your Event Trip <ArrowRight size={20} className="ml-2" /></>
+                  <span className="flex items-center justify-center gap-2">
+                    Plan Your Event Trip <ArrowRight size={20} />
+                  </span>
                 )}
-              </Button>
+              </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-6 mt-10">
-              <div className="text-center">
-                <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">10,000+</div>
-                <div className="text-sm text-gray-600 mt-1">Events Tracked</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">150+</div>
-                <div className="text-sm text-gray-600 mt-1">Countries</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">24/7</div>
-                <div className="text-sm text-gray-600 mt-1">AI Support</div>
-              </div>
+            {/* Stats - Refined */}
+            <div className="grid grid-cols-3 gap-8 mt-16">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="text-center"
+              >
+                <div className="text-4xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent mb-1">10,000+</div>
+                <div className="text-sm text-gray-600 font-medium">Events Tracked</div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="text-center"
+              >
+                <div className="text-4xl font-semibold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent mb-1">150+</div>
+                <div className="text-sm text-gray-600 font-medium">Countries</div>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}
+                className="text-center"
+              >
+                <div className="text-4xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent mb-1">24/7</div>
+                <div className="text-sm text-gray-600 font-medium">AI Support</div>
+              </motion.div>
             </div>
+          </motion.div>
+
+          {/* Scroll Indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 1 }}
+            className="absolute bottom-12 left-1/2 -translate-x-1/2"
+          >
+            <ChevronDown className="w-6 h-6 text-gray-300 animate-bounce" />
           </motion.div>
         </div>
       </section>
 
-      {/* Rest of YOUR original working code continues exactly as before... */}
-      {/* Featured Events, Browse by Category, How It Works, Popular Destinations, Trust Signals, Results Section, etc. */}
-      
-      {/* Featured Events */}
-      <section className="py-16 px-6 bg-gray-50">
+      {/* FEATURED EVENTS - More Spacious */}
+      <section className="py-40 px-6 bg-gray-50/50">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">Featured Events</h2>
-            <p className="text-lg text-gray-600">Don't miss these incredible experiences</p>
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-semibold text-gray-900 mb-4 tracking-tight">Featured Events</h2>
+            <p className="text-xl text-gray-600">Don't miss these incredible experiences</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
             {featuredEvents.slice(0, 3).map((event, idx) => (
               <motion.div
                 key={event.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
+                transition={{ delay: idx * 0.1, duration: 0.6, ease: "easeOut" }}
                 onClick={() => router.push(`/events/${event.id}`)}
                 className="group cursor-pointer"
               >
-                <div className="relative h-80 rounded-2xl overflow-hidden border-2 border-blue-100 hover:border-blue-300 shadow-lg hover:shadow-2xl transition-all">
-                  <img src={event.thumbnail} alt={event.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent" />
+                <div className="relative h-[420px] rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500">
+                  <img 
+                    src={event.thumbnail} 
+                    alt={event.name} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
                   
-                  <div className="absolute top-4 right-4 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-yellow-500 text-white rounded-full text-xs font-bold shadow-lg">
+                  {/* Gold Featured Badge */}
+                  <div className="absolute top-6 right-6 px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-white rounded-full text-xs font-bold shadow-lg">
                     Featured
                   </div>
 
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <h3 className="text-white font-bold text-xl mb-2">{event.name}</h3>
-                    <div className="flex items-center gap-3 text-white/90 text-sm mb-4">
-                      <span>{new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  <div className="absolute bottom-0 left-0 right-0 p-8">
+                    <h3 className="text-white font-bold text-2xl mb-3">{event.name}</h3>
+                    <div className="flex items-center gap-3 text-white/90 text-sm mb-6">
+                      <span className="font-medium">{new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                       <span>•</span>
-                      <span>{event.venue.city}</span>
+                      <span className="font-medium">{event.venue.city}</span>
                     </div>
-                    <button className="w-full py-2.5 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition">
+                    <button className="w-full py-3.5 bg-white/95 backdrop-blur-sm text-blue-600 font-semibold rounded-2xl hover:bg-white transition-all shadow-lg">
                       Plan My Trip →
                     </button>
                   </div>
@@ -600,34 +603,38 @@ export default function HomeClient() {
           </div>
 
           <div className="text-center">
-            <Button onClick={() => router.push('/events')} variant="outline" className="border-2 border-blue-600 text-blue-600 hover:bg-blue-50 rounded-xl px-8">
-              View All Events <ArrowRight size={16} className="ml-2" />
-            </Button>
+            <button 
+              onClick={() => router.push('/events')} 
+              className="px-10 py-4 border-2 border-gray-200 hover:border-blue-600 hover:text-blue-600 rounded-2xl font-semibold transition-all text-gray-900"
+            >
+              View All Events <ArrowRight size={18} className="ml-2 inline" />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Browse by Category */}
-      <section className="py-16 px-6">
+      {/* BROWSE BY CATEGORY - Refined */}
+      <section className="py-40 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">Browse by Category</h2>
-            <p className="text-lg text-gray-600">Find events that match your interests</p>
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-semibold text-gray-900 mb-4 tracking-tight">Browse by Category</h2>
+            <p className="text-xl text-gray-600">Find events that match your interests</p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {eventCategories.map((category, idx) => (
               <motion.div
                 key={idx}
-                initial={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.9 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.1 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1, duration: 0.4 }}
                 onClick={() => { setSearchQuery(category.name); handleSearch(); }}
                 className="group cursor-pointer"
               >
-                <div className={`bg-gradient-to-br ${category.color} p-8 rounded-2xl text-center hover:shadow-2xl transition-all`}>
-                  <category.icon className="w-12 h-12 text-white mx-auto mb-3" />
-                  <h3 className="text-white font-bold text-lg">{category.name}</h3>
+                <div className={`bg-gradient-to-br ${category.gradient} p-12 rounded-3xl text-center hover:shadow-2xl hover:scale-105 transition-all duration-300`}>
+                  <category.icon className="w-14 h-14 text-white mx-auto mb-4" />
+                  <h3 className="text-white font-bold text-xl">{category.name}</h3>
                 </div>
               </motion.div>
             ))}
@@ -635,75 +642,77 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-16 px-6 bg-gradient-to-b from-white to-blue-50">
+      {/* HOW IT WORKS - Apple-style Simple */}
+      <section className="py-40 px-6 bg-gradient-to-b from-white via-blue-50/30 to-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">How It Works</h2>
-            <p className="text-lg text-gray-600">Three simple steps to your perfect event trip</p>
+          <div className="text-center mb-24">
+            <h2 className="text-5xl font-semibold text-gray-900 mb-4 tracking-tight">How It Works</h2>
+            <p className="text-xl text-gray-600">Three simple steps to your perfect event trip</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Search className="text-white" size={28} />
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">1</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Find Events</h3>
-              <p className="text-gray-600">Search for concerts, sports, or festivals worldwide</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Ticket className="text-white" size={28} />
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">2</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Compare Tickets</h3>
-              <p className="text-gray-600">Get the best prices across all platforms</p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <Calendar className="text-white" size={28} />
-              </div>
-              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full text-white font-bold flex items-center justify-center mx-auto mb-4 text-sm">3</div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Book Everything</h3>
-              <p className="text-gray-600">Flights, hotels, and activities - all in one place</p>
-            </div>
+          <div className="grid md:grid-cols-3 gap-16">
+            {[
+              { icon: Search, title: "Find Events", desc: "Search for concerts, sports, or festivals worldwide", num: "1" },
+              { icon: Ticket, title: "Compare Tickets", desc: "Get the best prices across all platforms", num: "2" },
+              { icon: Calendar, title: "Book Everything", desc: "Flights, hotels, and activities - all in one place", num: "3" }
+            ].map((step, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.15, duration: 0.6 }}
+                className="text-center"
+              >
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200/50">
+                  <step.icon className="text-white" size={32} />
+                </div>
+                <div className="w-10 h-10 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full text-white font-bold flex items-center justify-center mx-auto mb-6 text-lg shadow-lg shadow-amber-200">
+                  {step.num}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">{step.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{step.desc}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Popular Destinations */}
-      <section className="py-16 px-6">
+      {/* POPULAR DESTINATIONS - Clean Grid */}
+      <section className="py-40 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-3">Popular Destinations</h2>
-            <p className="text-lg text-gray-600">Where the world is heading</p>
+          <div className="text-center mb-20">
+            <h2 className="text-5xl font-semibold text-gray-900 mb-4 tracking-tight">Popular Destinations</h2>
+            <p className="text-xl text-gray-600">Where the world is heading</p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
             {suggestedDestinations.map((dest, idx) => (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, scale: 0.95 }}
                 whileInView={{ opacity: 1, scale: 1 }}
-                transition={{ delay: idx * 0.05 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.05, duration: 0.4 }}
                 onClick={() => { setSearchQuery(dest.city); handleSearch(); }}
                 className="group cursor-pointer"
               >
-                <div className="relative h-64 rounded-2xl overflow-hidden border-2 border-blue-100 hover:border-blue-300 shadow-lg hover:shadow-xl transition-all">
+                <div className="relative h-80 rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500">
                   {dest.image ? (
-                    <img src={dest.image} alt={dest.city} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    <img 
+                      src={dest.image} 
+                      alt={dest.city} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                      <Globe2 className="text-blue-400" size={48} />
+                      <Globe2 className="text-blue-400" size={56} />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/80 via-blue-900/30 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="text-white font-bold text-xl">{dest.city}</h3>
-                    <p className="text-white/80 text-sm">{dest.country}</p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <h3 className="text-white font-bold text-2xl mb-1">{dest.city}</h3>
+                    <p className="text-white/80 text-sm font-medium">{dest.country}</p>
                   </div>
                 </div>
               </motion.div>
@@ -712,44 +721,30 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* Trust Signals */}
-      <section className="py-12 px-6 bg-blue-50">
+      {/* TRUST SIGNALS - Refined */}
+      <section className="py-24 px-6 bg-blue-50/30">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Shield className="text-white" size={24} />
+          <div className="grid md:grid-cols-3 gap-12">
+            {[
+              { icon: Shield, title: "Secure Payment", desc: "Your data is protected", color: "blue" },
+              { icon: Ticket, title: "Official Partners", desc: "Ticketmaster verified", color: "amber" },
+              { icon: Clock, title: "24/7 Support", desc: "We're here to help", color: "blue" }
+            ].map((item, idx) => (
+              <div key={idx} className="flex items-center gap-5">
+                <div className={`w-14 h-14 ${item.color === 'amber' ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-blue-600'} rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${item.color === 'amber' ? 'shadow-amber-200' : 'shadow-blue-200'}`}>
+                  <item.icon className="text-white" size={26} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 text-lg mb-0.5">{item.title}</h4>
+                  <p className="text-sm text-gray-600">{item.desc}</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-gray-900">Secure Payment</h4>
-                <p className="text-sm text-gray-600">Your data is protected</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Ticket className="text-white" size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-900">Official Partners</h4>
-                <p className="text-sm text-gray-600">Ticketmaster verified</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Clock className="text-white" size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-900">24/7 Support</h4>
-                <p className="text-sm text-gray-600">We're here to help</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Modals */}
+      {/* Modals & Results (keep your existing code) */}
       <TripRefinementModal
         isOpen={showRefinement}
         onClose={() => setShowRefinement(false)}
@@ -783,246 +778,114 @@ export default function HomeClient() {
         </section>
       )}
 
-      {/* Results Section */}
+      {/* Results Section (keep your existing tabs code) */}
       {(itineraryData || hotels?.length > 0 || loading) && !showPreview && (
-        <section id="results-section" className="px-4 py-12 bg-gray-50">
+        <section id="results-section" className="px-4 py-16 bg-gray-50">
           <div className="max-w-7xl mx-auto">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
               <div className="overflow-x-auto scrollbar-hide">
-                <TabsList className="inline-flex bg-white border-2 border-blue-100 p-1 rounded-xl shadow-sm min-w-max">
-                  <TabsTrigger value="itinerary" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Itinerary</TabsTrigger>
-                  <TabsTrigger value="events" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">🎉 Events</TabsTrigger>
-                  <TabsTrigger value="tickets-hub" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">🎫 Tickets Hub</TabsTrigger>
-                  <TabsTrigger value="weather" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">🌤️ Weather</TabsTrigger>
-                  <TabsTrigger value="flights" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Flights</TabsTrigger>
-                  <TabsTrigger value="hotels" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Hotels</TabsTrigger>
-                  <TabsTrigger value="restaurants" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Dining</TabsTrigger>
-                  <TabsTrigger value="activities" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Activities</TabsTrigger>
-                  <TabsTrigger value="insurance" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Insurance</TabsTrigger>
-                  <TabsTrigger value="transport" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Transport</TabsTrigger>
-                  <TabsTrigger value="maps" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Maps</TabsTrigger>
-                  <TabsTrigger value="photos" className="rounded-lg px-4 py-2 text-xs font-medium whitespace-nowrap">Photos</TabsTrigger>
+                <TabsList className="inline-flex bg-white border border-gray-200 p-1.5 rounded-2xl shadow-sm min-w-max">
+                  <TabsTrigger value="itinerary" className="rounded-xl px-5 py-2.5 text-sm font-medium">Itinerary</TabsTrigger>
+                  <TabsTrigger value="events" className="rounded-xl px-5 py-2.5 text-sm font-medium">🎉 Events</TabsTrigger>
+                  <TabsTrigger value="flights" className="rounded-xl px-5 py-2.5 text-sm font-medium">Flights</TabsTrigger>
+                  <TabsTrigger value="hotels" className="rounded-xl px-5 py-2.5 text-sm font-medium">Hotels</TabsTrigger>
+                  <TabsTrigger value="restaurants" className="rounded-xl px-5 py-2.5 text-sm font-medium">Dining</TabsTrigger>
+                  <TabsTrigger value="activities" className="rounded-xl px-5 py-2.5 text-sm font-medium">Activities</TabsTrigger>
                 </TabsList>
               </div>
 
-              <div className="bg-white rounded-2xl border-2 border-blue-100 p-4 sm:p-6 min-h-[400px]">
+              <div className="bg-white rounded-3xl border border-gray-100 p-8 min-h-[400px] shadow-sm">
                 <TabsContent value="itinerary" className="mt-0">
-                  {loading && <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>}
-                  {error && <div className="text-center py-12 text-red-600 bg-red-50 p-6 rounded-xl text-sm">{error}</div>}
+                  {loading && <div className="space-y-4"><Skeleton className="h-28 w-full rounded-2xl" /><Skeleton className="h-28 w-full rounded-2xl" /></div>}
+                  {error && <div className="text-center py-16 text-red-600 bg-red-50 p-6 rounded-2xl">{error}</div>}
                   {itineraryData && !loading && !error && <ItineraryView data={itineraryData} />}
                   {!itineraryData && !loading && !error && (
-                    <div className="text-center py-16">
-                      <Globe2 className="mx-auto mb-4 text-gray-300" size={64} />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">Ready to explore?</h3>
-                      <p className="text-gray-600">Enter a destination to start planning.</p>
+                    <div className="text-center py-20">
+                      <Globe2 className="mx-auto mb-6 text-gray-300" size={72} />
+                      <h3 className="text-2xl font-semibold text-gray-900 mb-3">Ready to explore?</h3>
+                      <p className="text-gray-600 text-lg">Enter a destination to start planning.</p>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="events" className="mt-0">
                   {liveEvents.length > 0 ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between mb-6">
-                        <div>
-                          <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                            <Trophy className="text-amber-500" size={28} />
-                            Live Events in {firstDestination}
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">Powered by Ticketmaster • Real-time data</p>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          LIVE
-                        </div>
-                      </div>
-                      
+                    <div className="space-y-6">
                       {liveEvents.map((event, i) => (
-                        <div key={i} className="bg-gradient-to-r from-blue-50 to-white border-2 border-blue-200 rounded-2xl p-6 hover:border-blue-400 hover:shadow-xl transition-all">
-                          <div className="flex items-start gap-4">
+                        <div key={i} className="bg-gradient-to-r from-blue-50 to-white border border-blue-200 rounded-2xl p-6 hover:shadow-lg transition-all">
+                          <div className="flex items-start gap-5">
                             {event.image && (
-                              <img src={event.image} alt={event.name} className="w-24 h-24 rounded-xl object-cover border-2 border-white shadow-md" />
+                              <img src={event.image} alt={event.name} className="w-28 h-28 rounded-xl object-cover border-2 border-white shadow-md flex-shrink-0" />
                             )}
-                            <div className="flex-1">
-                              <h4 className="text-xl font-bold text-gray-900 mb-2">{event.name}</h4>
-                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3">
-                                <div className="flex items-center gap-1">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-xl font-bold text-gray-900 mb-3">{event.name}</h4>
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
+                                <div className="flex items-center gap-1.5">
                                   <Calendar size={16} />
-                                  {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  <span>{new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1.5">
                                   <MapPin size={16} />
-                                  {event.venue?.name || event.venue?.city}
+                                  <span>{event.venue?.name || event.venue?.city}</span>
                                 </div>
-                                {event.source && (
-                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full font-semibold">via {event.source}</span>
-                                )}
                               </div>
-                              {event.priceRange && event.priceRange.min > 0 && (
-                                <div className="flex items-center gap-2 mb-3">
-                                  <span className="text-sm text-gray-600">From</span>
-                                  <span className="text-lg font-bold text-green-600">
-                                    {event.priceRange.currency} ${event.priceRange.min.toLocaleString()}
-                                  </span>
-                                </div>
-                              )}
-                              {event.description && <p className="text-sm text-gray-600 line-clamp-2 mb-4">{event.description}</p>}
-                              <div className="flex gap-3">
-                                {event.url && (
-                                  <a href={event.url} target="_blank" rel="noopener noreferrer" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-900 transition-all flex items-center gap-2 text-sm">
-                                    Buy Tickets <ArrowRight size={16} />
-                                  </a>
-                                )}
-                                <button
-                                  onClick={() => {
-                                    const eventDate = new Date(event.startDate);
-                                    const start = new Date(eventDate);
-                                    start.setDate(start.getDate() - 2);
-                                    const end = new Date(eventDate);
-                                    end.setDate(end.getDate() + 1);
-                                    setStartDate(start);
-                                    setEndDate(end);
-                                    setDays(4);
-                                    handleSearch(firstDestination);
-                                  }}
-                                  className="px-6 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-600 transition-all text-sm"
+                              {event.url && (
+                                <a 
+                                  href={event.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg shadow-blue-200/50"
                                 >
-                                  Plan Trip
-                                </button>
-                              </div>
+                                  Buy Tickets <ArrowRight size={16} />
+                                </a>
+                              )}
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Trophy className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p className="font-semibold text-lg text-gray-900 mb-2">No Events Found</p>
-                      <p className="text-sm mb-4">Search a destination to find live events</p>
-                      <Button onClick={() => router.push('/events')} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">Browse All Events</Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="tickets-hub" className="mt-0">
-                  <div className="space-y-8">
-                    <div className="text-center">
-                      <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 border-2 border-amber-200 rounded-full mb-6">
-                        <Ticket className="text-amber-600" size={16} />
-                        <span className="text-sm font-semibold text-amber-900">Trusted Partners</span>
-                      </div>
-                      <h3 className="text-3xl font-bold text-gray-900 mb-3">Compare Ticket Prices</h3>
-                      <p className="text-lg text-gray-600 max-w-2xl mx-auto">Find the best deals across all major ticket platforms</p>
-                    </div>
-
-                    <div className="grid md:grid-cols-4 gap-4">
-                      {ticketPartners.map((partner, idx) => (
-                        <div key={idx} className="bg-gradient-to-br from-white to-blue-50 border-2 border-blue-200 rounded-2xl p-6 text-center hover:border-blue-400 hover:shadow-xl transition-all cursor-pointer group">
-                          <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">{partner.logo}</div>
-                          <h4 className="text-lg font-bold text-gray-900 mb-1">{partner.name}</h4>
-                          <p className="text-sm text-gray-600 mb-4">{partner.category}</p>
-                          <button className="w-full py-2.5 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all">Browse Tickets</button>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid md:grid-cols-3 gap-4 mt-8">
-                      <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl border-2 border-blue-100">
-                        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
-                          <TrendingUp className="text-white" size={24} />
-                        </div>
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Price Comparison</h4>
-                        <p className="text-gray-600 text-sm">We scan all platforms to find you the best ticket prices in real-time.</p>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-amber-50 to-white p-6 rounded-2xl border-2 border-amber-200">
-                        <div className="w-12 h-12 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-xl flex items-center justify-center mb-4">
-                          <Star className="text-white fill-white" size={24} />
-                        </div>
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Premium Access</h4>
-                        <p className="text-gray-600 text-sm">Get early access to exclusive tickets and VIP experiences.</p>
-                      </div>
-
-                      <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl border-2 border-blue-100">
-                        <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
-                          <ShoppingBag className="text-white" size={24} />
-                        </div>
-                        <h4 className="text-lg font-bold text-gray-900 mb-2">Bundle Deals</h4>
-                        <p className="text-gray-600 text-sm">Save more with ticket + hotel + flight package deals.</p>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="weather" className="mt-0">
-                  {currentWeather ? <WeatherWidget destination={firstDestination} showRecommendations={true} /> : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Cloud className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p className="font-semibold text-lg text-gray-900 mb-2">Weather Forecast</p>
-                      <p className="text-sm">Search a destination to see weather conditions</p>
+                    <div className="text-center py-20">
+                      <Trophy className="mx-auto mb-6 text-gray-300" size={64} />
+                      <p className="font-semibold text-xl text-gray-900 mb-2">No Events Found</p>
+                      <p className="text-gray-600 mb-6">Search a destination to find live events</p>
+                      <button 
+                        onClick={() => router.push('/events')} 
+                        className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold transition-all"
+                      >
+                        Browse All Events
+                      </button>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="flights" className="mt-0">
                   {flights?.length > 0 ? <FlightResults flights={flights} onSaveItem={(flight) => handleSaveItem(flight, 'flight')} /> : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Plane className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p>Search to see available flights</p>
+                    <div className="text-center py-20">
+                      <Plane className="mx-auto mb-6 text-gray-300" size={64} />
+                      <p className="text-gray-600 text-lg">Search to see available flights</p>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="hotels" className="mt-0">
                   {hotels?.length > 0 ? <HotelResults hotels={hotels} onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')} /> : (
-                    <div className="text-center py-16 text-gray-500">Search to find hotels</div>
+                    <div className="text-center py-20 text-gray-600 text-lg">Search to find hotels</div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="restaurants" className="mt-0">
                   {restaurants?.length > 0 ? <RestaurantResults restaurants={restaurants} onSaveItem={(restaurant) => handleSaveItem(restaurant, 'restaurant')} /> : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Utensils className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p>Search to discover restaurants</p>
+                    <div className="text-center py-20">
+                      <Utensils className="mx-auto mb-6 text-gray-300" size={64} />
+                      <p className="text-gray-600 text-lg">Search to discover restaurants</p>
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="activities" className="mt-0">
                   {activities?.length > 0 ? <ActivityResults activities={activities} onSaveItem={(activity) => handleSaveItem(activity, 'activity')} /> : (
-                    <div className="text-center py-16 text-gray-500">Search to find activities</div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="insurance" className="mt-0">
-                  <InsuranceView destination={firstDestination} startDate={startDate?.toISOString().split('T')[0]} endDate={endDate?.toISOString().split('T')[0]} travelers={tripPreferences?.groupSize || 1} tripCost={estimatedTripCost} />
-                </TabsContent>
-
-                <TabsContent value="transport" className="mt-0">
-                  {transport ? <TransportResults transport={transport} /> : (
-                    <div className="text-center py-16 text-gray-500">
-                      <Car className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p>Search to see transport options</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="maps" className="mt-0">
-                  {firstDestination ? <MapsDirections destination={firstDestination} /> : (
-                    <div className="text-center py-16 text-gray-500">
-                      <MapPin className="mx-auto mb-4 text-gray-300" size={48} />
-                      <p>Search to view maps</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="photos" className="mt-0">
-                  {images?.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      {images.map((url, index) => url && <img key={index} src={url} alt={`View ${index + 1}`} className="w-full h-48 object-cover rounded-xl" />)}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 text-gray-500">Search to view photos</div>
+                    <div className="text-center py-20 text-gray-600 text-lg">Search to find activities</div>
                   )}
                 </TabsContent>
               </div>
@@ -1033,25 +896,54 @@ export default function HomeClient() {
 
       <Footer />
       
+      {/* Floating Action Buttons - Refined */}
       {totalSavedItems > 0 && (
-        <button onClick={() => setShowTripSummary(true)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-blue-600 to-blue-800 rounded-full shadow-2xl flex items-center justify-center z-50 hover:scale-110 transition-transform">
-          <Calendar className="text-white" size={22} />
-          <span className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-lg">{totalSavedItems}</span>
+        <button 
+          onClick={() => setShowTripSummary(true)} 
+          className="fixed bottom-8 right-8 w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full shadow-2xl shadow-blue-300/50 flex items-center justify-center z-50 hover:scale-110 transition-transform active:scale-95"
+        >
+          <Calendar className="text-white" size={24} />
+          <span className="absolute -top-2 -right-2 w-7 h-7 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full text-white text-xs font-bold flex items-center justify-center shadow-lg">
+            {totalSavedItems}
+          </span>
         </button>
       )}
 
       {itineraryData && (
-        <button onClick={() => setShowFeedback(true)} className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-2xl flex items-center justify-center z-40 hover:scale-110 transition-transform" title="Rate your trip">
-          <Star className="text-white fill-white" size={22} />
+        <button 
+          onClick={() => setShowFeedback(true)} 
+          className="fixed bottom-28 right-8 w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full shadow-2xl shadow-green-300/50 flex items-center justify-center z-40 hover:scale-110 transition-transform active:scale-95" 
+          title="Rate your trip"
+        >
+          <Star className="text-white fill-white" size={24} />
         </button>
       )}
 
-      <TripSummary isOpen={showTripSummary} onClose={() => setShowTripSummary(false)} savedItems={savedItems} onRemoveItem={handleRemoveItem} destination={firstDestination} />
-      <FeedbackModal isOpen={showFeedback} onClose={() => setShowFeedback(false)} tripData={completedTrip || { destination: firstDestination, startDate: startDate?.toISOString() || new Date().toISOString(), endDate: endDate?.toISOString() || new Date().toISOString(), tripId: 'trip_' + Date.now() }} onSubmit={handleFeedbackSubmit} />
+      <TripSummary 
+        isOpen={showTripSummary} 
+        onClose={() => setShowTripSummary(false)} 
+        savedItems={savedItems} 
+        onRemoveItem={handleRemoveItem} 
+        destination={firstDestination} 
+      />
+      
+      <FeedbackModal 
+        isOpen={showFeedback} 
+        onClose={() => setShowFeedback(false)} 
+        tripData={completedTrip || { 
+          destination: firstDestination, 
+          startDate: startDate?.toISOString() || new Date().toISOString(), 
+          endDate: endDate?.toISOString() || new Date().toISOString(), 
+          tripId: 'trip_' + Date.now() 
+        }} 
+        onSubmit={handleFeedbackSubmit} 
+      />
+      
       <GladysAIAgent 
         currentDestination={firstDestination || "Paris"}
         onBookingComplete={handleAgentBookingComplete}
       />
+      
       <EventNotificationToast userLocation={origin} />
     </main>
   );
