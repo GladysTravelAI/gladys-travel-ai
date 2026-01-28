@@ -7,15 +7,36 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { getFeaturedEvents, type Event } from '@/lib/event-data';
-import { eventService, searchEventsWithCache } from '@/lib/eventService';
+import { searchEventsWithCache } from '@/lib/eventService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+
+// Type for API search results (from Ticketmaster)
+interface SearchResultEvent {
+  id: string;
+  name: string;
+  startDate: string;
+  venue: {
+    name: string;
+    city: string;
+    country: string;
+  };
+  priceRange: {
+    min: number;
+    max: number;
+    currency: string;
+  } | null;
+  url: string;
+  image: string;
+  description: string;
+  source: string;
+}
 
 const EventsHub = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedSport, setSelectedSport] = useState<string>('all');
-  const [apiEvents, setApiEvents] = useState<any[]>([]);
+  const [apiEvents, setApiEvents] = useState<SearchResultEvent[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<'featured' | 'search'>('featured');
 
@@ -263,13 +284,41 @@ const EventsHub = () => {
       </section>
 
       <Footer />
+
+      <style jsx global>{`
+        @keyframes pulse-slow {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.05); }
+        }
+
+        @keyframes pulse-slower {
+          0%, 100% { opacity: 0.2; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.1); }
+        }
+
+        .animate-pulse-slow {
+          animation: pulse-slow 4s ease-in-out infinite;
+        }
+
+        .animate-pulse-slower {
+          animation: pulse-slower 6s ease-in-out infinite;
+        }
+      `}</style>
     </main>
   );
 };
 
 // Event Card Component
-const EventCard = ({ event, index, isApiEvent }: { event: any; index: number; isApiEvent?: boolean }) => {
-  const imageUrl = event.image || event.thumbnail || event.heroImage || '';
+const EventCard = ({ event, index, isApiEvent }: { event: Event | SearchResultEvent; index: number; isApiEvent?: boolean }) => {
+  // Handle different image field names
+  const getImageUrl = (event: Event | SearchResultEvent): string => {
+    if ('image' in event && event.image) return event.image;
+    if ('thumbnail' in event && event.thumbnail) return event.thumbnail;
+    if ('heroImage' in event && event.heroImage) return event.heroImage;
+    return '';
+  };
+
+  const imageUrl = getImageUrl(event);
   const imageStyle = imageUrl.startsWith('linear-gradient') 
     ? { background: imageUrl }
     : { backgroundImage: `url(${imageUrl})` };
@@ -280,7 +329,7 @@ const EventCard = ({ event, index, isApiEvent }: { event: any; index: number; is
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
     >
-      {isApiEvent && event.url ? (
+      {isApiEvent && 'url' in event && event.url ? (
         <a href={event.url} target="_blank" rel="noopener noreferrer" className="group block">
           <EventCardContent event={event} imageStyle={imageStyle} isApiEvent={isApiEvent} />
         </a>
@@ -293,7 +342,13 @@ const EventCard = ({ event, index, isApiEvent }: { event: any; index: number; is
   );
 };
 
-const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: any; imageStyle: any; isApiEvent?: boolean }) => {
+const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | SearchResultEvent; imageStyle: any; isApiEvent?: boolean }) => {
+  // Type-safe property access
+  const eventType = 'type' in event ? event.type : 'Event';
+  const isFeatured = 'featured' in event ? event.featured : false;
+  const eventSource = 'source' in event ? event.source : undefined;
+  const eventDescription = 'description' in event ? event.description : undefined;
+
   return (
     <div className="relative h-full bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200">
       {/* Image */}
@@ -313,7 +368,7 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: any; image
         )}
 
         {/* Featured Badge */}
-        {event.featured && !isApiEvent && (
+        {isFeatured && !isApiEvent && (
           <div className="absolute top-4 right-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full text-xs font-bold flex items-center gap-2 shadow-lg">
             <Sparkles size={14} />
             Featured
@@ -322,7 +377,7 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: any; image
 
         {/* Type Badge */}
         <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-semibold border border-white/30">
-          {event.type ? event.type.charAt(0).toUpperCase() + event.type.slice(1) : 'Event'}
+          {eventType ? eventType.charAt(0).toUpperCase() + eventType.slice(1) : 'Event'}
         </div>
 
         {/* Event Name */}
@@ -355,29 +410,37 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: any; image
               {event.venue?.city || 'TBD'}, {event.venue?.country || 'TBD'}
             </span>
           </div>
-          {(event.estimatedTicketPrice || event.priceRange) && (
+          {(('estimatedTicketPrice' in event && event.estimatedTicketPrice) || event.priceRange) && (
             <div className="flex items-center gap-2 text-gray-600">
               <Ticket size={16} />
               <span className="text-sm font-medium">
-                From {event.estimatedTicketPrice?.currency || event.priceRange?.currency || 'USD'} $
-                {(event.estimatedTicketPrice?.min || event.priceRange?.min || 0).toLocaleString()}
+                From {
+                  ('estimatedTicketPrice' in event && event.estimatedTicketPrice?.currency) || 
+                  event.priceRange?.currency || 
+                  'USD'
+                } $
+                {(
+                  ('estimatedTicketPrice' in event && event.estimatedTicketPrice?.min) || 
+                  event.priceRange?.min || 
+                  0
+                ).toLocaleString()}
               </span>
             </div>
           )}
         </div>
 
         {/* Description */}
-        {event.description && (
+        {eventDescription && (
           <p className="text-gray-600 text-sm line-clamp-2">
-            {event.description}
+            {eventDescription}
           </p>
         )}
 
         {/* Source Badge */}
-        {isApiEvent && event.source && (
+        {isApiEvent && eventSource && (
           <div className="pt-2">
             <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-              via {event.source}
+              via {eventSource}
             </span>
           </div>
         )}

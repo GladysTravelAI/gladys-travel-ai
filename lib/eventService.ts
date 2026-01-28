@@ -469,11 +469,33 @@ export async function universalSearch(query: string): Promise<SearchResult[]> {
 }
 
 /**
+ * Cached search for events page
+ * This is an alias for universalSearch for backward compatibility
+ */
+export async function searchEventsWithCache(query?: string): Promise<SearchResult[]> {
+  // If no query, return featured events
+  if (!query || query.trim() === '') {
+    console.log('🎫 No query provided, using default search');
+    // Return some default results or empty array
+    return [];
+  }
+  
+  // Use universalSearch which already has the logic
+  return universalSearch(query);
+}
+
+/**
  * Export eventService object for compatibility with existing code
  */
 export const eventService = {
   universalSearch,
   fetchLiveEvents,
   clearEventsCache,
-  getEventsCacheStats
+  getEventsCacheStats,
+  searchEventsWithCache
 };
+
+/**
+ * Also export as default for maximum compatibility
+ */
+export default eventService;
