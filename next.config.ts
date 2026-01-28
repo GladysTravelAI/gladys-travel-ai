@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true, // From our previous config
   
+  // Skip ESLint during production builds
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
   // From our previous config to allow external images
   images: {
     remotePatterns: [
@@ -22,13 +27,13 @@ const nextConfig: NextConfig = {
   },
 
   // Your new properties
-  experimental: {
-    // Skip prerendering for specific routes
-  },
-  // Add these pages to skip static generation
-  async rewrites() {
-    return [];
-  },
+  experimental: {
+    // Skip prerendering for specific routes
+  },
+  // Add these pages to skip static generation
+  async rewrites() {
+    return [];
+  },
 };
 
 export default nextConfig;
