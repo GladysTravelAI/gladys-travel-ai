@@ -49,14 +49,153 @@
   }
 }
 
+/* ============================================
+   TYPOGRAPHY SYSTEM - World-Class Standards
+   ============================================ */
+
 @layer base {
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 
+                 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 
+                 sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'kern' 1, 'liga' 1;
+  }
+
+  /* Hero Headlines - Extra Bold, Tight Spacing */
+  h1 {
+    @apply text-6xl md:text-7xl lg:text-8xl;
+    @apply font-bold tracking-tight leading-[0.95];
+    @apply text-gray-900;
+    letter-spacing: -0.02em;
+  }
+
+  /* Section Headers - Bold, Readable */
+  h2 {
+    @apply text-4xl md:text-5xl;
+    @apply font-bold tracking-tight leading-tight;
+    @apply text-gray-900;
+    letter-spacing: -0.01em;
+  }
+
+  /* Card Titles - Semibold, Clear */
+  h3 {
+    @apply text-2xl md:text-3xl;
+    @apply font-bold leading-snug;
+    @apply text-gray-900;
+  }
+
+  /* Subheadings - Medium Weight */
+  h4 {
+    @apply text-xl md:text-2xl;
+    @apply font-semibold leading-snug;
+    @apply text-gray-900;
+  }
+
+  /* Body Text - Comfortable Reading */
+  p {
+    @apply text-base md:text-lg;
+    @apply leading-relaxed;
+    @apply text-gray-600;
+  }
+
+  /* Small Text - Meta Info */
+  small {
+    @apply text-sm;
+    @apply text-gray-500;
   }
 }
+
+/* ============================================
+   SPACING SYSTEM - Generous White Space
+   ============================================ */
+
+@layer utilities {
+  .section-padding {
+    @apply py-20 md:py-32;
+  }
+
+  .content-padding {
+    @apply px-6 md:px-12;
+  }
+
+  .card-padding {
+    @apply p-8 md:p-10;
+  }
+
+  .tight-spacing {
+    @apply space-y-2;
+  }
+
+  .normal-spacing {
+    @apply space-y-4;
+  }
+
+  .relaxed-spacing {
+    @apply space-y-8;
+  }
+
+  .generous-spacing {
+    @apply space-y-12;
+  }
+}
+
+/* ============================================
+   COMPONENT STYLES - Premium Feel
+   ============================================ */
+
+/* Smooth Transitions */
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .transition-spring {
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Premium Shadows */
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  }
+
+  .shadow-medium {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  .shadow-strong {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* Glassmorphism */
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* ============================================
+   SCROLLBAR STYLING - Minimal & Clean
+   ============================================ */
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .scrollbar-hide::-webkit-scrollbar {
@@ -67,4 +206,139 @@
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* Custom Scrollbar - When Visible */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   FOCUS STATES - Accessible & Beautiful
+   ============================================ */
+
+@layer utilities {
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+  }
+
+  .focus-ring-inset {
+    @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500;
+  }
+}
+
+/* ============================================
+   ANIMATIONS - Subtle & Sophisticated
+   ============================================ */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES - Consistency
+   ============================================ */
+
+@layer utilities {
+  /* Border Radius - Apple Style */
+  .rounded-button {
+    @apply rounded-full;
+  }
+
+  .rounded-card {
+    @apply rounded-3xl;
+  }
+
+  .rounded-input {
+    @apply rounded-2xl;
+  }
+
+  /* Container Widths */
+  .container-tight {
+    @apply max-w-3xl mx-auto;
+  }
+
+  .container-normal {
+    @apply max-w-5xl mx-auto;
+  }
+
+  .container-wide {
+    @apply max-w-7xl mx-auto;
+  }
+}
+
+/* ============================================
+   PRINT STYLES - Professional Output
+   ============================================ */
+
+@media print {
+  body {
+    @apply text-black bg-white;
+  }
+
+  nav, footer, button {
+    display: none !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
 }
