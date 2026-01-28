@@ -349,6 +349,25 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
   const eventSource = 'source' in event ? event.source : undefined;
   const eventDescription = 'description' in event ? event.description : undefined;
 
+  // Helper to get price info
+  const getPriceInfo = (event: Event | SearchResultEvent) => {
+    if ('estimatedTicketPrice' in event && event.estimatedTicketPrice) {
+      return {
+        currency: event.estimatedTicketPrice.currency || 'USD',
+        min: event.estimatedTicketPrice.min || 0
+      };
+    }
+    if ('priceRange' in event && event.priceRange) {
+      return {
+        currency: event.priceRange.currency || 'USD',
+        min: event.priceRange.min || 0
+      };
+    }
+    return null;
+  };
+
+  const priceInfo = getPriceInfo(event);
+
   return (
     <div className="relative h-full bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200">
       {/* Image */}
@@ -410,20 +429,11 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
               {event.venue?.city || 'TBD'}, {event.venue?.country || 'TBD'}
             </span>
           </div>
-          {(('estimatedTicketPrice' in event && event.estimatedTicketPrice) || event.priceRange) && (
+          {priceInfo && (
             <div className="flex items-center gap-2 text-gray-600">
               <Ticket size={16} />
               <span className="text-sm font-medium">
-                From {
-                  ('estimatedTicketPrice' in event && event.estimatedTicketPrice?.currency) || 
-                  event.priceRange?.currency || 
-                  'USD'
-                } $
-                {(
-                  ('estimatedTicketPrice' in event && event.estimatedTicketPrice?.min) || 
-                  event.priceRange?.min || 
-                  0
-                ).toLocaleString()}
+                From {priceInfo.currency} ${priceInfo.min.toLocaleString()}
               </span>
             </div>
           )}
