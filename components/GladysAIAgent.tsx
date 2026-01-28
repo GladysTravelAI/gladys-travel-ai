@@ -247,7 +247,7 @@ class AgentWorkflowEngine {
   private async searchEvents(query: string): Promise<any[]> {
     try {
      const results = await eventService.universalSearch(query);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
-      return events.slice(0, 5);
+      return results.slice(0, 5);
     } catch {
       return [];
     }
