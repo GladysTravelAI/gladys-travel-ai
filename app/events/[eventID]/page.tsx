@@ -10,14 +10,15 @@ import EventStickyHeader from "@/components/EventStickyHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import tab components (we'll create these)
-import ItineraryTab from "@/components/event-tabs/index/ItineraryTab";
-import StayTab from "@/components/event-tabs/StayTab";
-import FlightsTab from "@/components/event-tabs/FlightsTab";
-import AroundEventTab from "@/components/event-tabs/AroundEventTab";
-import DiningTab from "@/components/event-tabs/DiningTab";
-import InsuranceTab from "@/components/event-tabs/InsuranceTab";
-import PhotosTab from "@/components/event-tabs/PhotosTab";
-
+import { 
+  ItineraryTab,
+  StayTab,
+  FlightsTab,
+  AroundEventTab,
+  DiningTab,
+  InsuranceTab,
+  PhotosTab
+} from "@/components/event-tabs";
 export default function EventDetailPage() {
   const params = useParams();
   const eventId = params?.id as string;
