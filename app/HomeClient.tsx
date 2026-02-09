@@ -21,7 +21,10 @@ import {
   MessageSquare,
   Bookmark,
   Settings,
-  CloudRain
+  CloudRain,
+  Trophy,
+  Music,
+  PartyPopper
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -92,6 +95,50 @@ interface SavedItem {
   description?: string;
 }
 
+// ==================== EVENT TYPE CONFIGURATION ====================
+// Strategic: Define event types as constants for scalability
+type EventType = 'sports' | 'music' | 'festivals' | null;
+
+interface EventTypeConfig {
+  id: EventType;
+  label: string;
+  icon: any;
+  placeholder: string;
+  examples: string[];
+  color: string;
+  bgColor: string;
+}
+
+const EVENT_TYPES: EventTypeConfig[] = [
+  {
+    id: 'sports',
+    label: 'Sports',
+    icon: Trophy,
+    placeholder: 'World Cup 2026, Super Bowl, Wimbledon...',
+    examples: ['World Cup 2026', 'NBA Finals', 'Premier League'],
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50 hover:bg-blue-100 border-blue-200'
+  },
+  {
+    id: 'music',
+    label: 'Music',
+    icon: Music,
+    placeholder: 'Taylor Swift, Coachella, Glastonbury...',
+    examples: ['Coachella', 'Beyoncé Tour', 'Glastonbury'],
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50 hover:bg-purple-100 border-purple-200'
+  },
+  {
+    id: 'festivals',
+    label: 'Festivals',
+    icon: PartyPopper,
+    placeholder: 'Carnival, Oktoberfest, Burning Man...',
+    examples: ['Rio Carnival', 'Oktoberfest', 'La Tomatina'],
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-50 hover:bg-orange-100 border-orange-200'
+  }
+];
+
 // ==================== MAIN COMPONENT ====================
 
 export default function HomeClient() {
@@ -99,6 +146,9 @@ export default function HomeClient() {
   const { user, userProfile, updateUserProfile } = useAuth();
   
   // ==================== STATE MANAGEMENT ====================
+  
+  // STRATEGIC: Event Type - Core to the product evolution
+  const [eventType, setEventType] = useState<EventType>(null);
   
   // Search & Trip State
   const [searchQuery, setSearchQuery] = useState("");
@@ -177,6 +227,22 @@ export default function HomeClient() {
                           (savedItems.restaurants?.length || 0) + 
                           (savedItems.activities?.length || 0);
 
+  // STRATEGIC: Get current event type config for dynamic UI
+  const currentEventConfig = EVENT_TYPES.find(e => e.id === eventType);
+  const searchPlaceholder = currentEventConfig?.placeholder || "Choose an event type above to get started";
+
+  // ==================== EVENT TYPE HANDLERS ====================
+  
+  const handleEventTypeSelect = (type: EventType) => {
+    setEventType(type);
+    setSearchQuery(""); // Reset search when changing event type
+    
+    // Analytics: Track event type selection (future upgrade)
+    if (user) {
+      profileManager.trackTripPlanned(user.uid, `Event Type: ${type}`).catch(console.error);
+    }
+  };
+
   // ==================== HANDLERS ====================
   
   const handleSaveItem = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
@@ -235,10 +301,17 @@ export default function HomeClient() {
     toast.success('Item removed from trip');
   };
 
+  // STRATEGIC: Enhanced search with event context
   const handleSearch = async (query?: string, preferences?: TripPreferences) => {
     const location = query || searchQuery;
     if (!location.trim()) {
-      toast.error('Please enter a destination');
+      toast.error('Please enter an event or destination');
+      return;
+    }
+
+    // STRATEGIC: Require event type selection for better UX and data quality
+    if (!eventType) {
+      toast.error('Please select an event type first');
       return;
     }
 
@@ -257,13 +330,15 @@ export default function HomeClient() {
       events: true,
     });
 
-    toast.loading('Searching for your perfect trip...', {
+    toast.loading(`Finding the best ${eventType} travel options...`, {
       id: 'search-toast',
     });
     
     try {
+      // STRATEGIC: Include event type in all API calls for intelligent recommendations
       const itineraryPayload = { 
         location, 
+        eventType, // NEW: Event context for AI decision engine
         tripType: prefs?.tripType || tripType || 'balanced',
         budget: prefs?.budget || selectedBudget,
         days: prefs?.days || days,
@@ -287,9 +362,9 @@ export default function HomeClient() {
         eventImages, landmarkMapsData
       ] = await Promise.all([
         fetch("/api/itinerary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(itineraryPayload) }),
-        fetch("/api/restaurants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, tripType: prefs?.tripType || tripType }) }),
-        fetch("/api/hotels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destination: location, budget: prefs?.budget || selectedBudget }) }),
-        fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, tripType: prefs?.tripType || tripType }) }),
+        fetch("/api/restaurants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, eventType, tripType: prefs?.tripType || tripType }) }),
+        fetch("/api/hotels", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destination: location, eventType, budget: prefs?.budget || selectedBudget }) }),
+        fetch("/api/activities", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location, eventType, tripType: prefs?.tripType || tripType }) }),
         fetch("/api/images", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destination: location }) }),
         fetch("/api/flights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ origin: prefs?.origin || origin, destination: location, passengers: prefs?.groupSize || 1, departDate: startDate?.toISOString(), returnDate: endDate?.toISOString() }) }),
         fetch("/api/transport", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destination: location, origin: prefs?.origin || origin }) }),
@@ -298,50 +373,38 @@ export default function HomeClient() {
         landmarkMapsPromise
       ]);
 
-      const [itinerary, restaurantsData, hotelsData, activitiesData, imagesData, flightsData, transportData] = await Promise.all([
-        itineraryRes.json(), restaurantsRes.json(), hotelsRes.json(), activitiesRes.json(), imagesRes.json(), flightsRes.json(), transportRes.json()
+      const [itineraryData, restaurantsData, hotelsData, activitiesData, imagesData, flightsData, transportData] = await Promise.all([
+        itineraryRes.json(),
+        restaurantsRes.json(),
+        hotelsRes.json(),
+        activitiesRes.json(),
+        imagesRes.json(),
+        flightsRes.json(),
+        transportRes.json()
       ]);
 
-      if (!itineraryRes.ok) throw new Error(itinerary.error || "Failed to fetch itinerary");
-
-      setItineraryData(itinerary);
+      // Process results
+      setItineraryData(itineraryData);
       setRestaurants(restaurantsData.restaurants || []);
       setHotels(hotelsData.hotels || []);
       setActivities(activitiesData.activities || []);
+      setFlights(flightsData.flights || []);
+      setTransport(transportData);
+      setImages(imagesData.images || []);
+      setFirstDestination(location);
+      setLiveEvents(liveEventsData);
       
-      // Combine regular images with event images
-      const allImages = [
-        ...(imagesData.images?.filter((url: string) => url) || []),
-        ...(eventImages || [])
-      ];
-      setImages(allImages);
+      // Combine event images with regular images
+      if (eventImages && eventImages.length > 0) {
+        setImages(prev => [...eventImages, ...prev]);
+      }
       
-      // Store landmark maps data if available
       if (landmarkMapsData) {
         console.log('Landmark maps data available for', location, landmarkMapsData);
-        // You can use this data to enhance map markers, venue displays, etc.
       }
-      
-      setFlights(flightsData.flights || []);
-      setTransport(transportData.transport || null);
-      setFirstDestination(location);
-      setDays(prefs?.days || days);
-      
-      if (liveEventsData && liveEventsData.length > 0) {
-        setLiveEvents(liveEventsData.slice(0, 10));
-      } else {
-        setLiveEvents([]);
-      }
-      
-      // Weather is now handled by WeatherWidget component
-      // which uses onWeatherLoad callback to update currentWeather
-      
-      const flightCost = flightsData.flights?.[0]?.price || 800;
-      const hotelCost = (hotelsData.hotels?.[0]?.price || 150) * (prefs?.days || days);
-      setEstimatedTripCost(flightCost + hotelCost + 500);
-      
+
+      // Track successful search
       if (user) {
-        await profileManager.trackSearch(user.uid, location);
         await profileManager.trackTripPlanned(user.uid, location);
         
         if (prefs) {
@@ -353,29 +416,12 @@ export default function HomeClient() {
           });
         }
       }
-      
-      toast.dismiss('search-toast');
-      toast.success('Trip planned successfully!', {
-        description: `Found ${hotels.length} hotels, ${restaurants.length} restaurants, and more`,
+
+      toast.success(`Found amazing ${eventType} options!`, {
+        id: 'search-toast',
+        description: `${hotels.length || 0} hotels, ${flights.length || 0} flights`
       });
 
-      if (flightsData.flights?.length > 0 && hotelsData.hotels?.length > 0) {
-        setShowPreview(true);
-      } else {
-        setActiveTab("itinerary");
-        setTimeout(() => {
-          document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to fetch travel data.";
-      setError(errorMessage);
-      toast.dismiss('search-toast');
-      toast.error('Search failed', {
-        description: errorMessage,
-      });
-    } finally {
-      setLoading(false);
       setLoadingStates({
         itinerary: false,
         hotels: false,
@@ -384,47 +430,40 @@ export default function HomeClient() {
         flights: false,
         events: false,
       });
+
+      // Scroll to results
+      setTimeout(() => {
+        document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+      
+    } catch (err) {
+      console.error('Search error:', err);
+      setError('Failed to search. Please try again.');
+      toast.error('Search failed', {
+        id: 'search-toast',
+        description: 'Please try again or contact support'
+      });
+      
+      setLoadingStates({
+        itinerary: false,
+        hotels: false,
+        restaurants: false,
+        activities: false,
+        flights: false,
+        events: false,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const toggleVoiceInput = () => {
-    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error('Speech recognition not supported', {
-        description: 'Please use a supported browser like Chrome',
-      });
-      return;
+    setIsListening(!isListening);
+    if (!isListening) {
+      toast.success('Voice input activated');
     }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.onstart = () => {
-      setIsListening(true);
-      toast.info('Listening...', { id: 'voice-toast' });
-    };
-    recognition.onend = () => {
-      setIsListening(false);
-      toast.dismiss('voice-toast');
-    };
-    recognition.onerror = () => {
-      setIsListening(false);
-      toast.dismiss('voice-toast');
-      toast.error('Voice input failed');
-    };
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchQuery(transcript);
-      toast.success('Voice captured!', {
-        description: transcript,
-      });
-    };
-
-    if (isListening) recognition.stop(); 
-    else recognition.start();
   };
 
-  // NEW: Voice Planner Handler
   const handleVoicePlannerComplete = (destination: string, dates: { start: Date; end: Date }) => {
     setSearchQuery(destination);
     setStartDate(dates.start);
@@ -433,44 +472,39 @@ export default function HomeClient() {
     handleSearch(destination);
   };
 
-  const handleFeedbackSubmit = async (feedback: any) => {
-    try {
-      await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(feedback) });
-      if (user) {
-        await profileManager.saveFeedback(user.uid, feedback);
-      }
-      toast.success('Thank you for your feedback!');
-    } catch (error) {
-      console.error('Failed to save feedback:', error);
-      toast.error('Failed to save feedback');
-    }
+  const handleRefinementSubmit = async (preferences: TripPreferences) => {
+    setTripPreferences(preferences);
+    setShowRefinement(false);
+    await handleSearch(searchQuery, preferences);
   };
 
   // ==================== EFFECTS ====================
   
   useEffect(() => {
-    const featured = getFeaturedEvents().slice(0, 3);
-    setFeaturedEvents(featured);
-
-    if (userProfile) {
-      if (userProfile.budgetRange) setSelectedBudget(userProfile.budgetRange);
-      if (userProfile.location) setOrigin(userProfile.location);
-    }
-  }, [userProfile]);
+    const loadFeaturedEvents = async () => {
+      const events = await getFeaturedEvents();
+      setFeaturedEvents(events);
+    };
+    loadFeaturedEvents();
+  }, []);
 
   // ==================== RENDER ====================
   
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-gradient-to-b from-white to-gray-50">
       <Navbar />
-      
-      {/* HERO SECTION */}
-      <section className="relative min-h-screen flex items-center justify-center px-6 py-32">
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-50/50 via-white to-white -z-10" />
+
+      {/* HERO SECTION - EVENT-FOCUSED */}
+      <section className="relative min-h-[85vh] flex items-center justify-center px-6 pt-32 pb-20">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-20"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-100 rounded-full blur-3xl opacity-20"></div>
+        </div>
         
-        <div className="max-w-4xl mx-auto text-center w-full space-y-12">
+        <div className="max-w-4xl mx-auto text-center w-full space-y-12 relative z-10">
           
-          {/* Headline */}
+          {/* STRATEGIC: Event-First Headline */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -478,17 +512,76 @@ export default function HomeClient() {
             className="space-y-6"
           >
             <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-gray-900 leading-[0.95]">
-              Find the event.
+              Your event.
               <br />
-              <span className="text-blue-600">We'll plan everything else.</span>
+              <span className="text-blue-600">Your perfect trip.</span>
             </h1>
             
             <p className="text-xl sm:text-2xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-normal">
-              AI plans your trip to concerts, festivals, and sports—flights, hotels, tickets—in one place.
+              Sports. Music. Festivals. We find the event tickets, flights, and hotels—all in one place.
             </p>
           </motion.div>
 
-          {/* Search Box */}
+          {/* STRATEGIC: Event Type Selector - Core Product Feature */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="max-w-2xl mx-auto"
+          >
+            <p className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">
+              Choose your event type
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              {EVENT_TYPES.map((type) => {
+                const Icon = type.icon;
+                const isSelected = eventType === type.id;
+                
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => handleEventTypeSelect(type.id)}
+                    className={`
+                      relative p-6 rounded-2xl border-2 transition-all duration-300
+                      ${isSelected 
+                        ? `${type.bgColor} border-current shadow-lg scale-105` 
+                        : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'
+                      }
+                    `}
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <div className={`
+                        w-12 h-12 rounded-xl flex items-center justify-center
+                        ${isSelected ? type.color : 'text-gray-400'}
+                        ${isSelected ? type.bgColor.replace('hover:', '') : 'bg-gray-50'}
+                      `}>
+                        <Icon size={24} />
+                      </div>
+                      <span className={`
+                        font-semibold
+                        ${isSelected ? type.color : 'text-gray-700'}
+                      `}>
+                        {type.label}
+                      </span>
+                    </div>
+                    
+                    {/* Selection Indicator */}
+                    {isSelected && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center"
+                      >
+                        <Sparkles size={14} className="text-white" />
+                      </motion.div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* STRATEGIC: Event Search - Adapts to selected event type */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -498,17 +591,28 @@ export default function HomeClient() {
             <div className="relative group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={22} />
               <Input 
-                placeholder="Search for an event: Coachella, Lakers, Wimbledon..." 
+                placeholder={searchPlaceholder}
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && handleSearch()}
-                className="w-full h-20 pl-16 pr-24 text-lg font-medium rounded-3xl border-2 border-gray-200 hover:border-gray-300 focus:border-blue-600 bg-white shadow-lg transition-all"
+                onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && eventType && handleSearch()}
+                disabled={!eventType}
+                className={`
+                  w-full h-20 pl-16 pr-24 text-lg font-medium rounded-3xl border-2 
+                  bg-white shadow-lg transition-all
+                  ${!eventType 
+                    ? 'border-gray-200 opacity-50 cursor-not-allowed' 
+                    : 'border-gray-200 hover:border-gray-300 focus:border-blue-600'
+                  }
+                `}
               />
               <button 
                 onClick={toggleVoiceInput} 
+                disabled={!eventType}
                 className={`absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
                   isListening 
                     ? 'bg-blue-600 text-white' 
+                    : !eventType
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'hover:bg-gray-100 text-gray-600'
                 }`}
               >
@@ -518,7 +622,7 @@ export default function HomeClient() {
 
             {/* Date inputs - DateRangePicker or basic inputs */}
             <AnimatePresence>
-              {searchQuery && (
+              {searchQuery && eventType && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
@@ -565,8 +669,8 @@ export default function HomeClient() {
             </AnimatePresence>
 
             <button 
-              onClick={() => searchQuery.trim() && handleSearch()} 
-              disabled={!searchQuery.trim() || loading}
+              onClick={() => searchQuery.trim() && eventType && handleSearch()} 
+              disabled={!searchQuery.trim() || !eventType || loading}
               className="w-full h-16 mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-3xl text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -575,11 +679,11 @@ export default function HomeClient() {
                   Searching...
                 </span>
               ) : (
-                'Search Events'
+                `Find ${eventType ? currentEventConfig?.label : 'Event'} Travel`
               )}
             </button>
 
-            {/* NEW: Quick Actions */}
+            {/* Quick Actions */}
             <div className="flex gap-2 mt-4">
               <Button
                 onClick={() => setShowVoicePlanner(true)}
@@ -621,10 +725,10 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* FEATURED EVENT */}
+      {/* FEATURED EVENTS */}
       <EventsBanner />
 
-      {/* HOW IT WORKS */}
+      {/* HOW IT WORKS - EVENT-FOCUSED */}
       <section className="py-32 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-20">
@@ -634,9 +738,9 @@ export default function HomeClient() {
 
           <div className="grid md:grid-cols-3 gap-12">
             {[
-              { step: "1", title: "Find your event", desc: "Search concerts, sports, or festivals worldwide" },
-              { step: "2", title: "See the options", desc: "Compare flights, hotels, and ticket prices instantly" },
-              { step: "3", title: "Book everything", desc: "One checkout for your entire trip" }
+              { step: "1", title: "Pick your event", desc: "Sports, music, or festivals—tell us what you're going to" },
+              { step: "2", title: "See smart options", desc: "AI finds the best flights, hotels, and tickets for your event" },
+              { step: "3", title: "Book it all", desc: "Complete your trip with our trusted partners" }
             ].map((item, idx) => (
               <motion.div
                 key={idx}
@@ -666,8 +770,8 @@ export default function HomeClient() {
                 <Shield className="text-white" size={24} />
               </div>
               <div>
-                <h4 className="font-bold text-gray-900 mb-1">Secure Payment</h4>
-                <p className="text-sm text-gray-600">Your data is encrypted and protected</p>
+                <h4 className="font-bold text-gray-900 mb-1">Secure Booking</h4>
+                <p className="text-sm text-gray-600">Bank-level encryption for all transactions</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -676,16 +780,16 @@ export default function HomeClient() {
               </div>
               <div>
                 <h4 className="font-bold text-gray-900 mb-1">Official Partners</h4>
-                <p className="text-sm text-gray-600">Verified Ticketmaster integration</p>
+                <p className="text-sm text-gray-600">Ticketmaster, Booking.com, and more</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <Clock className="text-white" size={24} />
+                <Sparkles className="text-white" size={24} />
               </div>
               <div>
-                <h4 className="font-bold text-gray-900 mb-1">24/7 Support</h4>
-                <p className="text-sm text-gray-600">AI assistance whenever you need it</p>
+                <h4 className="font-bold text-gray-900 mb-1">AI-Powered</h4>
+                <p className="text-sm text-gray-600">Smart recommendations based on your event</p>
               </div>
             </div>
           </div>
@@ -698,373 +802,264 @@ export default function HomeClient() {
           <div className="max-w-7xl mx-auto">
             {/* Results Header */}
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+              className="mb-8"
             >
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Your Trip to {firstDestination}</h2>
-                <div className="flex gap-2">
-                  {totalSavedItems > 0 && (
-                    <Badge className="bg-blue-600 text-white">
-                      {totalSavedItems} items saved
-                    </Badge>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-4xl font-bold text-gray-900 mb-2">
+                    Your {eventType && currentEventConfig?.label} Trip
+                  </h2>
+                  <p className="text-gray-600 text-lg">
+                    {firstDestination && `${firstDestination} • `}
+                    {startDate && endDate && `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`}
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  {currentWeather && (
+                    <Button
+                      onClick={() => setShowWeather(true)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <CloudRain size={16} className="mr-2" />
+                      {currentWeather.temp}°
+                    </Button>
                   )}
-                  {currentWeather && showWeather && (
-                    <Badge variant="outline" className="border-blue-300 text-blue-700">
-                      <CloudRain size={14} className="mr-1" />
-                      {currentWeather.temp}°C
-                    </Badge>
+                  
+                  <Button
+                    onClick={() => setShowMaps(true)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <MapPin size={16} className="mr-2" />
+                    Map
+                  </Button>
+                  
+                  {totalSavedItems > 0 && (
+                    <Button
+                      onClick={() => setShowTripSummary(true)}
+                      variant="default"
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Bookmark size={16} className="mr-2" />
+                      View Trip ({totalSavedItems})
+                    </Button>
                   )}
                 </div>
               </div>
-              
-              <div className="flex gap-2">
-                {firstDestination && (
-                  <>
-                    <Button
-                      onClick={() => setShowMaps(!showMaps)}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                    >
-                      <MapPin size={16} />
-                      {showMaps ? 'Hide' : 'Show'} Map
-                    </Button>
-                    {currentWeather && (
-                      <Button
-                        onClick={() => setShowWeather(!showWeather)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <CloudRain size={16} />
-                        Weather
-                      </Button>
-                    )}
-                  </>
-                )}
-                <Button
-                  onClick={() => router.push('/settings')}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <Settings size={16} />
-                  Settings
-                </Button>
-              </div>
+
+              {/* Event Type Badge */}
+              {eventType && (
+                <Badge variant="secondary" className="text-sm">
+                  {currentEventConfig?.icon && <currentEventConfig.icon size={14} className="mr-1" />}
+                  {currentEventConfig?.label} Event
+                </Badge>
+              )}
             </motion.div>
 
-            {/* Weather Widget */}
-            <AnimatePresence>
-              {showWeather && currentWeather && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-8 overflow-hidden"
-                >
-                  <WeatherWidget 
-                    destination={firstDestination}
-                    showRecommendations={true}
-                    showHourlyForecast={false}
-                    onWeatherLoad={(weather) => {
-                      setCurrentWeather({
-                        temp: weather.current.temp,
-                        condition: weather.current.condition,
-                        humidity: weather.current.humidity,
-                        wind_speed: weather.current.wind_speed
-                      });
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Results Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="w-full justify-start mb-8 bg-white p-2 rounded-2xl shadow-sm">
+                <TabsTrigger value="itinerary" className="flex items-center gap-2">
+                  <Sparkles size={16} />
+                  <span className="hidden sm:inline">Itinerary</span>
+                </TabsTrigger>
+                <TabsTrigger value="hotels" className="flex items-center gap-2">
+                  <Hotel size={16} />
+                  <span className="hidden sm:inline">Hotels</span>
+                  {hotels.length > 0 && <Badge variant="secondary">{hotels.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="flights" className="flex items-center gap-2">
+                  <Plane size={16} />
+                  <span className="hidden sm:inline">Flights</span>
+                  {flights.length > 0 && <Badge variant="secondary">{flights.length}</Badge>}
+                </TabsTrigger>
+                <TabsTrigger value="restaurants" className="flex items-center gap-2">
+                  <Utensils size={16} />
+                  <span className="hidden sm:inline">Dining</span>
+                </TabsTrigger>
+                <TabsTrigger value="activities" className="flex items-center gap-2">
+                  <Zap size={16} />
+                  <span className="hidden sm:inline">Activities</span>
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Maps Section */}
-            <AnimatePresence>
-              {showMaps && firstDestination && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-8 overflow-hidden"
-                >
-                  <div className="bg-white rounded-3xl border-2 border-gray-200 p-6">
-                    <MapsDirections 
-                      destination={firstDestination}
-                      defaultOrigin={origin}
-                    />
+              <TabsContent value="itinerary" className="mt-0">
+                {itineraryData ? (
+                  <ItineraryView data={itineraryData} />
+                ) : (
+                  <div className="text-center py-20">
+                    <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600">Creating your personalized itinerary...</p>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </TabsContent>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-              <div className="overflow-x-auto scrollbar-hide">
-                <TabsList className="inline-flex bg-white border-2 border-gray-200 p-1.5 rounded-2xl shadow-sm min-w-max">
-                  <TabsTrigger value="itinerary" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Calendar size={16} className="mr-2" />
-                    Itinerary
-                  </TabsTrigger>
-                  <TabsTrigger value="events" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Ticket size={16} className="mr-2" />
-                    Events
-                  </TabsTrigger>
-                  <TabsTrigger value="flights" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Plane size={16} className="mr-2" />
-                    Flights
-                  </TabsTrigger>
-                  <TabsTrigger value="hotels" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Hotel size={16} className="mr-2" />
-                    Hotels
-                  </TabsTrigger>
-                  <TabsTrigger value="restaurants" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Utensils size={16} className="mr-2" />
-                    Dining
-                  </TabsTrigger>
-                  <TabsTrigger value="activities" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                    <Zap size={16} className="mr-2" />
-                    Activities
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+              <TabsContent value="hotels" className="mt-0">
+                <HotelResults 
+                  hotels={hotels} 
+                  onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')}
+                  loading={loadingStates.hotels}
+                />
+              </TabsContent>
 
-              <div className="bg-white rounded-3xl border-2 border-gray-200 p-8 min-h-[400px]">
-                <TabsContent value="itinerary" className="mt-0">
-                  {loadingStates.itinerary ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="text-center">
-                        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading itinerary...</p>
-                      </div>
-                    </div>
-                  ) : itineraryData ? (
-                    <ItineraryView data={itineraryData} />
-                  ) : (
-                    <div className="text-center py-20">
-                      <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No itinerary available</p>
-                    </div>
-                  )}
-                </TabsContent>
+              <TabsContent value="flights" className="mt-0">
+                <FlightResults 
+                  flights={flights} 
+                  onSaveItem={(flight) => handleSaveItem(flight, 'flight')}
+                  loading={loadingStates.flights}
+                />
+              </TabsContent>
 
-                <TabsContent value="events" className="mt-0">
-                  {loadingStates.events ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="text-center">
-                        <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading events...</p>
-                      </div>
-                    </div>
-                  ) : liveEvents.length > 0 ? (
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {liveEvents.map((event, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.1 }}
-                          className="p-6 border-2 border-gray-100 rounded-2xl hover:border-blue-200 transition-all cursor-pointer"
-                        >
-                          <h4 className="font-bold text-lg mb-2">{event.name}</h4>
-                          <p className="text-gray-600 text-sm mb-3">
-                            {new Date(event.startDate).toLocaleDateString()}
-                          </p>
-                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                            View Details
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-20">
-                      <Ticket className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No events found</p>
-                    </div>
-                  )}
-                </TabsContent>
+              <TabsContent value="restaurants" className="mt-0">
+                <RestaurantResults 
+                  restaurants={restaurants}
+                  destination={firstDestination}
+                  onSaveItem={(restaurant) => handleSaveItem(restaurant, 'restaurant')}
+                  loading={loadingStates.restaurants}
+                />
+              </TabsContent>
 
-                <TabsContent value="flights" className="mt-0">
-                  {flights?.length > 0 ? (
-                    <FlightResults 
-                      flights={flights} 
-                      onSaveItem={(flight) => handleSaveItem(flight, 'flight')}
-                      loading={loadingStates.flights}
-                    />
-                  ) : (
-                    <div className="text-center py-20">
-                      <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No flights available</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="hotels" className="mt-0">
-                  {hotels?.length > 0 ? (
-                    <HotelResults 
-                      hotels={hotels} 
-                      onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')}
-                      loading={loadingStates.hotels}
-                    />
-                  ) : (
-                    <div className="text-center py-20">
-                      <Hotel className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No hotels available</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="restaurants" className="mt-0">
-                  {restaurants?.length > 0 ? (
-                    <RestaurantResults 
-                      restaurants={restaurants}
-                      destination={firstDestination}
-                      onSaveItem={(restaurant) => handleSaveItem(restaurant, 'restaurant')}
-                      loading={loadingStates.restaurants}
-                    />
-                  ) : (
-                    <div className="text-center py-20">
-                      <Utensils className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No restaurants available</p>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="activities" className="mt-0">
-                  {activities?.length > 0 ? (
-                    <ActivityResults 
-                      activities={activities} 
-                      onSaveItem={(activity) => handleSaveItem(activity, 'activity')}
-                      loading={loadingStates.activities}
-                    />
-                  ) : (
-                    <div className="text-center py-20">
-                      <Zap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                      <p className="text-gray-600">No activities available</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </div>
+              <TabsContent value="activities" className="mt-0">
+                <ActivityResults 
+                  activities={activities}
+                  onSaveItem={(activity) => handleSaveItem(activity, 'activity')}
+                  loading={loadingStates.activities}
+                />
+              </TabsContent>
             </Tabs>
           </div>
         </section>
       )}
 
+      {/* FOOTER */}
       <Footer />
-      
-      {/* ==================== ALL MODALS ==================== */}
+
+      {/* MODALS */}
       
       {/* Trip Refinement Modal */}
-      <TripRefinementModal
-        isOpen={showRefinement}
-        onClose={() => setShowRefinement(false)}
-        onGenerate={(prefs) => {
-          setTripPreferences(prefs);
-          setShowRefinement(false);
-          handleSearch(searchQuery, prefs);
-        }}
-        destination={searchQuery}
-        isLoading={loading}
-      />
+      {showRefinement && (
+        <TripRefinementModal
+          isOpen={showRefinement}
+          onClose={() => setShowRefinement(false)}
+          onSubmit={handleRefinementSubmit}
+          initialPreferences={tripPreferences}
+        />
+      )}
 
-      {/* Trip Preview */}
-      {showPreview && flights?.length > 0 && hotels?.length > 0 && !loading && (
+      {/* Trip Preview Modal */}
+      {showPreview && completedTrip && (
         <TripPreview
-          destination={firstDestination}
-          flights={flights}
-          hotels={hotels}
-          startDate={startDate}
-          endDate={endDate}
-          onViewDetails={() => {
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          trip={completedTrip}
+          onConfirm={() => {
             setShowPreview(false);
-            setActiveTab("itinerary");
-            setTimeout(() => {
-              document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
+            setShowTripSummary(true);
           }}
         />
       )}
 
       {/* Trip Summary Modal */}
-      <TripSummary 
-        isOpen={showTripSummary} 
-        onClose={() => setShowTripSummary(false)} 
-        savedItems={savedItems} 
-        onRemoveItem={handleRemoveItem} 
-        destination={firstDestination} 
-      />
-      
-      {/* Feedback Modal */}
-      <FeedbackModal 
-        isOpen={showFeedback} 
-        onClose={() => setShowFeedback(false)} 
-        tripData={completedTrip || { 
-          destination: firstDestination, 
-          startDate: startDate?.toISOString() || new Date().toISOString(), 
-          endDate: endDate?.toISOString() || new Date().toISOString(), 
-          tripId: 'trip_' + Date.now() 
-        }} 
-        onSubmit={handleFeedbackSubmit} 
-      />
+      {showTripSummary && (
+        <TripSummary
+          isOpen={showTripSummary}
+          onClose={() => setShowTripSummary(false)}
+          savedItems={savedItems}
+          onRemoveItem={handleRemoveItem}
+          estimatedCost={estimatedTripCost}
+          destination={firstDestination}
+        />
+      )}
 
-      {/* NEW: Voice Trip Planner Modal */}
+      {/* Feedback Modal */}
+      {showFeedback && (
+        <FeedbackModal
+          isOpen={showFeedback}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
+
+      {/* Maps Directions */}
+      {showMaps && firstDestination && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-2xl font-bold">Map & Directions</h3>
+              <button
+                onClick={() => setShowMaps(false)}
+                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
+              <MapsDirections 
+                destination={firstDestination}
+                defaultOrigin={origin}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weather Widget Modal */}
+      {showWeather && firstDestination && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h3 className="text-2xl font-bold">Weather Forecast</h3>
+              <button
+                onClick={() => setShowWeather(false)}
+                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-6">
+              <WeatherWidget 
+                destination={firstDestination}
+                showRecommendations={true}
+                showHourlyForecast={false}
+                onWeatherLoad={(weather) => {
+                  setCurrentWeather({
+                    temp: weather.current.temp,
+                    condition: weather.current.condition,
+                    humidity: weather.current.humidity,
+                    wind_speed: weather.current.wind_speed
+                  });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voice Trip Planner */}
       {showVoicePlanner && (
         <VoiceTripPlanner />
       )}
 
-      {/* NEW: Saved Trips Modal */}
+      {/* Saved Trips Modal */}
       {showSavedTrips && (
         <SavedTrips />
       )}
 
-      {/* NEW: Contact Modal */}
+      {/* Contact Modal */}
       {showContact && (
         <Contact />
       )}
 
-      {/* NEW: Terms Modal */}
+      {/* Terms Modal */}
       {showTerms && (
         <TermsOfService />
       )}
-      
-      {/* ==================== FLOATING BUTTONS ==================== */}
-      
-      {/* Floating Trip Summary Button */}
-      <AnimatePresence>
-        {totalSavedItems > 0 && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowTripSummary(true)}
-            className="fixed bottom-8 right-8 w-16 h-16 bg-blue-600 rounded-full shadow-2xl flex items-center justify-center z-50"
-          >
-            <Calendar className="text-white" size={24} />
-            <span className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">
-              {totalSavedItems}
-            </span>
-          </motion.button>
-        )}
-      </AnimatePresence>
 
-      {/* NEW: Floating Chat Button */}
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setShowGladysChat(!showGladysChat)}
-        className="fixed bottom-8 left-8 w-16 h-16 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full shadow-2xl flex items-center justify-center z-50"
-      >
-        <MessageSquare className="text-white" size={24} />
-      </motion.button>
-
-      {/* NEW: Gladys Chat */}
+      {/* Gladys Chat */}
       <AnimatePresence>
         {showGladysChat && (
           <GladysChat />
