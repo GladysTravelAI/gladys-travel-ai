@@ -1,421 +1,559 @@
 // lib/eventLandmarkMaps.ts
-// EVENT-FIRST landmark mapping for GladysTravelAI
-// Prioritizes event venues, stadiums, concert halls, and festival grounds
+// 🎯 Event Landmark Maps - Trademark-Safe Location Discovery
+//
+// STRATEGIC ARCHITECTURE:
+// - Generates landmark and mapping data for events
+// - Provides nearby attractions, venues, and points of interest
+// - Uses factual, descriptive language for locations
+// - Integrates with Google Maps/Mapbox for visualization
+//
+// LEGAL FRAMEWORK:
+// - Location data is factual and publicly available
+// - Venue names used for informational purposes only
+// - No claims of affiliation with venues or landmarks
 
-/**
- * EVENT TYPE DEFINITIONS
- * Maps to Ticketmaster categories and GladysTravelAI event types
- */
-export type EventType = 
-  | 'concert' 
-  | 'sports' 
-  | 'festival' 
-  | 'theater' 
-  | 'comedy'
-  | 'arts'
-  | 'family'
-  | 'conference'
-  | 'explore'; // For general city exploration
+import { Event, isEventTrademarked } from './eventService';
 
-/**
- * LANDMARK MAP DATA
- * Comprehensive data about a destination's venues and landmarks
- */
-export interface LandmarkMapData {
-  destination: string;
-  venues: {
-    concerts: string[];
-    sports: string[];
-    festivals: string[];
-    theaters: string[];
+// ==================== TYPE DEFINITIONS ====================
+
+export interface EventLandmark {
+  id: string;
+  name: string;
+  type: 'venue' | 'attraction' | 'hotel' | 'restaurant' | 'transport' | 'landmark';
+  location: {
+    lat: number;
+    lng: number;
+    address?: string;
+    city: string;
+    country: string;
   };
-  landmarks: string[];
-  topVenues: string[]; // Combined top 5 venues across all categories
-  searchQuery: string; // Optimized search query for images/maps
+  description?: string;
+  distance?: number; // Distance from event venue in km
+  relevance: 'primary' | 'secondary' | 'tertiary';
+  imageUrl?: string;
 }
 
-/**
- * EVENT VENUE MAPPING
- * Maps major cities to their iconic event venues
- * Priority: Event venues > Tourist landmarks
- */
-export const EVENT_VENUES: Record<string, {
-  concerts: string[];
-  sports: string[];
-  festivals: string[];
-  theaters: string[];
-  general: string[];
-}> = {
-  // ==================== NORTH AMERICA ====================
-  'new york': {
-    concerts: ['madison square garden', 'barclays center', 'radio city music hall', 'apollo theater'],
-    sports: ['yankee stadium', 'citi field', 'madison square garden', 'barclays center'],
-    festivals: ['central park summerstage', 'governors ball', 'electric zoo', 'bryant park'],
-    theaters: ['broadway theater district', 'lincoln center', 'carnegie hall'],
-    general: ['times square', 'central park', 'brooklyn bridge', 'statue of liberty']
-  },
-  'los angeles': {
-    concerts: ['hollywood bowl', 'staples center', 'the forum', 'greek theatre'],
-    sports: ['dodger stadium', 'staples center', 'rose bowl', 'sofi stadium'],
-    festivals: ['coachella valley', 'outside lands', 'fyi fest'],
-    theaters: ['dolby theatre', 'pantages theatre', 'greek theatre'],
-    general: ['hollywood sign', 'santa monica pier', 'griffith observatory', 'venice beach']
-  },
-  'chicago': {
-    concerts: ['united center', 'aragon ballroom', 'metro', 'riviera theatre'],
-    sports: ['wrigley field', 'soldier field', 'united center', 'guaranteed rate field'],
-    festivals: ['lollapalooza', 'pitchfork music festival', 'chicago blues festival', 'grant park'],
-    theaters: ['chicago theatre', 'steppenwolf theatre', 'goodman theatre'],
-    general: ['cloud gate bean', 'millennium park', 'navy pier', 'willis tower']
-  },
-  'las vegas': {
-    concerts: ['t-mobile arena', 'mgm grand garden', 'allegiant stadium', 'park theater'],
-    sports: ['allegiant stadium', 't-mobile arena', 'las vegas ballpark'],
-    festivals: ['electric daisy carnival', 'life is beautiful', 'when we were young'],
-    theaters: ['colosseum caesars palace', 'dolby live', 'park mgm'],
-    general: ['las vegas strip', 'bellagio fountains', 'fremont street', 'high roller']
-  },
-  'miami': {
-    concerts: ['ftx arena', 'hard rock stadium', 'fillmore miami beach', 'bayfront park'],
-    sports: ['hard rock stadium', 'ftx arena', 'marlins park', 'miami open'],
-    festivals: ['ultra music festival', 'rolling loud', 'art basel', 'wynwood'],
-    theaters: ['adrienne arsht center', 'fillmore miami beach'],
-    general: ['south beach', 'ocean drive', 'wynwood walls', 'vizcaya museum']
-  },
-  'toronto': {
-    concerts: ['scotiabank arena', 'budweiser stage', 'massey hall', 'rebel'],
-    sports: ['scotiabank arena', 'rogers centre', 'bmo field'],
-    festivals: ['toronto international film festival', 'caribana', 'veld music festival'],
-    theaters: ['princess of wales theatre', 'royal alexandra theatre', 'four seasons centre'],
-    general: ['cn tower', 'distillery district', 'casa loma', 'harbourfront']
-  },
+export interface EventMapData {
+  eventId: string;
+  eventName: string;
+  center: {
+    lat: number;
+    lng: number;
+  };
+  zoom: number;
+  landmarks: EventLandmark[];
+  mapMetadata?: {
+    isTrademarkedEvent: boolean;
+    venueDisclaimer?: string;
+  };
+}
 
-  // ==================== EUROPE ====================
-  'london': {
-    concerts: ['o2 arena', 'wembley stadium', 'royal albert hall', 'apollo'],
-    sports: ['wembley stadium', 'emirates stadium', 'stamford bridge', 'wimbledon'],
-    festivals: ['glastonbury', 'hyde park bst', 'wireless festival', 'notting hill carnival'],
-    theaters: ['west end theatres', 'royal opera house', 'national theatre'],
-    general: ['big ben', 'tower bridge', 'buckingham palace', 'london eye']
-  },
-  'paris': {
-    concerts: ['accor arena', 'zenith paris', 'olympia', 'philharmonie de paris'],
-    sports: ['stade de france', 'parc des princes', 'roland garros', 'accor arena'],
-    festivals: ['rock en seine', 'paris jazz festival', 'fete de la musique'],
-    theaters: ['palais garnier', 'comedie francaise', 'theatre du chatelet'],
-    general: ['eiffel tower', 'louvre museum', 'arc de triomphe', 'notre dame']
-  },
-  'barcelona': {
-    concerts: ['palau sant jordi', 'razzmatazz', 'apolo', 'sala bikini'],
-    sports: ['camp nou', 'palau sant jordi', 'estadi olimpic', 'circuit de catalunya'],
-    festivals: ['primavera sound', 'sonar', 'la merce festival'],
-    theaters: ['gran teatre del liceu', 'palau de la musica catalana'],
-    general: ['sagrada familia', 'park guell', 'la rambla', 'casa batllo']
-  },
-  'amsterdam': {
-    concerts: ['ziggo dome', 'afas live', 'paradiso', 'melkweg'],
-    sports: ['johan cruyff arena', 'ziggo dome', 'olympic stadium'],
-    festivals: ['amsterdam dance event', 'king\'s day', 'awakenings'],
-    theaters: ['royal concertgebouw', 'tuschinski theatre'],
-    general: ['canal houses', 'rijksmuseum', 'anne frank house', 'dam square']
-  },
-  'berlin': {
-    concerts: ['mercedes-benz arena', 'olympiastadion', 'berghain', 'tempodrom'],
-    sports: ['olympiastadion', 'mercedes-benz arena', 'velodrom'],
-    festivals: ['berlin festival', 'lollapalooza berlin', 'atonal'],
-    theaters: ['berlin philharmonic', 'deutsche oper', 'volksbuhne'],
-    general: ['brandenburg gate', 'berlin wall', 'reichstag', 'museum island']
-  },
+export interface EventDirections {
+  from: string;
+  to: string;
+  mode: 'driving' | 'walking' | 'transit' | 'bicycling';
+  distance?: string;
+  duration?: string;
+  mapsUrl: string;
+}
 
-  // ==================== ASIA ====================
-  'tokyo': {
-    concerts: ['tokyo dome', 'nippon budokan', 'saitama super arena', 'zepp'],
-    sports: ['tokyo dome', 'national stadium', 'saitama super arena', 'ariake arena'],
-    festivals: ['summer sonic', 'fuji rock', 'ultra japan'],
-    theaters: ['kabuki-za theatre', 'tokyo opera city', 'bunkamura'],
-    general: ['tokyo tower', 'shibuya crossing', 'senso-ji temple', 'mount fuji']
-  },
-  'seoul': {
-    concerts: ['kspo dome', 'jamsil olympic stadium', 'blue square', 'yes24 live hall'],
-    sports: ['seoul world cup stadium', 'jamsil baseball stadium', 'kspo dome'],
-    festivals: ['seoul jazz festival', 'ultra korea', 'world dj festival'],
-    theaters: ['sejong center', 'national theater of korea'],
-    general: ['gyeongbokgung palace', 'n seoul tower', 'bukchon hanok', 'gangnam']
-  },
-  'singapore': {
-    concerts: ['singapore indoor stadium', 'esplanade theatres', 'star theatre'],
-    sports: ['singapore indoor stadium', 'national stadium', 'singapore f1'],
-    festivals: ['ultra singapore', 'zoukout', 'st jerome\'s laneway'],
-    theaters: ['esplanade theatres', 'victoria theatre'],
-    general: ['marina bay sands', 'gardens by the bay', 'merlion', 'sentosa']
-  },
+// ==================== VENUE COORDINATES DATABASE ====================
+// STRATEGIC: Pre-defined coordinates for major event venues
+// This avoids repeated geocoding API calls
 
-  // ==================== AUSTRALIA ====================
-  'sydney': {
-    concerts: ['sydney opera house', 'qudos bank arena', 'hordern pavilion', 'enmore theatre'],
-    sports: ['sydney cricket ground', 'anz stadium', 'qudos bank arena'],
-    festivals: ['vivid sydney', 'splendour in the grass', 'field day'],
-    theaters: ['sydney opera house', 'capitol theatre', 'state theatre'],
-    general: ['sydney opera house', 'harbour bridge', 'bondi beach', 'darling harbour']
+const VENUE_COORDINATES: Record<string, { lat: number; lng: number; address?: string }> = {
+  // FIFA World Cup 2026 Venues
+  'metlife-stadium': {
+    lat: 40.8128,
+    lng: -74.0742,
+    address: 'MetLife Stadium, East Rutherford, NJ, USA'
   },
-  'melbourne': {
-    concerts: ['rod laver arena', 'margaret court arena', 'forum melbourne'],
-    sports: ['melbourne cricket ground', 'etihad stadium', 'rod laver arena'],
-    festivals: ['australian open', 'moomba festival', 'st kilda festival'],
-    theaters: ['princess theatre', 'regent theatre', 'her majesty\'s theatre'],
-    general: ['federation square', 'flinders street station', 'great ocean road']
+  'rose-bowl': {
+    lat: 34.1614,
+    lng: -118.1678,
+    address: 'Rose Bowl Stadium, Pasadena, CA, USA'
   },
-
-  // ==================== LATIN AMERICA ====================
-  'rio de janeiro': {
-    concerts: ['jeunesse arena', 'maracana stadium', 'citibank hall'],
-    sports: ['maracana stadium', 'olympic park', 'sambadrome'],
-    festivals: ['carnival', 'rock in rio', 'lollapalooza brazil'],
-    theaters: ['theatro municipal', 'cidade das artes'],
-    general: ['christ the redeemer', 'sugarloaf mountain', 'copacabana beach', 'ipanema']
+  'att-stadium': {
+    lat: 32.7473,
+    lng: -97.0945,
+    address: 'AT&T Stadium, Arlington, TX, USA'
   },
-  'buenos aires': {
-    concerts: ['luna park', 'movistar arena', 'teatro colon'],
-    sports: ['la bombonera', 'el monumental', 'movistar arena'],
-    festivals: ['lollapalooza argentina', 'personal fest', 'tango festival'],
-    theaters: ['teatro colon', 'teatro nacional cervantes'],
-    general: ['obelisco', 'la boca', 'recoleta cemetery', 'teatro colon']
+  
+  // Super Bowl
+  'levis-stadium': {
+    lat: 37.4032,
+    lng: -121.9698,
+    address: "Levi's Stadium, Santa Clara, CA, USA"
   },
-
-  // ==================== MIDDLE EAST ====================
-  'dubai': {
-    concerts: ['coca-cola arena', 'dubai opera', 'burj park'],
-    sports: ['dubai autodrome', 'dubai sports city', 'meydan racecourse'],
-    festivals: ['dubai jazz festival', 'redFestDXB', 'dubai shopping festival'],
-    theaters: ['dubai opera', 'madinat theatre'],
-    general: ['burj khalifa', 'palm jumeirah', 'dubai mall', 'burj al arab']
+  
+  // Wimbledon
+  'all-england-club': {
+    lat: 51.4344,
+    lng: -0.2149,
+    address: 'All England Lawn Tennis and Croquet Club, London, UK'
   },
-
-  // ==================== AFRICA ====================
-  'cape town': {
-    concerts: ['cape town stadium', 'grand arena', 'kirstenbosch'],
-    sports: ['cape town stadium', 'newlands cricket ground'],
-    festivals: ['cape town jazz festival', 'rocking the daisies', 'afropunk'],
-    theaters: ['artscape theatre', 'baxter theatre'],
-    general: ['table mountain', 'robben island', 'victoria alfred waterfront', 'cape point']
+  
+  // Coachella
+  'empire-polo-club': {
+    lat: 33.6803,
+    lng: -116.2373,
+    address: 'Empire Polo Club, Indio, CA, USA'
   },
+  
+  // Glastonbury
+  'worthy-farm': {
+    lat: 51.1530,
+    lng: -2.5831,
+    address: 'Worthy Farm, Pilton, Somerset, UK'
+  },
+  
+  // Burning Man
+  'black-rock-desert': {
+    lat: 40.7864,
+    lng: -119.2065,
+    address: 'Black Rock Desert, Nevada, USA'
+  },
+  
+  // Olympics 2028
+  'la-memorial-coliseum': {
+    lat: 34.0141,
+    lng: -118.2879,
+    address: 'Los Angeles Memorial Coliseum, Los Angeles, CA, USA'
+  }
 };
 
-/**
- * FETCH LANDMARK MAPS DATA
- * Returns comprehensive venue and landmark data for a destination
- * Can be used to enhance maps, image searches, and venue displays
- */
-export async function fetchLandmarkMaps(destination: string): Promise<LandmarkMapData | null> {
-  const normalized = destination.toLowerCase().trim();
-  const venues = EVENT_VENUES[normalized];
+// ==================== VENUE MAPPING ====================
+// STRATEGIC: Maps events to their primary venues
 
-  if (!venues) {
-    // Unknown destination - return null or basic data
-    return {
-      destination,
-      venues: {
-        concerts: [],
-        sports: [],
-        festivals: [],
-        theaters: []
-      },
-      landmarks: [],
-      topVenues: [],
-      searchQuery: `${destination} landmarks venues`
-    };
+function getVenueCoordinatesForEvent(event: Event): { lat: number; lng: number; address?: string } | null {
+  const venueKeyMap: Record<string, string> = {
+    'fifa-world-cup-2026': 'metlife-stadium', // Final venue
+    'super-bowl-lx-2026': 'levis-stadium',
+    'wimbledon-2026': 'all-england-club',
+    'coachella-2026': 'empire-polo-club',
+    'glastonbury-2026': 'worthy-farm',
+    'burning-man-2026': 'black-rock-desert',
+    'summer-olympics-2028': 'la-memorial-coliseum'
+  };
+  
+  const venueKey = venueKeyMap[event.id];
+  if (venueKey && VENUE_COORDINATES[venueKey]) {
+    return VENUE_COORDINATES[venueKey];
   }
+  
+  return null;
+}
 
-  // Combine top venues from all categories
-  const topVenues = [
-    ...venues.concerts.slice(0, 2),
-    ...venues.sports.slice(0, 1),
-    ...venues.festivals.slice(0, 1),
-    ...venues.general.slice(0, 1)
-  ];
+// ==================== LANDMARK GENERATION ====================
+// STRATEGIC: Generate landmarks for event locations
 
-  // Build optimized search query
-  const searchQuery = buildEventQuery(destination, 'explore');
-
-  return {
-    destination,
-    venues: {
-      concerts: venues.concerts,
-      sports: venues.sports,
-      festivals: venues.festivals,
-      theaters: venues.theaters
+/**
+ * Get landmarks for an event
+ * STRATEGIC: Returns nearby attractions, hotels, restaurants
+ */
+export async function getEventLandmarks(event: Event): Promise<EventLandmark[]> {
+  const landmarks: EventLandmark[] = [];
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  
+  if (!venueCoords) {
+    console.warn(`⚠️ No venue coordinates for event: ${event.id}`);
+    return generateGenericLandmarks(event);
+  }
+  
+  // Primary landmark: Event venue
+  landmarks.push({
+    id: `${event.id}-venue`,
+    name: event.location.venue || 'Event Venue',
+    type: 'venue',
+    location: {
+      lat: venueCoords.lat,
+      lng: venueCoords.lng,
+      address: venueCoords.address,
+      city: event.location.city,
+      country: event.location.country
     },
-    landmarks: venues.general,
-    topVenues,
-    searchQuery
+    description: `Primary venue for ${event.name}`,
+    relevance: 'primary'
+  });
+  
+  // Add event-specific landmarks
+  const specificLandmarks = getEventSpecificLandmarks(event, venueCoords);
+  landmarks.push(...specificLandmarks);
+  
+  return landmarks;
+}
+
+/**
+ * Get event-specific landmarks
+ * STRATEGIC: Curated landmarks for specific events
+ */
+function getEventSpecificLandmarks(
+  event: Event,
+  venueCoords: { lat: number; lng: number }
+): EventLandmark[] {
+  const landmarks: EventLandmark[] = [];
+  
+  // Event-specific landmark data
+  const landmarkData: Record<string, EventLandmark[]> = {
+    'fifa-world-cup-2026': [
+      {
+        id: 'times-square',
+        name: 'Times Square',
+        type: 'attraction',
+        location: {
+          lat: 40.7580,
+          lng: -73.9855,
+          city: 'New York',
+          country: 'USA'
+        },
+        description: 'Iconic landmark in Midtown Manhattan',
+        relevance: 'secondary'
+      },
+      {
+        id: 'statue-of-liberty',
+        name: 'Statue of Liberty',
+        type: 'attraction',
+        location: {
+          lat: 40.6892,
+          lng: -74.0445,
+          city: 'New York',
+          country: 'USA'
+        },
+        description: 'Historic monument and symbol of freedom',
+        relevance: 'secondary'
+      }
+    ],
+    'coachella-2026': [
+      {
+        id: 'palm-springs',
+        name: 'Palm Springs',
+        type: 'attraction',
+        location: {
+          lat: 33.8303,
+          lng: -116.5453,
+          city: 'Palm Springs',
+          country: 'USA'
+        },
+        description: 'Nearby desert resort city',
+        relevance: 'secondary'
+      }
+    ],
+    'wimbledon-2026': [
+      {
+        id: 'wimbledon-village',
+        name: 'Wimbledon Village',
+        type: 'attraction',
+        location: {
+          lat: 51.4220,
+          lng: -0.2069,
+          city: 'London',
+          country: 'UK'
+        },
+        description: 'Historic village center near the tennis grounds',
+        relevance: 'secondary'
+      }
+    ]
+  };
+  
+  return landmarkData[event.id] || [];
+}
+
+/**
+ * Generate generic landmarks when specific data unavailable
+ * STRATEGIC: Fallback landmark generation
+ */
+function generateGenericLandmarks(event: Event): EventLandmark[] {
+  return [
+    {
+      id: `${event.id}-city-center`,
+      name: `${event.location.city} City Center`,
+      type: 'landmark',
+      location: {
+        lat: 0, // Would need geocoding
+        lng: 0,
+        city: event.location.city,
+        country: event.location.country
+      },
+      description: `Central area of ${event.location.city}`,
+      relevance: 'secondary'
+    }
+  ];
+}
+
+// ==================== MAP DATA GENERATION ====================
+
+/**
+ * Generate complete map data for an event
+ * STRATEGIC: Returns everything needed to render an event map
+ */
+export async function getEventMapData(event: Event): Promise<EventMapData> {
+  const landmarks = await getEventLandmarks(event);
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  const isTrademarked = isEventTrademarked(event);
+  
+  // Default center (use venue if available, otherwise city center)
+  const center = venueCoords || { lat: 0, lng: 0 };
+  
+  // Generate venue disclaimer for trademarked events
+  let venueDisclaimer: string | undefined;
+  if (isTrademarked && event.trademark?.disclaimer) {
+    venueDisclaimer = event.trademark.disclaimer;
+  }
+  
+  return {
+    eventId: event.id,
+    eventName: event.name,
+    center,
+    zoom: 12, // Default zoom level
+    landmarks,
+    mapMetadata: {
+      isTrademarkedEvent: isTrademarked,
+      venueDisclaimer
+    }
   };
 }
 
+// ==================== DIRECTIONS GENERATION ====================
+
 /**
- * EVENT-SPECIFIC SEARCH QUERIES
- * Builds intelligent search queries based on event type and destination
+ * Generate Google Maps directions URL
+ * STRATEGIC: Creates deep link to Google Maps for navigation
  */
-export function buildEventQuery(
-  destination: string,
-  eventType: EventType = 'explore'
+export function getEventDirectionsUrl(
+  event: Event,
+  origin?: string,
+  mode: 'driving' | 'walking' | 'transit' | 'bicycling' = 'driving'
 ): string {
-  const normalized = destination.toLowerCase().trim();
-  const venues = EVENT_VENUES[normalized];
-
-  if (!venues) {
-    // Unknown destination - use generic event query
-    return `${destination} ${eventType} venue event`;
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  
+  if (!venueCoords) {
+    console.warn(`⚠️ No venue coordinates for event: ${event.id}`);
+    return `https://www.google.com/maps/search/${encodeURIComponent(event.location.city)}`;
   }
-
-  // Build query based on event type
-  switch (eventType) {
-    case 'concert':
-      return `${venues.concerts.slice(0, 3).join(' ')} ${destination} concert venue`;
-    
-    case 'sports':
-      return `${venues.sports.slice(0, 3).join(' ')} ${destination} stadium arena`;
-    
-    case 'festival':
-      return `${venues.festivals.slice(0, 3).join(' ')} ${destination} festival grounds`;
-    
-    case 'theater':
-      return `${venues.theaters.slice(0, 2).join(' ')} ${destination} theater venue`;
-    
-    case 'explore':
-      // Mix of venues + landmarks for city exploration
-      const mixed = [
-        ...venues.general.slice(0, 2),
-        ...venues.concerts.slice(0, 1)
-      ];
-      return `${mixed.join(' ')} ${destination}`;
-    
-    default:
-      return `${venues.general.slice(0, 3).join(' ')} ${destination}`;
+  
+  const destination = `${venueCoords.lat},${venueCoords.lng}`;
+  const params = new URLSearchParams({
+    api: '1',
+    destination,
+    travelmode: mode
+  });
+  
+  if (origin) {
+    params.append('origin', origin);
   }
+  
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
 
 /**
- * Get venue names for a destination and event type
+ * Generate directions data
+ * STRATEGIC: Structured directions data for UI display
  */
-export function getEventVenues(
-  destination: string,
-  eventType: EventType = 'explore'
-): string[] {
-  const normalized = destination.toLowerCase().trim();
-  const venues = EVENT_VENUES[normalized];
+export function getEventDirections(
+  event: Event,
+  origin?: string,
+  mode: 'driving' | 'walking' | 'transit' | 'bicycling' = 'driving'
+): EventDirections {
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  const destination = event.location.venue || event.location.city;
+  
+  return {
+    from: origin || 'Your location',
+    to: destination,
+    mode,
+    mapsUrl: getEventDirectionsUrl(event, origin, mode)
+  };
+}
 
-  if (!venues) return [];
+// ==================== NEARBY SEARCH ====================
 
-  switch (eventType) {
-    case 'concert':
-      return venues.concerts;
-    case 'sports':
-      return venues.sports;
-    case 'festival':
-      return venues.festivals;
-    case 'theater':
-      return venues.theaters;
-    case 'explore':
-      return venues.general;
-    default:
-      return venues.general;
-  }
+/**
+ * Get nearby hotels for an event
+ * STRATEGIC: Returns hotels near event venue
+ * 
+ * NOTE: This is a mock implementation. In production, integrate with
+ * Google Places API, Booking.com API, or similar
+ */
+export async function getNearbyHotels(
+  event: Event,
+  radius: number = 5 // km
+): Promise<EventLandmark[]> {
+  console.log(`🏨 Searching hotels near ${event.name} within ${radius}km`);
+  
+  // TODO: Integrate with Google Places API or similar
+  // Example: const response = await fetch(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius * 1000}&type=lodging`);
+  
+  // Mock implementation
+  return [
+    {
+      id: `${event.id}-hotel-1`,
+      name: `Hotel near ${event.location.city}`,
+      type: 'hotel',
+      location: {
+        lat: 0,
+        lng: 0,
+        city: event.location.city,
+        country: event.location.country
+      },
+      description: 'Accommodation near event venue',
+      relevance: 'secondary'
+    }
+  ];
 }
 
 /**
- * Detect event type from event name/description
- * Used when you have event data from Ticketmaster
+ * Get nearby restaurants for an event
+ * STRATEGIC: Returns restaurants near event venue
  */
-export function detectEventType(eventName: string): EventType {
-  const lower = eventName.toLowerCase();
-
-  // Sports keywords
-  if (
-    /\b(nba|nfl|mlb|nhl|premier league|champions league|world cup|soccer|football|basketball|baseball|hockey|tennis|golf|f1|formula 1|ufc|boxing|wrestling)\b/.test(lower)
-  ) {
-    return 'sports';
-  }
-
-  // Festival keywords
-  if (
-    /\b(festival|fest|coachella|lollapalooza|glastonbury|tomorrowland|ultra|edc|burning man)\b/.test(lower)
-  ) {
-    return 'festival';
-  }
-
-  // Theater keywords
-  if (
-    /\b(broadway|musical|play|theater|theatre|opera|ballet|symphony|orchestra)\b/.test(lower)
-  ) {
-    return 'theater';
-  }
-
-  // Comedy keywords
-  if (/\b(comedy|comedian|stand.?up|laugh)\b/.test(lower)) {
-    return 'comedy';
-  }
-
-  // Concert keywords (default for music events)
-  if (
-    /\b(concert|tour|live|show|performance|band|artist|singer|rapper|dj)\b/.test(lower)
-  ) {
-    return 'concert';
-  }
-
-  // Default to explore
-  return 'explore';
+export async function getNearbyRestaurants(
+  event: Event,
+  radius: number = 2 // km
+): Promise<EventLandmark[]> {
+  console.log(`🍽️ Searching restaurants near ${event.name} within ${radius}km`);
+  
+  // TODO: Integrate with Google Places API or similar
+  
+  // Mock implementation
+  return [
+    {
+      id: `${event.id}-restaurant-1`,
+      name: `Restaurant in ${event.location.city}`,
+      type: 'restaurant',
+      location: {
+        lat: 0,
+        lng: 0,
+        city: event.location.city,
+        country: event.location.country
+      },
+      description: 'Dining near event venue',
+      relevance: 'tertiary'
+    }
+  ];
 }
 
 /**
- * Build search query with event context
- * Use this when you have specific event information
+ * Get nearby transport hubs
+ * STRATEGIC: Returns airports, train stations, etc.
  */
-export function buildEventContextQuery(params: {
-  destination: string;
-  eventName?: string;
-  eventType?: EventType;
-  venueName?: string;
-}): string {
-  const { destination, eventName, eventType, venueName } = params;
+export async function getNearbyTransport(
+  event: Event,
+  radius: number = 50 // km
+): Promise<EventLandmark[]> {
+  console.log(`🚆 Searching transport near ${event.name} within ${radius}km`);
+  
+  // TODO: Integrate with transport APIs
+  
+  // Mock implementation
+  return [
+    {
+      id: `${event.id}-airport`,
+      name: `${event.location.city} Airport`,
+      type: 'transport',
+      location: {
+        lat: 0,
+        lng: 0,
+        city: event.location.city,
+        country: event.location.country
+      },
+      description: 'Nearest major airport',
+      relevance: 'secondary'
+    }
+  ];
+}
 
-  // If we have venue name, prioritize it
-  if (venueName) {
-    return `${venueName} ${destination} venue`;
+// ==================== MAP EMBED GENERATION ====================
+
+/**
+ * Generate Google Maps embed URL
+ * STRATEGIC: Creates embeddable map URL for iframes
+ */
+export function getMapEmbedUrl(event: Event, zoom: number = 12): string {
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  
+  if (!venueCoords) {
+    return `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodeURIComponent(event.location.city)}`;
   }
-
-  // Detect event type from name if not provided
-  const type = eventType || (eventName ? detectEventType(eventName) : 'explore');
-
-  // Build query based on event type
-  return buildEventQuery(destination, type);
+  
+  const params = new URLSearchParams({
+    key: process.env.GOOGLE_MAPS_API_KEY || 'YOUR_API_KEY',
+    q: `${venueCoords.lat},${venueCoords.lng}`,
+    zoom: zoom.toString()
+  });
+  
+  return `https://www.google.com/maps/embed/v1/place?${params.toString()}`;
 }
 
 /**
- * BACKWARD COMPATIBILITY
- * Export landmark maps for general travel queries
+ * Generate Mapbox static map URL
+ * STRATEGIC: Creates static map image URL
  */
-export const DESTINATION_LANDMARKS = Object.entries(EVENT_VENUES).reduce(
-  (acc, [city, venues]) => {
-    acc[city] = venues.general;
-    return acc;
-  },
-  {} as Record<string, string[]>
-);
-
-export function getLandmarks(destination: string): string[] {
-  return getEventVenues(destination, 'explore');
-}
-
-export function buildSearchQuery(
-  destination: string,
-  includeLandmark: boolean = true
+export function getStaticMapUrl(
+  event: Event,
+  width: number = 600,
+  height: number = 400,
+  zoom: number = 12
 ): string {
-  if (!includeLandmark) {
-    return `${destination} city skyline landmark`;
+  const venueCoords = getVenueCoordinatesForEvent(event);
+  
+  if (!venueCoords) {
+    return `https://via.placeholder.com/${width}x${height}?text=${encodeURIComponent(event.location.city)}`;
   }
-  return buildEventQuery(destination, 'explore');
+  
+  const mapboxToken = process.env.MAPBOX_ACCESS_TOKEN || 'YOUR_TOKEN';
+  
+  return `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/${venueCoords.lng},${venueCoords.lat},${zoom}/${width}x${height}?access_token=${mapboxToken}`;
 }
 
-export function getDestinationKey(destination: string): string {
-  return destination.toLowerCase().trim();
+// ==================== EXPORT UTILITIES ====================
+
+/**
+ * Calculate distance between two coordinates (Haversine formula)
+ * STRATEGIC: Used to calculate distances from event venue
+ */
+export function calculateDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) *
+      Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c;
+  
+  return Math.round(distance * 10) / 10; // Round to 1 decimal
+}
+
+function toRadians(degrees: number): number {
+  return degrees * (Math.PI / 180);
+}
+
+/**
+ * Format distance for display
+ */
+export function formatDistance(km: number): string {
+  if (km < 1) {
+    return `${Math.round(km * 1000)}m`;
+  }
+  return `${km.toFixed(1)}km`;
+}
+
+/**
+ * Legacy compatibility: getEventVenueCoordinates
+ * @deprecated Use getVenueCoordinatesForEvent() instead
+ */
+export function getEventVenueCoordinates(eventId: string): { lat: number; lng: number } | null {
+  console.warn('⚠️ getEventVenueCoordinates is deprecated. Use getVenueCoordinatesForEvent() with Event object instead.');
+  
+  const venueKey = eventId.replace(/-\d{4}$/, ''); // Remove year suffix
+  return VENUE_COORDINATES[venueKey] || null;
 }

@@ -1,5 +1,5 @@
 // app/api/itinerary/route.ts
-// 🎯 EVENT-ANCHORED Itinerary Generation - EVOLVED
+// 🎯 EVENT-ANCHORED Itinerary Generation - Trademark-Safe Architecture
 
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
@@ -80,6 +80,13 @@ interface ItineraryResponse {
     totalBudget: string;
     dailyAverage: string;
     eventDayCost?: string; // Special cost for event day
+    breakdown?: {
+      accommodation: string;
+      transport: string;
+      food: string;
+      event: string;
+      activities: string;
+    };
   };
   days: Day[];
 }
@@ -119,7 +126,7 @@ async function generateItineraryWithRetry(
 
       // STRATEGIC: Validate event-centric structure
       if (!data.days || !Array.isArray(data.days) || data.days.length === 0) {
-        console.error(`❌ Invalid response structure on attempt ${attempt}`);
+        console.error(`❌ Invalid response structure on attempt ${attempt}: missing days array`);
         if (attempt === maxRetries) {
           throw new Error("Generated itinerary missing required 'days' array");
         }
@@ -137,6 +144,17 @@ async function generateItineraryWithRetry(
           venue: data.metadata.eventVenue || "TBD",
           city: data.metadata.eventCity || "TBD"
         };
+      }
+
+      // STRATEGIC: Validate at least one event day exists
+      const hasEventDay = data.days.some((day: Day) => day.isEventDay === true);
+      if (!hasEventDay && data.eventAnchor) {
+        console.warn(`⚠️ No event day found - injecting event day`);
+        const eventDayIndex = data.eventAnchor.eventDay - 1;
+        if (data.days[eventDayIndex]) {
+          data.days[eventDayIndex].isEventDay = true;
+          data.days[eventDayIndex].label = "EVENT DAY";
+        }
       }
 
       console.log(`✅ Successfully generated ${data.days.length} days on attempt ${attempt}`);
@@ -164,10 +182,10 @@ CORE PRINCIPLE:
 Users travel FOR AN EVENT (sports, music, festivals), then explore the city before and after.
 The EVENT is the ANCHOR. Everything else supports it.
 
-EVENT TYPES:
-- sports: World Cup, Super Bowl, NBA Finals, Premier League, Wimbledon, Olympics
-- music: Concerts, tours, music festivals (Coachella, Glastonbury, Tomorrowland)
-- festivals: Cultural festivals, Carnival, Oktoberfest, Burning Man, La Tomatina
+EVENT TYPES & EXAMPLES (USE GENERIC DESCRIPTIONS):
+- sports: International football finals, major basketball championships, global tennis tournaments, racing competitions
+- music: Major artist concerts, international music festivals, touring performances
+- festivals: Cultural celebrations, seasonal festivals, food festivals, art exhibitions
 
 YOUR JOB:
 1. Identify the EVENT DAY (when the event happens)
@@ -181,24 +199,26 @@ YOUR JOB:
    - Day-by-day itinerary
    - Clear labels: "Pre-Event Day 1", "EVENT DAY", "Post-Event Day 1"
    - Event block with special formatting
-   - Budget breakdown
+   - Budget breakdown with categories
    - Affiliate-ready structure (hotels, activities, dining)
 
-RESPONSE STRUCTURE:
+CRITICAL: YOU MUST RETURN ONLY VALID JSON. NO MARKDOWN. NO COMMENTARY. NO EXPLANATIONS. JUST PURE JSON.
+
+RESPONSE STRUCTURE (EXACT FORMAT REQUIRED):
 {
   "overview": "2-3 sentence trip overview emphasizing the event",
   "eventAnchor": {
-    "eventName": "Exact event name",
+    "eventName": "Exact event name provided by user",
     "eventType": "sports|music|festivals",
     "eventDate": "YYYY-MM-DD",
-    "eventDay": 2, // Which day number is the event
+    "eventDay": 2,
     "venue": "Stadium/Arena/Festival Grounds name",
     "city": "City name",
     "country": "Country name"
   },
   "tripSummary": {
     "totalDays": 5,
-    "cities": ["Miami"],
+    "cities": ["City"],
     "highlights": ["5 key highlights including THE EVENT"],
     "eventPhases": {
       "preEvent": 1,
@@ -209,29 +229,52 @@ RESPONSE STRUCTURE:
   "budget": {
     "totalBudget": "$2,500 USD",
     "dailyAverage": "$500/day",
-    "eventDayCost": "$800" // Include event ticket estimate
+    "eventDayCost": "$800",
+    "breakdown": {
+      "accommodation": "$800",
+      "transport": "$400",
+      "food": "$600",
+      "event": "$500",
+      "activities": "$200"
+    }
   },
   "days": [
     {
       "day": 1,
-      "date": "2026-06-10",
-      "city": "Miami",
+      "date": "YYYY-MM-DD",
+      "city": "City",
       "theme": "Arrival & Beach Exploration",
       "label": "Pre-Event Day 1",
       "isEventDay": false,
       "morning": {
         "time": "9:00 AM - 12:00 PM",
         "activities": "Light activities, settle in",
-        "location": "South Beach area",
+        "location": "Area name",
         "cost": "$50"
       },
-      "afternoon": {...},
-      "evening": {...},
+      "afternoon": {
+        "time": "12:00 PM - 6:00 PM",
+        "activities": "Afternoon exploration",
+        "location": "Area name",
+        "cost": "$75"
+      },
+      "evening": {
+        "time": "6:00 PM - 11:00 PM",
+        "activities": "Evening dining and relaxation",
+        "location": "Area name",
+        "cost": "$100"
+      },
       "mealsAndDining": [
         {
           "meal": "Lunch",
           "recommendation": "Specific restaurant name",
           "priceRange": "$15-25",
+          "location": "Address or area"
+        },
+        {
+          "meal": "Dinner",
+          "recommendation": "Specific restaurant name",
+          "priceRange": "$30-50",
           "location": "Address or area"
         }
       ],
@@ -239,9 +282,9 @@ RESPONSE STRUCTURE:
     },
     {
       "day": 2,
-      "date": "2026-06-11",
-      "city": "Miami",
-      "theme": "World Cup Final - USA vs Brazil",
+      "date": "YYYY-MM-DD",
+      "city": "City",
+      "theme": "Event Name - Description",
       "label": "EVENT DAY",
       "isEventDay": true,
       "morning": {
@@ -252,50 +295,58 @@ RESPONSE STRUCTURE:
       },
       "afternoon": {
         "time": "12:00 PM - 6:00 PM",
-        "activities": "Pre-game fan zone, stadium atmosphere",
-        "location": "Hard Rock Stadium area",
-        "cost": "$100",
-        "isEventBlock": true,
-        "eventDetails": {
-          "doors": "2:00 PM",
-          "startTime": "3:00 PM",
-          "duration": "3 hours",
-          "ticketUrl": "https://ticketmaster.com/world-cup"
-        }
+        "activities": "Pre-event activities, fan zone, stadium atmosphere",
+        "location": "Venue area",
+        "cost": "$100"
       },
       "evening": {
         "time": "6:00 PM - 11:00 PM",
-        "activities": "THE EVENT: World Cup Final + Post-game celebrations",
-        "location": "Hard Rock Stadium",
+        "activities": "THE EVENT: [Event Name] + Post-event celebrations",
+        "location": "Venue name",
         "cost": "$500",
         "isEventBlock": true,
         "eventDetails": {
-          "startTime": "6:00 PM",
-          "duration": "4 hours"
+          "doors": "5:00 PM",
+          "startTime": "7:00 PM",
+          "duration": "3-4 hours",
+          "ticketUrl": "https://example.com/tickets"
         }
       },
-      "mealsAndDining": [...],
-      "tips": ["Event-specific tips: arrive early, parking, what to bring"]
-    },
-    {
-      "day": 3,
-      "date": "2026-06-12",
-      "city": "Miami",
-      "theme": "Post-Event Recovery & Beach Day",
-      "label": "Post-Event Day 1",
-      "isEventDay": false,
-      ...
+      "mealsAndDining": [
+        {
+          "meal": "Breakfast",
+          "recommendation": "Light breakfast spot",
+          "priceRange": "$10-20",
+          "location": "Near hotel"
+        },
+        {
+          "meal": "Pre-Event Snack",
+          "recommendation": "Quick bite near venue",
+          "priceRange": "$15-25",
+          "location": "Near venue"
+        }
+      ],
+      "tips": [
+        "Arrive at venue early to avoid crowds",
+        "Check parking or public transport options",
+        "Bring required items (ID, tickets, etc.)",
+        "Stay hydrated throughout the event"
+      ]
     }
   ]
 }
 
 CRITICAL RULES:
-- The EVENT DAY must have isEventDay: true
-- Event blocks must have isEventBlock: true
-- Use real venue names and locations
-- Budget should include event ticket costs
+- RETURN ONLY VALID JSON - NO MARKDOWN, NO COMMENTARY
+- The EVENT DAY must have "isEventDay": true
+- Event blocks must have "isEventBlock": true
+- At least one time block on event day must be the main event
+- Use real venue names and locations when provided
+- Budget breakdown should be realistic and detailed
 - Tips should be practical and event-specific
-- Return ONLY valid JSON, no markdown or explanations`;
+- Include specific restaurant/venue recommendations
+- All dates must be in YYYY-MM-DD format
+- All costs must include currency symbol and amount`;
 }
 
 // ==================== EVENT-ANCHORED PROMPT BUILDER ====================
@@ -391,38 +442,49 @@ PRE-EVENT DAYS (Days ${eventDay > 1 ? `1-${eventDay - 1}` : 'none'}):
 EVENT DAY (Day ${eventDay} - ${eventDate}):
 - Morning: Light activities, breakfast, prepare
 - Afternoon/Evening: THE EVENT at ${eventVenue}
-  * Include pre-event fan zones, atmosphere
-  * Event start time, doors, duration
-  * Ticket estimates
-  * What to bring, parking, tips
+  * Include pre-event activities (fan zones, atmosphere)
+  * Event start time, doors opening time, duration
+  * Realistic ticket cost estimates
+  * What to bring, parking/transport, arrival tips
 - Post-event: Celebrations, nightlife near ${eventCity}
+- CRITICAL: Event block must have "isEventBlock": true
 
 POST-EVENT DAYS (Days ${eventDay < days ? `${eventDay + 1}-${days}` : 'none'}):
 - Full city discovery mode
 - Beaches, culture, museums, food tours
 - Shopping, nightlife, hidden gems
-- Recovery activities (spa, beach, chill)
+- Recovery activities (spa, beach, relaxation)
 
-EVENT-SPECIFIC TIPS:
+EVENT-SPECIFIC RECOMMENDATIONS:
 ${eventType === 'sports' ? `
-- Best sports bars for pre-game
-- Team merchandise locations
-- Public transportation to stadium
-- Post-game celebration spots
+- Best viewing locations and seating recommendations
+- Pre-event gathering spots and sports bars
+- Team merchandise and memorabilia locations
+- Public transportation to venue
+- Post-event celebration hotspots
 ` : eventType === 'music' ? `
-- Best accommodation near venue
-- Pre-show dinner spots
-- Merch and meet-and-greet info
-- After-party recommendations
+- Best accommodation near venue for easy access
+- Pre-show dinner spots within walking distance
+- Merchandise and artist meet-and-greet information
+- After-party and club recommendations
+- Sound check and early entry opportunities
 ` : `
-- Festival ground layout
-- Best days/times to attend
-- What to wear/bring
-- Nearby accommodation
-- Food and vendor options
+- Festival ground layout and navigation tips
+- Best days/times to attend specific attractions
+- What to wear, bring, and prepare
+- Nearby accommodation with shuttle service
+- Food vendors and local cuisine options
+- Rest areas and chill-out zones
 `}
 
-Generate the complete event-focused itinerary following the JSON structure provided in the system prompt.`;
+BUDGET BREAKDOWN REQUIREMENTS:
+- Accommodation: Hotels/Airbnb costs for ${days} nights
+- Transport: Flights, local transport, parking
+- Food: All meals and dining experiences
+- Event: Ticket costs and event-specific expenses
+- Activities: Tours, attractions, entertainment
+
+RETURN ONLY VALID JSON following the exact structure in the system prompt. NO MARKDOWN. NO EXPLANATIONS.`;
 }
 
 // ==================== MAIN API HANDLER ====================
@@ -538,7 +600,7 @@ export async function POST(req: Request) {
           tripType: tripType || 'balanced',
           generationTime: `${generationTime}s`,
           origin: origin || null,
-          version: '5.0-event-centric'
+          version: '6.0-trademark-safe'
         }
       });
     }
@@ -563,6 +625,8 @@ Budget: ${budget || 'Mid-range'}
 Group: ${groupType || 'solo'} (${groupSize} people)
 Style: ${tripType || 'balanced'}
 
+CRITICAL: RETURN ONLY VALID JSON. NO MARKDOWN. NO COMMENTARY.
+
 Return valid JSON with this structure:
 {
   "overview": "Brief trip overview",
@@ -578,7 +642,14 @@ Return valid JSON with this structure:
   },
   "budget": {
     "totalBudget": "$X,XXX USD",
-    "dailyAverage": "$XXX/day"
+    "dailyAverage": "$XXX/day",
+    "breakdown": {
+      "accommodation": "$XXX",
+      "transport": "$XXX",
+      "food": "$XXX",
+      "event": "$0",
+      "activities": "$XXX"
+    }
   },
   "days": [
     ${dates.map((date, i) => `{
@@ -588,16 +659,19 @@ Return valid JSON with this structure:
       "theme": "Day ${i + 1} theme",
       "label": "Day ${i + 1}",
       "isEventDay": false,
-      "morning": {"time": "9:00 AM - 12:00 PM", "activities": "...", "location": "...", "cost": "$XX"},
-      "afternoon": {"time": "12:00 PM - 6:00 PM", "activities": "...", "location": "...", "cost": "$XX"},
-      "evening": {"time": "6:00 PM - 11:00 PM", "activities": "...", "location": "...", "cost": "$XX"},
-      "mealsAndDining": [...],
-      "tips": [...]
+      "morning": {"time": "9:00 AM - 12:00 PM", "activities": "Morning activities", "location": "Location", "cost": "$XX"},
+      "afternoon": {"time": "12:00 PM - 6:00 PM", "activities": "Afternoon activities", "location": "Location", "cost": "$XX"},
+      "evening": {"time": "6:00 PM - 11:00 PM", "activities": "Evening activities", "location": "Location", "cost": "$XX"},
+      "mealsAndDining": [
+        {"meal": "Lunch", "recommendation": "Restaurant", "priceRange": "$XX-XX", "location": "Area"},
+        {"meal": "Dinner", "recommendation": "Restaurant", "priceRange": "$XX-XX", "location": "Area"}
+      ],
+      "tips": ["Tip 1", "Tip 2"]
     }`).join(',\n    ')}
   ]
 }`;
 
-    const systemPrompt = `You are an expert travel planner. Create detailed itineraries with real place names. Return ONLY valid JSON.`;
+    const systemPrompt = `You are an expert travel planner. Create detailed itineraries with real place names. CRITICAL: Return ONLY valid JSON. NO MARKDOWN. NO COMMENTARY. NO EXPLANATIONS.`;
     const data = await generateItineraryWithRetry(systemPrompt, genericPrompt);
 
     const endTime = Date.now();
@@ -616,7 +690,7 @@ Return valid JSON with this structure:
         tripType: tripType || 'balanced',
         generationTime: `${generationTime}s`,
         origin: origin || null,
-        version: '5.0-generic-fallback',
+        version: '6.0-generic-fallback',
         warning: 'For event-based trips, provide eventName, eventDate, eventVenue, and eventType.'
       }
     });
@@ -644,7 +718,7 @@ export async function GET() {
     status: "operational",
     service: "GladysTravelAI - Event-Centric Itinerary API",
     model: "gpt-4o-mini",
-    version: "5.0-event-centric",
+    version: "6.0-trademark-safe",
     features: [
       "🎯 Event-anchored trip planning",
       "📅 Pre-event, event day, post-event phases",
@@ -652,7 +726,8 @@ export async function GET() {
       "✅ Structured JSON with event blocks",
       "💎 Venue-optimized recommendations",
       "🔗 Affiliate-ready output",
-      "🔄 Fallback to generic itineraries"
+      "🔄 Fallback to generic itineraries",
+      "⚖️ Trademark-safe architecture"
     ],
     requiredFields: {
       eventBased: {

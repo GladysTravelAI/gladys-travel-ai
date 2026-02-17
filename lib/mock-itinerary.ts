@@ -1,46 +1,36 @@
-// This matches the structure from your /api/itinerary route
-export interface ItineraryData {
-  overview: string;
-  tripSummary: {
-    totalDays: number;
-    cities: string[];
-    eventsAttending: number;
-    venues: string[];
-    highlights: string[];
-  };
-  budget: {
-    totalBudget: string;
-    breakdown: {
-      accommodation: string;
-      transportation: string;
-      tickets: string;
-      food: string;
-      activities: string;
-      contingency: string;
-    };
-    dailyAverage: string;
-    savingTips: string[];
-  };
-  days: DayPlan[];
-  accommodations: Accommodation[];
-  flights: Flight[];
-  localTips: {
-    language?: string;
-    currency?: string;
-    customs?: string;
-    safety?: string;
-    eventTips?: string[];
-  };
-  metadata?: {
-    generatedAt: string;
-    eventFocused: boolean;
-    team: string | null;
-    eventCount: number;
-    optimized: boolean;
-    groupSize: number;
-    groupType?: string | null;  // 'solo' | 'couple' | 'family' | 'group'
-    budget?: string;            // 'budget' | 'mid-range' | 'luxury'
-    tripType?: string;          // 'adventure' | 'romantic' | 'cultural' etc.
+// lib/mock-itinerary.ts
+// 🎯 EVENT-CENTRIC ITINERARY ARCHITECTURE
+// Production-grade TypeScript contracts for event-anchored travel
+
+export interface EventAnchor {
+  eventName: string;
+  eventType: 'sports' | 'music' | 'festivals' | 'other';
+  eventDate: string;
+  eventDay: number;
+  venue: string;
+  city: string;
+  country?: string;
+}
+
+export interface TimeBlock {
+  time: string;
+  activities: string;
+  location: string;
+  cost: string;
+  affiliateLinks?: Array<{
+    type: string;
+    partner?: string;
+    url?: string;
+  }>;
+}
+
+export interface EventBlock extends TimeBlock {
+  isEventBlock?: boolean;
+  eventDetails?: {
+    doors?: string;
+    startTime?: string;
+    duration?: string;
+    ticketUrl?: string;
   };
 }
 
@@ -49,65 +39,45 @@ export interface DayPlan {
   date: string;
   city: string;
   theme: string;
-  morning: ActivityBlock;
-  afternoon: ActivityBlock;
-  evening: ActivityBlock;
-  event: EventBlock | null;
-  mealsAndDining: Meal[];
-  transportation: {
-    method: string;
-    totalTime: string;
-    totalCost: string;
+  label: string;
+  isEventDay: boolean;
+  morning: TimeBlock;
+  afternoon: TimeBlock | EventBlock;
+  evening: TimeBlock | EventBlock;
+  mealsAndDining?: Array<{
+    meal: string;
+    recommendation: string;
+    priceRange: string;
+    location: string;
+    affiliateUrl?: string;
+  }>;
+  tips?: string[];
+}
+
+export interface ItineraryData {
+  overview: string;
+  eventAnchor?: EventAnchor;
+  tripSummary: {
+    totalDays: number;
+    cities: string[];
+    highlights?: string[];
+    eventPhases?: {
+      preEvent: number;
+      eventDay: number;
+      postEvent: number;
+    };
   };
-  tips: string[];
-}
-
-interface ActivityBlock {
-  time: string;
-  activities: string;
-  location: string;
-  transportTime: string;
-  cost: string;
-}
-
-interface EventBlock {
-  hasEvent: boolean;
-  startTime: string;
-  venue: string;
-  teams: string;
-  arrivalTime: string;
-  preEventActivities: string[];
-  postEventPlan: string;
-}
-
-interface Meal {
-  meal: string;
-  recommendation: string;
-  cuisine: string;
-  location: string;
-  priceRange: string;
-}
-
-export interface Accommodation {
-  name: string;
-  checkIn: string;
-  checkOut: string;
-  nights: number;
-  location: string;
-  description: string;
-  rating: number;
-  priceRange: {
-    normal: string;
-    eventDay: string;
-    total: string;
+  budget: {
+    totalBudget: string;
+    dailyAverage: string;
+    eventDayCost?: string;
+    breakdown?: {
+      accommodation: string;
+      transport: string;
+      food: string;
+      event: string;
+      activities: string;
+    };
   };
-  bookingUrl: string;
-}
-
-export interface Flight {
-  route: string;
-  date: string;
-  estimatedCost: string;
-  airlines: string[];
-  tips: string[];
+  days: DayPlan[];
 }

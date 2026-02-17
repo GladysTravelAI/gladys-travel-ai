@@ -32,7 +32,7 @@ interface TripRefinementModalProps {
   eventContext?: {
     name: string;
     date: string;
-    type: 'concert' | 'sports' | 'festival' | 'theater' | 'other';
+    type: 'sports' | 'music' | 'festivals' | 'other';
   };
 }
 
@@ -603,14 +603,13 @@ export default function TripRefinementModal({
 
 // ==================== HELPER FUNCTIONS ====================
 
-function getEventInterests(eventType: string): string[] {
-  const interestMap: Record<string, string[]> = {
-    concert: ['Nightlife', 'Music', 'Local Culture', 'Photography'],
-    sports: ['Sports', 'Nightlife', 'Food Tours', 'Local Culture'],
-    festival: ['Local Culture', 'Food Tours', 'Nightlife', 'Photography'],
-    theater: ['Culture', 'Museums', 'History', 'Shopping'],
-    other: ['Local Culture', 'Food Tours', 'Photography'],
+function getEventInterests(eventType: 'sports' | 'music' | 'festivals' | 'other'): string[] {
+  const interestMap: Record<'sports' | 'music' | 'festivals' | 'other', string[]> = {
+    sports:    ['Sports', 'Nightlife', 'Food Tours', 'Local Culture'],
+    music:     ['Nightlife', 'Local Culture', 'Photography', 'Food Tours'],
+    festivals: ['Local Culture', 'Food Tours', 'Nightlife', 'Photography'],
+    other:     ['Local Culture', 'Food Tours', 'Photography', 'History'],
   };
 
-  return interestMap[eventType] || [];
+  return interestMap[eventType] ?? [];
 }

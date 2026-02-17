@@ -1,9 +1,17 @@
 // lib/GladysAgentAI.ts
-// 🧠 GLADYS AGENT AI - BRAIN / ORCHESTRATOR
+// 🧠 GLADYS AGENT AI - BRAIN / ORCHESTRATOR (OpenAI-Powered)
 // This file is the BRAIN. It returns structured JSON ONLY.
 // It does NOT speak conversationally or render UI.
 
-import { eventService } from "./eventService";
+import OpenAI from 'openai';
+import { searchTicketmasterEvents } from './ticketmasterService';
+import { getAllEvents, type Event } from './eventService';
+
+// ==================== OPENAI CLIENT ====================
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
 // ==================== TYPES ====================
 
@@ -49,6 +57,7 @@ export interface EventSearchResult {
   name: string;
   type: EventType;
   startDate: string;
+  endDate?: string;
   venue: {
     name: string;
     city: string;
@@ -86,428 +95,375 @@ export interface TripPlan {
   optimized: boolean;
 }
 
-// ==================== ENTITY DATABASES ====================
+// ==================== AI SYSTEM PROMPT ====================
 
-const SPORTS_TEAMS = [
-  // NBA
-  'lakers', 'celtics', 'warriors', 'bulls', 'heat', 'knicks', 'nets', 'bucks',
-  'clippers', 'mavericks', 'rockets', 'suns', 'nuggets', 'trail blazers',
-  
-  // NFL
-  'patriots', 'cowboys', 'packers', '49ers', 'steelers', 'eagles', 'chiefs',
-  'ravens', 'rams', 'seahawks', 'broncos', 'saints',
-  
-  // Soccer
-  'barcelona', 'real madrid', 'manchester united', 'liverpool', 'chelsea',
-  'arsenal', 'bayern munich', 'juventus', 'psg', 'inter miami'
-];
+const GLADYS_AGENT_SYSTEM_PROMPT = `You are GladysAgent, the global event-travel intelligence orchestration layer.
 
-const MUSIC_ARTISTS = [
-  'taylor swift', 'beyonce', 'drake', 'bad bunny', 'ed sheeran',
-  'the weeknd', 'billie eilish', 'ariana grande', 'kanye west',
-  'travis scott', 'post malone', 'imagine dragons', 'coldplay',
-  'bruno mars', 'adele', 'rihanna', 'justin bieber'
-];
+# CORE MISSION
+You analyze user travel queries and return structured routing intelligence for an event-focused travel platform.
+You NEVER speak conversationally.
+You ALWAYS return valid JSON matching the AgentAnalysis schema.
 
-const FESTIVALS = [
-  'coachella', 'lollapalooza', 'bonnaroo', 'glastonbury', 'tomorrowland',
-  'burning man', 'ultra', 'edc', 'sxsw', 'comic-con', 'essence fest'
-];
+# CAPABILITIES
+You detect:
+1. Intent type (EVENT, DESTINATION, HYBRID, GENERAL)
+2. Event type (SPORTS, MUSIC, FESTIVAL, CONFERENCE, THEATER, OTHER)
+3. Primary entities (teams, artists, festivals, leagues, venues)
+4. Locations (cities, venues, countries)
+5. Context (budget level, travelers, dates)
+6. Suggested actions for the platform
 
-const LEAGUES = [
-  'nba', 'nfl', 'mlb', 'nhl', 'mls', 'premier league', 'la liga',
-  'champions league', 'super bowl', 'world cup', 'f1', 'ufc'
-];
+# INTENT CLASSIFICATION
+
+**EVENT**: User wants to attend a specific event
+- Triggers: team names, artist names, sports leagues, concerts, matches, games
+- Examples: "Lakers game", "Taylor Swift concert", "World Cup", "Coachella"
+
+**DESTINATION**: User wants to visit a location without event focus
+- Triggers: city names with vacation/explore/visit keywords
+- Examples: "trip to Paris", "explore Tokyo", "vacation in Miami"
+
+**HYBRID**: User wants both event + destination exploration
+- Triggers: event + city exploration combined
+- Examples: "Lakers game and explore LA", "concert in NYC and visit museums"
+
+**GENERAL**: Unclear or informational query
+- Triggers: help requests, vague questions, greetings
+- Examples: "what can you do?", "help me plan", "hello"
+
+# ENTITY EXTRACTION
+
+**Teams (SPORTS):**
+NBA: Lakers, Celtics, Warriors, Bulls, Heat, Knicks, Nets, Bucks, Clippers, Mavericks, Rockets, Suns, Nuggets
+NFL: Patriots, Cowboys, Packers, 49ers, Steelers, Eagles, Chiefs, Ravens, Rams, Seahawks, Broncos, Saints
+Soccer: Barcelona, Real Madrid, Manchester United, Liverpool, Chelsea, Arsenal, Bayern Munich, Juventus, PSG, Inter Miami
+
+**Artists (MUSIC):**
+Taylor Swift, Beyoncé, Drake, Bad Bunny, Ed Sheeran, The Weeknd, Billie Eilish, Ariana Grande, Travis Scott, Post Malone, Imagine Dragons, Coldplay, Bruno Mars, Adele, Rihanna
+
+**Festivals (FESTIVAL):**
+Coachella, Lollapalooza, Bonnaroo, Glastonbury, Tomorrowland, Burning Man, Ultra, EDC, SXSW, Comic-Con
+
+**Leagues (SPORTS):**
+NBA, NFL, MLB, NHL, MLS, Premier League, La Liga, Champions League, Super Bowl, World Cup, F1, UFC
+
+# CITIES DATABASE
+Major US: New York, Los Angeles, Chicago, Houston, Miami, Atlanta, Boston, Seattle, Denver, Las Vegas, Dallas, Austin
+International: London, Paris, Barcelona, Madrid, Rome, Berlin, Tokyo, Sydney, Dubai, Singapore
+
+# BUDGET DETECTION
+- "luxury", "premium", "5-star", "expensive" → luxury
+- "budget", "cheap", "affordable", "economical" → budget
+- default → moderate
+
+# SUGGESTED ACTIONS
+Based on intent, suggest relevant actions:
+- EVENT intent → ["search_events", "compare_ticket_prices", "build_trip"]
+- DESTINATION intent → ["find_hotels", "show_destination_info"]
+- HYBRID intent → ["search_events", "build_trip", "show_destination_info"]
+- GENERAL intent → ["search_events"]
+
+# ROUTING
+- EVENT with entity → shouldNavigateTo: "/events", searchParams: {q: entity, type: entityType}
+- Otherwise → no routing
+
+# CRITICAL RULES
+1. ALWAYS return valid JSON matching this EXACT schema
+2. NEVER include conversational text
+3. NEVER hallucinate fields outside the schema
+4. Be deterministic and precise
+5. Confidence score: 0.0-1.0 based on clarity of intent
+
+# OUTPUT SCHEMA
+{
+  "intent": "EVENT" | "DESTINATION" | "HYBRID" | "GENERAL",
+  "confidence": number (0.0-1.0),
+  "eventType": "SPORTS" | "MUSIC" | "FESTIVAL" | "CONFERENCE" | "THEATER" | "OTHER" | null,
+  "entity": string | null,
+  "entityType": "team" | "artist" | "festival" | "league" | "venue" | null,
+  "city": string | null,
+  "venue": string | null,
+  "country": string | null,
+  "context": {
+    "detectedTeam": string | null,
+    "detectedArtist": string | null,
+    "detectedFestival": string | null,
+    "detectedLeague": string | null,
+    "detectedVenue": string | null,
+    "detectedDate": string | null,
+    "detectedBudget": "budget" | "moderate" | "luxury" | null,
+    "numberOfTravelers": number | null
+  },
+  "suggestedActions": string[],
+  "shouldNavigateTo": "/events" | "/events/[id]" | "/itinerary" | null,
+  "searchParams": object | null
+}
+
+Analyze the query and return ONLY the JSON object. No explanations. No markdown. Pure JSON.`;
 
 // ==================== GLADYS AGENT AI CLASS ====================
 
 export class GladysAgentAI {
   
-  // ==================== CORE ANALYSIS ====================
+  // ==================== CORE ANALYSIS (AI-POWERED) ====================
   
   /**
-   * Analyze user query and return structured intent
+   * Analyze user query and return structured intent using OpenAI
    * This is the MAIN entry point
    */
   async analyzeQuery(query: string, context?: any): Promise<AgentAnalysis> {
+    try {
+      console.log('🧠 GladysAgent analyzing:', query);
+      
+      // Call OpenAI for intelligent analysis
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        temperature: 0.2, // Low temperature for deterministic output
+        messages: [
+          {
+            role: 'system',
+            content: GLADYS_AGENT_SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: `Analyze this travel query: "${query}"`
+          }
+        ],
+        response_format: { type: 'json_object' } // Force JSON mode
+      });
+      
+      const content = completion.choices[0].message.content;
+      
+      if (!content) {
+        throw new Error('No response from OpenAI');
+      }
+      
+      // Parse AI response
+      const aiAnalysis = JSON.parse(content);
+      
+      // Validate and normalize to AgentAnalysis interface
+      const analysis: AgentAnalysis = {
+        intent: aiAnalysis.intent || 'GENERAL',
+        confidence: aiAnalysis.confidence || 0.5,
+        eventType: aiAnalysis.eventType || undefined,
+        entity: aiAnalysis.entity || undefined,
+        entityType: aiAnalysis.entityType || undefined,
+        city: aiAnalysis.city || undefined,
+        venue: aiAnalysis.venue || undefined,
+        country: aiAnalysis.country || undefined,
+        context: {
+          detectedTeam: aiAnalysis.context?.detectedTeam || undefined,
+          detectedArtist: aiAnalysis.context?.detectedArtist || undefined,
+          detectedFestival: aiAnalysis.context?.detectedFestival || undefined,
+          detectedLeague: aiAnalysis.context?.detectedLeague || undefined,
+          detectedVenue: aiAnalysis.context?.detectedVenue || undefined,
+          detectedDate: aiAnalysis.context?.detectedDate || undefined,
+          detectedBudget: aiAnalysis.context?.detectedBudget || undefined,
+          numberOfTravelers: aiAnalysis.context?.numberOfTravelers || undefined,
+        },
+        suggestedActions: aiAnalysis.suggestedActions || ['search_events'],
+        shouldNavigateTo: aiAnalysis.shouldNavigateTo || undefined,
+        searchParams: aiAnalysis.searchParams || undefined
+      };
+      
+      console.log('✅ AI Analysis:', {
+        intent: analysis.intent,
+        entity: analysis.entity,
+        confidence: analysis.confidence
+      });
+      
+      return analysis;
+      
+    } catch (error) {
+      console.error('❌ OpenAI analysis failed:', error);
+      
+      // FALLBACK: Basic rule-based detection
+      console.log('⚠️ Using fallback rule-based detection');
+      return this.fallbackAnalysis(query);
+    }
+  }
+  
+  // ==================== FALLBACK RULE-BASED ANALYSIS ====================
+  
+  /**
+   * Fallback to simple rule-based detection if OpenAI fails
+   */
+  private fallbackAnalysis(query: string): AgentAnalysis {
     const normalized = query.toLowerCase().trim();
     
-    // 1. Detect intent type
-    const intent = this.detectIntent(normalized);
+    // Simple keyword-based intent detection
+    const eventKeywords = ['game', 'match', 'concert', 'show', 'festival', 'event', 'tickets'];
+    const destinationKeywords = ['visit', 'trip', 'vacation', 'explore', 'tour'];
     
-    // 2. Extract entities
-    const entities = this.extractEntities(normalized);
+    const hasEventKeyword = eventKeywords.some(kw => normalized.includes(kw));
+    const hasDestinationKeyword = destinationKeywords.some(kw => normalized.includes(kw));
     
-    // 3. Detect event type
-    const eventType = this.detectEventType(normalized, entities);
+    let intent: IntentType = 'GENERAL';
+    if (hasEventKeyword && hasDestinationKeyword) {
+      intent = 'HYBRID';
+    } else if (hasEventKeyword) {
+      intent = 'EVENT';
+    } else if (hasDestinationKeyword) {
+      intent = 'DESTINATION';
+    }
     
-    // 4. Extract location
-    const location = this.extractLocation(normalized);
+    // Basic entity extraction
+    const teams = ['lakers', 'celtics', 'warriors', 'patriots', 'cowboys'];
+    const artists = ['taylor swift', 'beyonce', 'drake', 'ed sheeran'];
     
-    // 5. Extract context (budget, dates, etc.)
-    const extractedContext = this.extractContext(normalized);
+    let entity: string | undefined;
+    let entityType: 'team' | 'artist' | undefined;
     
-    // 6. Determine suggested actions
-    const suggestedActions = this.determineSuggestedActions(intent, entities, extractedContext);
+    for (const team of teams) {
+      if (normalized.includes(team)) {
+        entity = team;
+        entityType = 'team';
+        break;
+      }
+    }
     
-    // 7. Determine routing
-    const routing = this.determineRouting(intent, entities);
+    if (!entity) {
+      for (const artist of artists) {
+        if (normalized.includes(artist)) {
+          entity = artist;
+          entityType = 'artist';
+          break;
+        }
+      }
+    }
     
-    // Build final analysis
     return {
       intent,
-      confidence: this.calculateConfidence(intent, entities),
-      eventType,
-      entity: entities.primary,
-      entityType: entities.type,
-      city: location.city,
-      venue: location.venue,
-      country: location.country,
+      confidence: entity ? 0.7 : 0.4,
+      eventType: entityType === 'team' ? 'SPORTS' : entityType === 'artist' ? 'MUSIC' : undefined,
+      entity,
+      entityType,
+      city: undefined,
+      venue: undefined,
+      country: undefined,
       context: {
-        ...extractedContext,
-        detectedTeam: entities.team,
-        detectedArtist: entities.artist,
-        detectedFestival: entities.festival,
-        detectedLeague: entities.league,
-        detectedVenue: location.venue,
+        detectedBudget: 'moderate'
       },
-      suggestedActions,
-      shouldNavigateTo: routing.navigateTo,
-      searchParams: routing.params
+      suggestedActions: intent === 'EVENT' ? ['search_events', 'build_trip'] : ['search_events'],
+      shouldNavigateTo: entity ? '/events' : undefined,
+      searchParams: entity ? { q: entity, type: entityType || 'all' } : undefined
     };
-  }
-  
-  // ==================== INTENT DETECTION ====================
-  
-  private detectIntent(query: string): IntentType {
-    // EVENT intent triggers
-    const eventTriggers = [
-      ...SPORTS_TEAMS,
-      ...MUSIC_ARTISTS,
-      ...FESTIVALS,
-      ...LEAGUES
-    ];
-    
-    const hasEventEntity = eventTriggers.some(trigger => 
-      query.includes(trigger.toLowerCase())
-    );
-    
-    // Check for event keywords
-    const eventKeywords = [
-      'game', 'match', 'concert', 'show', 'festival', 'championship',
-      'tour', 'event', 'tickets', 'watch', 'see play', 'see perform'
-    ];
-    
-    const hasEventKeyword = eventKeywords.some(kw => query.includes(kw));
-    
-    // DESTINATION triggers
-    const destinationKeywords = [
-      'visit', 'trip to', 'vacation in', 'traveling to', 'explore',
-      'tour of', 'sightseeing in', 'holiday in'
-    ];
-    
-    const hasDestinationKeyword = destinationKeywords.some(kw => query.includes(kw));
-    
-    // City detection
-    const cities = this.extractLocation(query);
-    const hasCity = !!cities.city;
-    
-    // Decision logic
-    if (hasEventEntity || hasEventKeyword) {
-      if (hasCity && hasDestinationKeyword) {
-        return 'HYBRID'; // "Lakers game in LA and explore the city"
-      }
-      return 'EVENT';
-    }
-    
-    if (hasCity || hasDestinationKeyword) {
-      return 'DESTINATION';
-    }
-    
-    return 'GENERAL';
-  }
-  
-  // ==================== ENTITY EXTRACTION ====================
-  
-  private extractEntities(query: string): {
-    primary?: string;
-    type?: 'team' | 'artist' | 'festival' | 'league' | 'venue';
-    team?: string;
-    artist?: string;
-    festival?: string;
-    league?: string;
-  } {
-    // Check sports teams
-    for (const team of SPORTS_TEAMS) {
-      if (query.includes(team.toLowerCase())) {
-        return {
-          primary: team,
-          type: 'team',
-          team: team
-        };
-      }
-    }
-    
-    // Check artists
-    for (const artist of MUSIC_ARTISTS) {
-      if (query.includes(artist.toLowerCase())) {
-        return {
-          primary: artist,
-          type: 'artist',
-          artist: artist
-        };
-      }
-    }
-    
-    // Check festivals
-    for (const festival of FESTIVALS) {
-      if (query.includes(festival.toLowerCase())) {
-        return {
-          primary: festival,
-          type: 'festival',
-          festival: festival
-        };
-      }
-    }
-    
-    // Check leagues
-    for (const league of LEAGUES) {
-      if (query.includes(league.toLowerCase())) {
-        return {
-          primary: league,
-          type: 'league',
-          league: league
-        };
-      }
-    }
-    
-    return {};
-  }
-  
-  // ==================== EVENT TYPE DETECTION ====================
-  
-  private detectEventType(query: string, entities: any): EventType | undefined {
-    if (entities.team || entities.league) return 'SPORTS';
-    if (entities.artist) return 'MUSIC';
-    if (entities.festival) return 'FESTIVAL';
-    
-    // Keyword-based detection
-    if (/(sports?|game|match|championship)/i.test(query)) return 'SPORTS';
-    if (/(concert|show|tour|perform)/i.test(query)) return 'MUSIC';
-    if (/(festival|fest)/i.test(query)) return 'FESTIVAL';
-    if (/(conference|summit|expo)/i.test(query)) return 'CONFERENCE';
-    if (/(play|theater|broadway)/i.test(query)) return 'THEATER';
-    
-    return undefined;
-  }
-  
-  // ==================== LOCATION EXTRACTION ====================
-  
-  private extractLocation(query: string): {
-    city?: string;
-    venue?: string;
-    country?: string;
-  } {
-    // Common cities
-    const cities = [
-      'new york', 'los angeles', 'chicago', 'houston', 'phoenix',
-      'philadelphia', 'san antonio', 'san diego', 'dallas', 'austin',
-      'miami', 'atlanta', 'boston', 'seattle', 'denver', 'las vegas',
-      'portland', 'nashville', 'detroit', 'charlotte',
-      'london', 'paris', 'barcelona', 'madrid', 'rome', 'berlin',
-      'tokyo', 'sydney', 'dubai', 'singapore', 'hong kong'
-    ];
-    
-    for (const city of cities) {
-      if (query.includes(city.toLowerCase())) {
-        return { city };
-      }
-    }
-    
-    // Common venues
-    const venues = [
-      'madison square garden', 'staples center', 'crypto.com arena',
-      'wembley', 'camp nou', 'bernabeu'
-    ];
-    
-    for (const venue of venues) {
-      if (query.includes(venue.toLowerCase())) {
-        return { venue };
-      }
-    }
-    
-    return {};
-  }
-  
-  // ==================== CONTEXT EXTRACTION ====================
-  
-  private extractContext(query: string): {
-    detectedDate?: string;
-    detectedBudget?: 'budget' | 'moderate' | 'luxury';
-    numberOfTravelers?: number;
-  } {
-    const context: any = {};
-    
-    // Budget detection
-    if (/(luxury|premium|expensive|5.?star)/i.test(query)) {
-      context.detectedBudget = 'luxury';
-    } else if (/(budget|cheap|affordable|economical)/i.test(query)) {
-      context.detectedBudget = 'budget';
-    } else {
-      context.detectedBudget = 'moderate';
-    }
-    
-    // Number of travelers
-    const travelersMatch = query.match(/(\d+)\s+(people|person|traveler|guest)/i);
-    if (travelersMatch) {
-      context.numberOfTravelers = parseInt(travelersMatch[1]);
-    }
-    
-    // Date extraction (basic)
-    if (/(next week|this weekend|tomorrow)/i.test(query)) {
-      context.detectedDate = 'soon';
-    }
-    
-    return context;
-  }
-  
-  // ==================== ACTION DETERMINATION ====================
-  
-  private determineSuggestedActions(
-    intent: IntentType,
-    entities: any,
-    context: any
-  ): string[] {
-    const actions: string[] = [];
-    
-    if (intent === 'EVENT') {
-      actions.push('search_events');
-      
-      if (entities.primary) {
-        actions.push('show_event_list');
-        actions.push('build_trip');
-      }
-      
-      actions.push('compare_ticket_prices');
-    }
-    
-    if (intent === 'DESTINATION') {
-      actions.push('show_destination_info');
-      actions.push('find_hotels');
-      actions.push('find_restaurants');
-    }
-    
-    if (intent === 'HYBRID') {
-      actions.push('search_events');
-      actions.push('show_destination_info');
-      actions.push('build_trip');
-    }
-    
-    return actions;
-  }
-  
-  // ==================== ROUTING DETERMINATION ====================
-  
-  private determineRouting(intent: IntentType, entities: any): {
-    navigateTo?: '/events' | '/events/[id]' | '/itinerary';
-    params?: Record<string, string>;
-  } {
-    if (intent === 'EVENT' && entities.primary) {
-      return {
-        navigateTo: '/events',
-        params: {
-          q: entities.primary,
-          type: entities.type || 'all'
-        }
-      };
-    }
-    
-    return {};
-  }
-  
-  // ==================== CONFIDENCE CALCULATION ====================
-  
-  private calculateConfidence(intent: IntentType, entities: any): number {
-    let confidence = 0.5; // Base confidence
-    
-    if (entities.primary) {
-      confidence += 0.3; // Strong entity match
-    }
-    
-    if (intent === 'EVENT' && entities.type) {
-      confidence += 0.2; // Event type detected
-    }
-    
-    return Math.min(confidence, 1.0);
   }
   
   // ==================== EVENT SEARCH ====================
   
   /**
    * Search for events using detected entity
+   * Dual-layer intelligence: Internal events first, Ticketmaster fallback
    */
   async searchEvents(entity: string, city?: string): Promise<EventSearchResult[]> {
     try {
-      // Use existing eventService
-      const results = await eventService.universalSearch(entity);
+      // LAYER 1: Internal structured events from eventService
+      let internalEvents = getAllEvents().filter(e =>
+        e.name.toLowerCase().includes(entity.toLowerCase()) ||
+        e.location.city.toLowerCase().includes(entity.toLowerCase()) ||
+        e.location.country.toLowerCase().includes(entity.toLowerCase())
+      );
       
       // Filter by city if provided
-      let filtered = city 
-        ? results.filter(r => r.venue?.city?.toLowerCase().includes(city.toLowerCase()))
-        : results;
+      if (city) {
+        internalEvents = internalEvents.filter(e =>
+          e.location.city.toLowerCase().includes(city.toLowerCase())
+        );
+      }
       
-      // Convert to our format
-      return filtered.slice(0, 10).map((event: any) => {
-        // Safely extract event type
-        const eventType = this.mapToEventType(event.type || event.category || event.genre || '');
+      // Map internal events to EventSearchResult format
+      const internalResults: EventSearchResult[] = internalEvents.map(event => ({
+        id: event.id,
+        name: event.name,
+        type: this.mapInternalTypeToEventType(event.type),
+        startDate: event.startDate,
+        endDate: event.endDate,
+        venue: {
+          name: event.location.venue || event.location.city,
+          city: event.location.city,
+          country: event.location.country
+        },
+        priceRange: event.priceRange,
+        source: event.source || 'GladysTravelAI',
+        image: event.heroImage
+      }));
+      
+      if (internalResults.length > 0) {
+        console.log('🎯 Using structured internal events');
+      }
+      
+      // LAYER 2: Ticketmaster fallback
+      console.log('🌍 Using Ticketmaster fallback');
+      let ticketmasterResults: EventSearchResult[] = [];
+      
+      try {
+        const tmEvents = await searchTicketmasterEvents(entity, city);
         
-        // Safely extract image
-        const eventImage = event.image || event.images?.[0]?.url || event.thumbnail || undefined;
-        
-        return {
-          id: event.id || '',
-          name: event.name || '',
-          type: eventType,
-          startDate: event.startDate || event.dates?.start?.localDate || new Date().toISOString(),
+        // Map Ticketmaster events to EventSearchResult format
+        ticketmasterResults = tmEvents.map(event => ({
+          id: event.id,
+          name: event.name,
+          type: this.mapInternalTypeToEventType(event.type),
+          startDate: event.startDate,
+          endDate: event.endDate,
           venue: {
-            name: event.venue?.name || event._embedded?.venues?.[0]?.name || '',
-            city: event.venue?.city || event._embedded?.venues?.[0]?.city?.name || '',
-            country: event.venue?.country || event._embedded?.venues?.[0]?.country?.name || ''
+            name: event.location.venue || event.location.city,
+            city: event.location.city,
+            country: event.location.country
           },
-          priceRange: event.priceRange ? {
-            min: event.priceRange.min,
-            max: event.priceRange.max,
-            currency: event.priceRange.currency
-          } : event.priceRanges?.[0] ? {
-            min: event.priceRanges[0].min,
-            max: event.priceRanges[0].max,
-            currency: event.priceRanges[0].currency
-          } : undefined,
-          source: event.source || 'ticketmaster',
-          image: eventImage
-        };
+          priceRange: event.priceRange,
+          source: event.source || 'Ticketmaster',
+          image: event.heroImage
+        }));
+      } catch (tmError) {
+        console.warn('Ticketmaster search failed, using internal events only:', tmError);
+      }
+      
+      // MERGE: Internal events first, then Ticketmaster
+      const allResults = [...internalResults, ...ticketmasterResults];
+      
+      // DEDUPLICATE: Remove duplicates by name + city
+      const seen = new Map<string, EventSearchResult>();
+      for (const event of allResults) {
+        const key = `${event.name.toLowerCase()}-${event.venue.city.toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.set(key, event);
+        }
+      }
+      
+      const uniqueResults = Array.from(seen.values());
+      
+      // SORT: By upcoming date, prioritizing internal events
+      uniqueResults.sort((a, b) => {
+        // Prioritize internal events
+        const aIsInternal = !a.id.startsWith('tm-');
+        const bIsInternal = !b.id.startsWith('tm-');
+        
+        if (aIsInternal && !bIsInternal) return -1;
+        if (!aIsInternal && bIsInternal) return 1;
+        
+        // Then sort by date
+        return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
       });
+      
+      // Return top 10
+      return uniqueResults.slice(0, 10);
+      
     } catch (error) {
       console.error('Event search failed:', error);
       return [];
     }
   }
   
-  private mapToEventType(type: string): EventType {
-    if (!type) return 'OTHER';
+  private mapInternalTypeToEventType(type: 'sports' | 'music' | 'festival'): EventType {
+    const typeMap: Record<string, EventType> = {
+      'sports': 'SPORTS',
+      'music': 'MUSIC',
+      'festival': 'FESTIVAL'
+    };
     
-    const lower = type.toLowerCase();
-    if (lower.includes('sport')) return 'SPORTS';
-    if (lower.includes('music') || lower.includes('concert')) return 'MUSIC';
-    if (lower.includes('festival')) return 'FESTIVAL';
-    if (lower.includes('conference')) return 'CONFERENCE';
-    if (lower.includes('theater') || lower.includes('theatre')) return 'THEATER';
-    
-    // Check common Ticketmaster classifications
-    if (lower.includes('basketball') || lower.includes('football') || 
-        lower.includes('soccer') || lower.includes('baseball')) return 'SPORTS';
-    
-    return 'OTHER';
+    return typeMap[type] || 'OTHER';
   }
   
   // ==================== PRICE COMPARISON ====================
@@ -591,15 +547,55 @@ export class GladysAgentAI {
     budget: number;
     origin?: string;
     preferences?: any;
+    arrivalDate?: Date;
+    departureDate?: Date;
   }): Promise<TripPlan> {
+    // Parse event start date
+    const eventStart = new Date(params.event.startDate);
+    
+    let arrivalDate: Date;
+    let departureDate: Date;
+    
+    // If manual override dates provided, use them
+    if (params.arrivalDate && params.departureDate) {
+      arrivalDate = params.arrivalDate;
+      departureDate = params.departureDate;
+    } else {
+      // Auto-calculate travel window
+      // Arrival: 1 day before event starts
+      arrivalDate = new Date(eventStart);
+      arrivalDate.setDate(arrivalDate.getDate() - 1);
+      
+      // Departure: 1 day after event ends (or starts if no endDate)
+      if (params.event.endDate) {
+        const eventEnd = new Date(params.event.endDate);
+        departureDate = new Date(eventEnd);
+        departureDate.setDate(departureDate.getDate() + 1);
+      } else {
+        departureDate = new Date(eventStart);
+        departureDate.setDate(departureDate.getDate() + 1);
+      }
+      
+      // Validate dates - ensure minimum 3 nights if calculation fails
+      const nights = Math.ceil((departureDate.getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (nights < 3 || isNaN(nights)) {
+        arrivalDate = new Date(eventStart);
+        arrivalDate.setDate(arrivalDate.getDate() - 1);
+        departureDate = new Date(eventStart);
+        departureDate.setDate(departureDate.getDate() + 2);
+      }
+    }
+    
+    console.log('🧳 Auto trip window:', arrivalDate, departureDate);
+    
     // 1. Get ticket prices
     const tickets = await this.compareTicketPrices(params.event.id);
     
     // 2. Find flights (mock for now)
-    const flights = await this.findFlights(params.event, params.origin);
+    const flights = await this.findFlights(params.event, params.origin, arrivalDate, departureDate);
     
     // 3. Find hotels (mock for now)
-    const hotels = await this.findHotels(params.event, params.preferences);
+    const hotels = await this.findHotels(params.event, params.preferences, arrivalDate, departureDate);
     
     // 4. Calculate totals
     const ticketCost = tickets[0]?.total || 0;
@@ -623,29 +619,38 @@ export class GladysAgentAI {
     };
   }
   
-  private async findFlights(event: EventSearchResult, origin?: string): Promise<any[]> {
+  private async findFlights(event: EventSearchResult, origin?: string, arrivalDate?: Date, departureDate?: Date): Promise<any[]> {
     // Mock implementation
     return [{
       id: 'flight-1',
       airline: 'Delta',
       price: 450,
       route: `${origin || 'Your City'} → ${event.venue.city}`,
-      class: 'Economy'
+      class: 'Economy',
+      outbound: arrivalDate?.toISOString().split('T')[0],
+      return: departureDate?.toISOString().split('T')[0]
     }];
   }
   
-  private async findHotels(event: EventSearchResult, preferences?: any): Promise<any[]> {
+  private async findHotels(event: EventSearchResult, preferences?: any, arrivalDate?: Date, departureDate?: Date): Promise<any[]> {
     // Mock implementation
     const pricePerNight = preferences?.budget === 'luxury' ? 300 : 
                           preferences?.budget === 'budget' ? 80 : 150;
     
+    // Calculate nights
+    const nights = arrivalDate && departureDate 
+      ? Math.ceil((departureDate.getTime() - arrivalDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 3;
+    
     return [{
       id: 'hotel-1',
       name: `Hotel near ${event.venue.name}`,
-      price: pricePerNight * 3,
+      price: pricePerNight * nights,
       pricePerNight,
-      nights: 3,
-      location: event.venue.city
+      nights,
+      location: event.venue.city,
+      checkIn: arrivalDate?.toISOString().split('T')[0],
+      checkOut: departureDate?.toISOString().split('T')[0]
     }];
   }
   
