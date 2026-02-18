@@ -33,6 +33,7 @@ export type Event = {
   imageQuery?: string;
   trademark?: EventTrademark;
   featured?: boolean;
+  sport?: string;
 };
 
 // ==================== TRADEMARK METADATA ====================

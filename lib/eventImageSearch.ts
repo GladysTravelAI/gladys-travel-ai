@@ -39,18 +39,9 @@ export interface EventImage {
 }
 
 // ==================== SEARCH QUERY GENERATION ====================
-// STRATEGIC: Generate trademark-safe image search queries
-// Uses descriptive terms rather than exact event names for external APIs
 
-/**
- * Generate image search query for an event
- * STRATEGIC: For trademarked events, uses descriptive terms
- * For non-trademarked events, can use event name directly
- */
 export function generateImageSearchQuery(event: Event): string {
   const isTrademarked = isEventTrademarked(event);
-  
-  // STRATEGIC: Different strategies based on trademark status
   if (isTrademarked) {
     return generateDescriptiveSearchQuery(event);
   } else {
@@ -58,22 +49,12 @@ export function generateImageSearchQuery(event: Event): string {
   }
 }
 
-/**
- * Generate direct search query (for non-trademarked events)
- */
 function generateDirectSearchQuery(event: Event): string {
-  // Can use event name directly
   return `${event.name} ${event.location.city}`;
 }
 
-/**
- * Generate descriptive search query (for trademarked events)
- * STRATEGIC: Uses descriptive terms rather than trademark names
- */
 function generateDescriptiveSearchQuery(event: Event): string {
-  const { type, location, name } = event;
-  
-  // STRATEGIC: Map trademarked events to descriptive search terms
+  const { type, location } = event;
   const descriptiveMap: Record<string, string> = {
     'fifa-world-cup-2026': 'soccer football stadium north america',
     'super-bowl-lx-2026': 'american football championship stadium',
@@ -83,77 +64,43 @@ function generateDescriptiveSearchQuery(event: Event): string {
     'glastonbury-2026': 'music festival uk countryside',
     'burning-man-2026': 'desert art festival nevada',
   };
-  
-  // If we have a predefined descriptive query, use it
   if (descriptiveMap[event.id]) {
     return descriptiveMap[event.id];
   }
-  
-  // Otherwise, build a generic descriptive query
   const typeMap = {
     sports: 'sports stadium arena',
     music: 'concert music festival',
     festival: 'festival celebration event'
   };
-  
   return `${typeMap[type]} ${location.city} ${location.country}`;
 }
 
-/**
- * Generate multiple search query variations
- * STRATEGIC: Provides fallback queries for better image discovery
- */
 export function generateSearchQueryVariations(event: Event): string[] {
   const queries: string[] = [];
-  
-  // Primary query
   queries.push(generateImageSearchQuery(event));
-  
-  // Venue-based query
   if (event.location.venue) {
     queries.push(`${event.location.venue} ${event.location.city}`);
   }
-  
-  // Location-based query
   queries.push(`${event.location.city} ${event.location.country} landmark`);
-  
-  // Type-based query
   const typeQueries = {
     sports: `${event.location.city} sports arena stadium`,
     music: `${event.location.city} music venue concert`,
     festival: `${event.location.city} festival celebration`
   };
   queries.push(typeQueries[event.type]);
-  
   return queries;
 }
 
 // ==================== IMAGE SEARCH INTEGRATION ====================
-// STRATEGIC: Mock implementation - replace with actual API calls
 
-/**
- * Search for event images
- * STRATEGIC: Uses trademark-safe search queries
- * 
- * @param event - Event to search images for
- * @param limit - Maximum number of images to return
- * @returns Image search results with metadata
- */
 export async function searchEventImages(
   event: Event,
   limit: number = 10
 ): Promise<EventImageSearchResult> {
   const searchQuery = generateImageSearchQuery(event);
   const isTrademarked = isEventTrademarked(event);
-  
   console.log(`🔍 Searching images for "${event.name}" using query: "${searchQuery}"`);
-  
-  // TODO: Replace with actual Unsplash/Pexels API calls
-  // Example: const response = await fetch(`https://api.unsplash.com/search/photos?query=${searchQuery}`);
-  
-  // Mock implementation
   const mockImages: EventImage[] = generateMockImages(event, limit);
-  
   return {
     eventId: event.id,
     eventName: event.name,
@@ -166,41 +113,23 @@ export async function searchEventImages(
   };
 }
 
-/**
- * Search images using Unsplash API
- * STRATEGIC: Real implementation for Unsplash integration
- * 
- * NOTE: Requires UNSPLASH_ACCESS_KEY environment variable
- */
 export async function searchUnsplashImages(
   event: Event,
   limit: number = 10
 ): Promise<EventImage[]> {
   const searchQuery = generateImageSearchQuery(event);
-  
-  // Check for API key
   const accessKey = process.env.UNSPLASH_ACCESS_KEY;
   if (!accessKey) {
     console.warn('⚠️ UNSPLASH_ACCESS_KEY not found, using mock images');
     return generateMockImages(event, limit);
   }
-  
   try {
     const response = await fetch(
       `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=${limit}`,
-      {
-        headers: {
-          'Authorization': `Client-ID ${accessKey}`
-        }
-      }
+      { headers: { 'Authorization': `Client-ID ${accessKey}` } }
     );
-    
-    if (!response.ok) {
-      throw new Error(`Unsplash API error: ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`Unsplash API error: ${response.status}`);
     const data = await response.json();
-    
     return data.results.map((photo: any) => ({
       id: photo.id,
       url: photo.urls.regular,
@@ -211,48 +140,29 @@ export async function searchUnsplashImages(
       width: photo.width,
       height: photo.height
     }));
-    
   } catch (error) {
     console.error('❌ Unsplash search failed:', error);
     return generateMockImages(event, limit);
   }
 }
 
-/**
- * Search images using Pexels API
- * STRATEGIC: Real implementation for Pexels integration
- * 
- * NOTE: Requires PEXELS_API_KEY environment variable
- */
 export async function searchPexelsImages(
   event: Event,
   limit: number = 10
 ): Promise<EventImage[]> {
   const searchQuery = generateImageSearchQuery(event);
-  
-  // Check for API key
   const apiKey = process.env.PEXELS_API_KEY;
   if (!apiKey) {
     console.warn('⚠️ PEXELS_API_KEY not found, using mock images');
     return generateMockImages(event, limit);
   }
-  
   try {
     const response = await fetch(
       `https://api.pexels.com/v1/search?query=${encodeURIComponent(searchQuery)}&per_page=${limit}`,
-      {
-        headers: {
-          'Authorization': apiKey
-        }
-      }
+      { headers: { 'Authorization': apiKey } }
     );
-    
-    if (!response.ok) {
-      throw new Error(`Pexels API error: ${response.status}`);
-    }
-    
+    if (!response.ok) throw new Error(`Pexels API error: ${response.status}`);
     const data = await response.json();
-    
     return data.photos.map((photo: any) => ({
       id: photo.id.toString(),
       url: photo.src.large,
@@ -263,19 +173,13 @@ export async function searchPexelsImages(
       width: photo.width,
       height: photo.height
     }));
-    
   } catch (error) {
     console.error('❌ Pexels search failed:', error);
     return generateMockImages(event, limit);
   }
 }
 
-/**
- * Get hero image for event
- * STRATEGIC: Returns the best available image for event display
- */
 export async function getEventHeroImage(event: Event): Promise<EventImage | null> {
-  // If event already has a hero image URL, use it
   if (event.heroImage) {
     return {
       id: `${event.id}-hero`,
@@ -285,18 +189,14 @@ export async function getEventHeroImage(event: Event): Promise<EventImage | null
       alt: event.name
     };
   }
-  
-  // Otherwise, search for images
   const images = await searchUnsplashImages(event, 1);
   return images[0] || null;
 }
 
 // ==================== MOCK IMAGES ====================
-// STRATEGIC: Fallback for development/testing
 
 function generateMockImages(event: Event, limit: number): EventImage[] {
   const mockImages: EventImage[] = [];
-  
   for (let i = 0; i < limit; i++) {
     mockImages.push({
       id: `${event.id}-mock-${i}`,
@@ -309,38 +209,25 @@ function generateMockImages(event: Event, limit: number): EventImage[] {
       height: 800
     });
   }
-  
   return mockImages;
 }
 
 // ==================== EXPORT UTILITIES ====================
 
-/**
- * Get alt text for event image
- * STRATEGIC: Generates descriptive alt text without trademark claims
- */
 export function generateImageAltText(event: Event): string {
   const isTrademarked = isEventTrademarked(event);
-  
   if (isTrademarked) {
-    // Use descriptive alt text without trademark claims
     const typeDescriptions = {
       sports: 'sporting event',
       music: 'music festival',
       festival: 'festival celebration'
     };
-    
     return `${typeDescriptions[event.type]} in ${event.location.city}, ${event.location.country}`;
   } else {
-    // Can use event name directly
     return `${event.name} in ${event.location.city}, ${event.location.country}`;
   }
 }
 
-/**
- * Get image attribution text
- * STRATEGIC: Proper credit for image sources
- */
 export function getImageAttribution(image: EventImage): string {
   switch (image.source) {
     case 'unsplash':
@@ -363,8 +250,6 @@ export async function searchEventImagesByName(
   limit: number = 10
 ): Promise<EventImage[]> {
   console.warn('⚠️ searchEventImagesByName is deprecated. Use searchEventImages() with Event object instead.');
-  
-  // Mock implementation for backward compatibility
   return generateMockImages(
     {
       id: 'legacy',
@@ -376,4 +261,59 @@ export async function searchEventImagesByName(
     },
     limit
   );
+}
+
+// ==================== API ROUTE EXPORTS ====================
+
+/**
+ * Fetch images for a single event
+ * Used by app/api/images/route.ts
+ * Combines Unsplash + Pexels results up to the requested limit
+ */
+export async function fetchEventImages(
+  event: Event,
+  limit: number = 10
+): Promise<EventImage[]> {
+  const unsplashImages = await searchUnsplashImages(event, Math.ceil(limit / 2));
+
+  if (unsplashImages.length >= limit) {
+    return unsplashImages.slice(0, limit);
+  }
+
+  const remaining = limit - unsplashImages.length;
+  const pexelsImages = await searchPexelsImages(event, remaining);
+
+  return [...unsplashImages, ...pexelsImages].slice(0, limit);
+}
+
+/**
+ * Fetch images for both an event and its destination city
+ * Used by app/api/images/route.ts
+ * Returns a structured object with separate event and destination image arrays
+ */
+export async function fetchEventAndDestinationImages(
+  event: Event,
+  limit: number = 20
+): Promise<{
+  eventImages: EventImage[];
+  destinationImages: EventImage[];
+}> {
+  const half = Math.ceil(limit / 2);
+
+  // Event-specific images
+  const eventImages = await fetchEventImages(event, half);
+
+  // Destination images using city as search context
+  const destinationEvent: Event = {
+    ...event,
+    id: `${event.id}-destination`,
+    name: `${event.location.city} ${event.location.country} travel destination landmark`,
+  };
+
+  const destinationImages = await fetchEventImages(destinationEvent, half);
+
+  return {
+    eventImages,
+    destinationImages,
+  };
 }

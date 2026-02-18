@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { PlaceImage } from '@/lib/Image';
+import type { EventImage } from '@/lib/eventImageSearch';
 
 // ==================== REQUEST/RESPONSE TYPES ====================
 
@@ -38,6 +39,27 @@ interface ImageResponse {
   error?: string;
 }
 
+// ==================== HELPERS ====================
+
+/**
+ * Map EventImage to PlaceImage
+ * Bridges the gap between EventImage and PlaceImage by injecting
+ * the required `attributions` field that PlaceImage demands
+ */
+function toPlaceImages(images: EventImage[]): PlaceImage[] {
+  return images.map((img) => ({
+    url: img.url,
+    attributions: img.photographer
+      ? `Photo by ${img.photographer}`
+      : 'GladysTravelAI',
+    source: img.source === 'local' ? 'fallback' : img.source,
+    photographer: img.photographer,
+    width: img.width,
+    height: img.height,
+  }));
+}
+
+
 // ==================== API HANDLER ====================
 
 export async function POST(req: NextRequest) {
@@ -57,7 +79,22 @@ export async function POST(req: NextRequest) {
     // ==================== MODE 1: EVENT ONLY ====================
     if (eventQuery && !destination) {
       const { fetchEventImages } = await import('@/lib/eventImageSearch');
-      const eventImages = await fetchEventImages(eventQuery, venueName);
+
+      const event = {
+        id: eventQuery.toLowerCase().replace(/\s+/g, '-'),
+        name: eventQuery,
+        type: 'music' as const,
+        location: {
+          city: venueName || 'Unknown',
+          country: 'Unknown',
+          venue: venueName
+        },
+        startDate: '',
+        endDate: ''
+      };
+
+      const rawImages = await fetchEventImages(event, maxImages);
+      const eventImages = toPlaceImages(rawImages);
 
       return NextResponse.json({
         eventImages,
@@ -85,17 +122,31 @@ export async function POST(req: NextRequest) {
     // ==================== MODE 3: COMBINED (RECOMMENDED) ====================
     if (eventQuery && destination) {
       const { fetchEventAndDestinationImages } = await import('@/lib/eventImageSearch');
-      
-      const { event, destination: dest, combined } = await fetchEventAndDestinationImages(
-        eventQuery,
-        destination,
-        venueName
-      );
+
+      const event = {
+        id: eventQuery.toLowerCase().replace(/\s+/g, '-'),
+        name: eventQuery,
+        type: 'music' as const,
+        location: {
+          city: destination,
+          country: 'Unknown',
+          venue: venueName
+        },
+        startDate: '',
+        endDate: ''
+      };
+
+      const { eventImages: rawEvent, destinationImages: rawDest } =
+        await fetchEventAndDestinationImages(event, maxImages);
+
+      const eventImages      = toPlaceImages(rawEvent);
+      const destinationImages = toPlaceImages(rawDest);
+      const combined          = [...eventImages, ...destinationImages];
 
       return NextResponse.json({
-        eventImages: event,
-        destinationImages: dest,
-        images: combined, // Combined for backward compatibility
+        eventImages,
+        destinationImages,
+        images: combined,
         source: 'combined',
         count: combined.length,
         mode: 'combined',
@@ -120,9 +171,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const hasGoogle = !!process.env.GOOGLE_PLACES_API_KEY;
+  const hasGoogle  = !!process.env.GOOGLE_PLACES_API_KEY;
   const hasUnsplash = !!process.env.UNSPLASH_ACCESS_KEY;
-  const hasPexels = !!process.env.PEXELS_API_KEY;
+  const hasPexels  = !!process.env.PEXELS_API_KEY;
 
   return NextResponse.json({
     status: 'operational',
@@ -136,19 +187,19 @@ export async function GET() {
       attribution: 'Full attribution support for all sources',
     },
     sources: {
-      google_places: hasGoogle ? '✅ configured (venues)' : '❌ missing',
-      unsplash: hasUnsplash ? '✅ configured (events & destinations)' : '❌ missing',
-      pexels: hasPexels ? '✅ configured (events & destinations)' : '❌ missing',
-      fallback: '✅ always available',
+      google_places: hasGoogle  ? '✅ configured (venues)'               : '❌ missing',
+      unsplash:      hasUnsplash ? '✅ configured (events & destinations)' : '❌ missing',
+      pexels:        hasPexels  ? '✅ configured (events & destinations)' : '❌ missing',
+      fallback:      '✅ always available',
     },
     usage: {
-      event_only: 'POST { eventQuery: "Taylor Swift Eras Tour", venueName: "Stade de France" }',
+      event_only:   'POST { eventQuery: "Taylor Swift Eras Tour", venueName: "Stade de France" }',
       destination_only: 'POST { destination: "Paris" }',
-      combined: 'POST { eventQuery: "Taylor Swift in Paris", destination: "Paris", venueName: "Stade de France" }',
+      combined:     'POST { eventQuery: "Taylor Swift in Paris", destination: "Paris", venueName: "Stade de France" }',
     },
     endpoints: {
       'POST /api/images': 'Get images (event, destination, or both)',
-      'GET /api/images': 'Check API status',
+      'GET /api/images':  'Check API status',
     },
   });
 }

@@ -7,7 +7,6 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { getFeaturedEvents, type Event } from '@/lib/event-data';
-import { searchEventsWithCache } from '@/lib/eventService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -56,7 +55,8 @@ const EventsHub = () => {
       setActiveTab('search');
       
       try {
-        const results = await searchEventsWithCache(searchQuery);
+        const response = await fetch(`/api/events?query=${encodeURIComponent(searchQuery)}`);
+        const results: SearchResultEvent[] = await response.json();
         setApiEvents(results);
       } catch (error) {
         console.error('Search error:', error);
@@ -312,9 +312,11 @@ const EventsHub = () => {
 const EventCard = ({ event, index, isApiEvent }: { event: Event | SearchResultEvent; index: number; isApiEvent?: boolean }) => {
   // Handle different image field names
   const getImageUrl = (event: Event | SearchResultEvent): string => {
-    if ('image' in event && event.image) return event.image;
-    if ('thumbnail' in event && event.thumbnail) return event.thumbnail;
-    if ('heroImage' in event && event.heroImage) return event.heroImage;
+    // Cast to any to access properties safely
+    const e = event as any;
+    if (e.image) return e.image;
+    if (e.heroImage) return e.heroImage;
+    if (e.thumbnail) return e.thumbnail;
     return '';
   };
 
@@ -342,31 +344,50 @@ const EventCard = ({ event, index, isApiEvent }: { event: Event | SearchResultEv
   );
 };
 
+// --- FIX STARTS HERE ---
 const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | SearchResultEvent; imageStyle: any; isApiEvent?: boolean }) => {
-  // Type-safe property access
-  const eventType = 'type' in event ? event.type : 'Event';
-  const isFeatured = 'featured' in event ? event.featured : false;
-  const eventSource = 'source' in event ? event.source : undefined;
-  const eventDescription = 'description' in event ? event.description : undefined;
+  // Safe property access using casting
+  const e = event as any;
+  const eventType = e.type || 'Event';
+  const isFeatured = e.featured || false;
+  const eventSource = e.source || undefined;
+  const eventDescription = e.description || undefined;
 
-  // Helper to get price info
-  const getPriceInfo = (event: Event | SearchResultEvent) => {
-    if ('estimatedTicketPrice' in event && event.estimatedTicketPrice) {
+  // Helper to safely get location string
+  const getLocation = () => {
+    // Handle API events (SearchResultEvent)
+    if ('venue' in event) {
+      return `${event.venue.city}, ${event.venue.country}`;
+    }
+    // Handle Local events (Event) which has location object
+    if ('location' in event) {
+       // We know local event has location: { city, country }
+       return `${event.location.city}, ${event.location.country}`;
+    }
+    return 'TBD';
+  };
+
+  // Helper to safely get price info
+  const getPriceInfo = (): { currency: string; min: number } | null => {
+    // Check for estimatedTicketPrice (Local data)
+    if (e.estimatedTicketPrice) {
       return {
-        currency: event.estimatedTicketPrice.currency || 'USD',
-        min: event.estimatedTicketPrice.min || 0
+        currency: e.estimatedTicketPrice.currency || 'USD',
+        min: e.estimatedTicketPrice.min || 0
       };
     }
-    if ('priceRange' in event && event.priceRange) {
+    // Check for priceRange (API data)
+    if (e.priceRange) {
       return {
-        currency: event.priceRange.currency || 'USD',
-        min: event.priceRange.min || 0
+        currency: e.priceRange.currency || 'USD',
+        min: e.priceRange.min || 0
       };
     }
     return null;
   };
 
-  const priceInfo = getPriceInfo(event);
+  const priceInfo = getPriceInfo();
+  const locationString = getLocation();
 
   return (
     <div className="relative h-full bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200">
@@ -396,7 +417,7 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
 
         {/* Type Badge */}
         <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-semibold border border-white/30">
-          {eventType ? eventType.charAt(0).toUpperCase() + eventType.slice(1) : 'Event'}
+          {eventType ? String(eventType).charAt(0).toUpperCase() + String(eventType).slice(1) : 'Event'}
         </div>
 
         {/* Event Name */}
@@ -423,12 +444,14 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
               </span>
             </div>
           )}
+          
           <div className="flex items-center gap-2 text-gray-600">
             <MapPin size={16} />
             <span className="text-sm font-medium">
-              {event.venue?.city || 'TBD'}, {event.venue?.country || 'TBD'}
+              {locationString}
             </span>
           </div>
+          
           {priceInfo && (
             <div className="flex items-center gap-2 text-gray-600">
               <Ticket size={16} />
@@ -442,7 +465,7 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
         {/* Description */}
         {eventDescription && (
           <p className="text-gray-600 text-sm line-clamp-2">
-            {eventDescription}
+            {String(eventDescription)}
           </p>
         )}
 
@@ -450,7 +473,7 @@ const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | Se
         {isApiEvent && eventSource && (
           <div className="pt-2">
             <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-              via {eventSource}
+              via {String(eventSource)}
             </span>
           </div>
         )}

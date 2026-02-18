@@ -557,3 +557,42 @@ export function getEventVenueCoordinates(eventId: string): { lat: number; lng: n
   const venueKey = eventId.replace(/-\d{4}$/, ''); // Remove year suffix
   return VENUE_COORDINATES[venueKey] || null;
 }
+
+// ==================== SEARCH UTILITIES ====================
+
+/**
+ * Build intelligent search query for image providers
+ * Used by imageSearch.ts for Unsplash, Pexels and Google Places
+ */
+export function buildSearchQuery(
+  destination: string,
+  locationSpecific: boolean = false
+): string {
+  const normalized = destination.trim();
+  if (locationSpecific) {
+    return `${normalized} landmark city skyline`;
+  }
+  return `${normalized} travel destination`;
+}
+
+/**
+ * Extract landmark keywords for a destination
+ * Used to improve image relevance
+ */
+export function getLandmarks(destination: string): string[] {
+  const normalized = destination.toLowerCase();
+  const landmarkMap: Record<string, string[]> = {
+    paris: ['Eiffel Tower', 'Louvre', 'Seine River'],
+    london: ['Big Ben', 'Tower Bridge', 'London Eye'],
+    rome: ['Colosseum', 'Vatican', 'Trevi Fountain'],
+    tokyo: ['Shibuya Crossing', 'Tokyo Tower', 'Mount Fuji'],
+    'new york': ['Statue of Liberty', 'Times Square', 'Central Park'],
+    dubai: ['Burj Khalifa', 'Palm Jumeirah', 'Dubai Marina'],
+  };
+  for (const key of Object.keys(landmarkMap)) {
+    if (normalized.includes(key)) {
+      return landmarkMap[key];
+    }
+  }
+  return [];
+}
