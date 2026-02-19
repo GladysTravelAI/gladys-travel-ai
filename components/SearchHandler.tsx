@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Calendar, MapPin, ArrowRight } from "lucide-react";
 import { searchIntent } from "@/lib/search-intent-classifier";
-import { searchEventsWithCache } from "@/lib/eventService";
+import { getAllEvents, searchEventsByQuery } from "@/lib/eventService";
 import ItineraryView from "@/components/ItineraryView";
 import HotelResults from "@/components/HotelResults";
 import RestaurantResults from "@/components/RestaurantResults";
@@ -81,7 +81,33 @@ export default function SearchHandler() {
 
     try {
       console.log(`🎯 Searching events for: "${query}"`);
-      const results = await searchEventsWithCache(query);
+      
+      // Get all events from curated data layer
+      const allEvents = getAllEvents();
+      
+      // Search using query
+      const matchedEvents = searchEventsByQuery(allEvents, query);
+      
+      // Map Event[] to SearchResult[]
+      const results: SearchResult[] = matchedEvents.map(event => ({
+        id: event.id,
+        name: event.name,
+        startDate: event.startDate,
+        venue: {
+          name: event.location.venue || '',
+          city: event.location.city,
+          country: event.location.country,
+        },
+        priceRange: event.priceRange ? {
+          min: event.priceRange.min,
+          max: event.priceRange.max,
+          currency: event.priceRange.currency,
+        } : null,
+        url: event.officialUrl || '',
+        image: event.heroImage || '',
+        description: event.description || '',
+        source: 'GladysTravelAI',
+      }));
       
       console.log(`✅ Found ${results.length} events`);
       setEventResults(results);
