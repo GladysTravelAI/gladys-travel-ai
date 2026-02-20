@@ -18,10 +18,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://gladystravel.ai'),
+  metadataBase: new URL('https://gladystravel.com'),
   title: {
-    default: "Gladys Travel AI - Your Autonomous Travel Agent",
-    template: "%s | Gladys Travel AI"
+    default: "Gladys Travel - Your Autonomous Travel Agent",
+    template: "%s | Gladys Travel"
   },
   description: "AI-powered event travel planning with autonomous booking, price comparison, and complete trip packages worldwide. Sports, concerts, festivals - all in one place.",
   keywords: [
@@ -35,11 +35,11 @@ export const metadata: Metadata = {
     "festivals",
     "AI travel agent",
     "event-first travel",
-    "Gladys AI"
+    "Gladys Travel"
   ],
-  authors: [{ name: "Gladys Travel AI", url: "https://gladystravel.ai" }],
-  creator: "Gladys Travel AI",
-  publisher: "Gladys Travel AI",
+  authors: [{ name: "Gladys Travel", url: "https://gladystravel.com" }],
+  creator: "Gladys Travel",
+  publisher: "Gladys Travel",
   robots: {
     index: true,
     follow: true,
@@ -54,24 +54,24 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://gladystravel.ai",
-    siteName: "Gladys Travel AI",
-    title: "Gladys Travel AI - Your Autonomous Travel Agent",
+    url: "https://gladystravel.com",
+    siteName: "Gladys Travel",
+    title: "Gladys Travel - Your Autonomous Travel Agent",
     description: "AI-powered event travel planning with autonomous booking and price comparison",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Gladys Travel AI",
+        alt: "Gladys Travel",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Gladys Travel AI - Your Autonomous Travel Agent",
+    title: "Gladys Travel - Your Autonomous Travel Agent",
     description: "Your autonomous AI travel agent for event-focused trips",
-    creator: "@GladysTravelAI",
+    creator: "@GladysTravel",
     images: ["/twitter-image.png"],
   },
   viewport: {
@@ -106,6 +106,21 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <head>
+        {/* Travelpayouts Verification */}
+        <script
+          data-noptimize="1"
+          data-cfasync="false"
+          data-wpfc-render="false"
+          dangerouslySetInnerHTML={{
+            __html: `(function () {
+      var script = document.createElement("script");
+      script.async = 1;
+      script.src = 'https://emrldtp.com/NTAwNTQw.js?t=500540';
+      document.head.appendChild(script);
+  })();`,
+          }}
+        />
+
         {/* Essential Meta Tags */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -118,8 +133,8 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         
         {/* Performance Hints */}
-        <link rel="dns-prefetch" href="https://api.gladystravel.ai" />
-        <link rel="preconnect" href="https://api.gladystravel.ai" />
+        <link rel="dns-prefetch" href="https://api.gladystravel.com" />
+        <link rel="preconnect" href="https://api.gladystravel.com" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
