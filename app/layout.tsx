@@ -121,6 +121,8 @@ export default function RootLayout({
           }}
         />
 
+        <meta name="agd-partner-manual-verification" />
+
         {/* Essential Meta Tags */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
