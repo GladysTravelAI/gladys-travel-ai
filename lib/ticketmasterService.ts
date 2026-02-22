@@ -1,15 +1,7 @@
 // lib/ticketmasterService.ts
 // 🎯 Ticketmaster API Integration - Event Discovery Fallback
-//
-// STRATEGIC ARCHITECTURE:
-// - Provides fallback event discovery when internal events don't match
-// - Normalizes Ticketmaster data to internal Event structure
-// - Maintains type safety throughout
-// - Production-ready error handling
 
 import { Event } from '@/lib/eventService';
-
-// ==================== TICKETMASTER TYPES ====================
 
 interface TicketmasterVenue {
   name: string;
@@ -70,14 +62,20 @@ interface TicketmasterSearchResponse {
 }
 
 // ==================== API KEY CHECK ====================
+// Supports both server-side (TICKETMASTER_API_KEY) and
+// client-side (NEXT_PUBLIC_TICKETMASTER_API_KEY) env vars
 
-const API_KEY = process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY;
+function getApiKey(): string | undefined {
+  return process.env.TICKETMASTER_API_KEY || 
+         process.env.NEXT_PUBLIC_TICKETMASTER_API_KEY;
+}
 
 function ensureApiKey(): string {
-  if (!API_KEY) {
-    throw new Error('Ticketmaster API key not configured. Set NEXT_PUBLIC_TICKETMASTER_API_KEY in environment variables.');
+  const key = getApiKey();
+  if (!key) {
+    throw new Error('Ticketmaster API key not configured. Set TICKETMASTER_API_KEY in environment variables.');
   }
-  return API_KEY;
+  return key;
 }
 
 // ==================== MAIN SEARCH FUNCTION ====================
@@ -123,7 +121,6 @@ export async function searchTicketmasterEvents(
       return [];
     }
 
-    // Normalize and filter events
     const normalizedEvents = data._embedded.events
       .map(normalizeTicketmasterEvent)
       .filter(isValidEvent);
@@ -142,13 +139,11 @@ export async function searchTicketmasterEvents(
 function normalizeTicketmasterEvent(tmEvent: TicketmasterEvent): Event {
   const venue = tmEvent._embedded?.venues?.[0];
   
-  // Get largest image
   const largestImage = tmEvent.images
     ?.sort((a, b) => b.width - a.width)[0]?.url;
 
-  // Map Ticketmaster segment to our event type
   const segmentName = tmEvent.classifications?.[0]?.segment?.name?.toLowerCase() || '';
-  let eventType: "sports" | "music" | "festival" = "music"; // Default
+  let eventType: "sports" | "music" | "festival" = "music";
   
   if (segmentName.includes('sports')) {
     eventType = 'sports';
@@ -158,10 +153,7 @@ function normalizeTicketmasterEvent(tmEvent: TicketmasterEvent): Event {
     eventType = 'festival';
   }
 
-  // Get price range if available
   const priceRange = tmEvent.priceRanges?.[0];
-
-  // Build description
   const venueName = venue?.name || 'venue';
   const cityName = venue?.city?.name || 'this city';
   const description = tmEvent.info || `${tmEvent.name} at ${venueName} in ${cityName}`;
@@ -185,8 +177,8 @@ function normalizeTicketmasterEvent(tmEvent: TicketmasterEvent): Event {
       currency: priceRange.currency
     } : undefined,
     officialUrl: tmEvent.url,
-    affiliateOnly: true, // Ticketmaster events are affiliate-only
-    trademark: undefined, // Ticketmaster events don't have our trademark metadata
+    affiliateOnly: true,
+    trademark: undefined,
     source: 'Ticketmaster'
   };
 }
@@ -197,25 +189,13 @@ function isValidEvent(event: Event): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Filter out events without essential data
-  if (!event.location.city || event.location.city === 'Unknown') {
-    return false;
-  }
+  if (!event.location.city || event.location.city === 'Unknown') return false;
+  if (!event.location.country || event.location.country === 'Unknown') return false;
+  if (!event.startDate) return false;
   
-  if (!event.location.country || event.location.country === 'Unknown') {
-    return false;
-  }
-  
-  if (!event.startDate) {
-    return false;
-  }
-  
-  // Filter out past events
   try {
     const eventDate = new Date(event.startDate);
-    if (eventDate < today) {
-      return false;
-    }
+    if (eventDate < today) return false;
   } catch (error) {
     console.warn('Invalid date for event:', event.id);
     return false;
@@ -224,7 +204,7 @@ function isValidEvent(event: Event): boolean {
   return true;
 }
 
-// ==================== ADDITIONAL SEARCH OPTIONS ====================
+// ==================== CATEGORY SEARCH ====================
 
 export async function searchTicketmasterEventsByCategory(
   category: 'sports' | 'music' | 'festival',
@@ -233,11 +213,10 @@ export async function searchTicketmasterEventsByCategory(
 ): Promise<Event[]> {
   const apiKey = ensureApiKey();
   
-  // Map our categories to Ticketmaster classification IDs
   const classificationMap = {
-    sports: 'KZFzniwnSyZfZ7v7nE', // Sports
-    music: 'KZFzniwnSyZfZ7v7nJ', // Music
-    festival: 'KZFzniwnSyZfZ7v7na'  // Festivals
+    sports: 'KZFzniwnSyZfZ7v7nE',
+    music: 'KZFzniwnSyZfZ7v7nJ',
+    festival: 'KZFzniwnSyZfZ7v7na'
   };
   
   const params = new URLSearchParams({
@@ -247,24 +226,18 @@ export async function searchTicketmasterEventsByCategory(
     sort: 'date,asc'
   });
   
-  if (city) {
-    params.append('city', city);
-  }
+  if (city) params.append('city', city);
   
   try {
     const response = await fetch(
       `https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`
     );
     
-    if (!response.ok) {
-      throw new Error(`Ticketmaster API error: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Ticketmaster API error: ${response.status}`);
     
     const data: TicketmasterSearchResponse = await response.json();
     
-    if (!data._embedded?.events) {
-      return [];
-    }
+    if (!data._embedded?.events) return [];
     
     return data._embedded.events
       .map(normalizeTicketmasterEvent)
@@ -281,7 +254,6 @@ export async function searchTicketmasterEventsByCategory(
 export async function getTicketmasterEventById(ticketmasterId: string): Promise<Event | null> {
   const apiKey = ensureApiKey();
   
-  // Remove 'tm-' prefix if present
   const cleanId = ticketmasterId.startsWith('tm-') 
     ? ticketmasterId.substring(3) 
     : ticketmasterId;
