@@ -389,7 +389,7 @@ export default function HomeClient() {
   const currentEventConfig = EVENT_TYPES.find(e => e.id === eventType);
   const searchPlaceholder = currentEventConfig?.placeholder || "Select an event type above to get started";
   const totalSavedItems = Object.values(savedItems).reduce((sum, items) => sum + items.length, 0);
-  const destination = agentResponse?.destination.city || "";
+  const destination = agentResponse?.destination?.city || "";
   const itineraryData: ItineraryData | null = agentResponse && agentResponse.intent !== 'city_selection_required'
     ? buildEventItinerary(agentResponse, startDate, endDate)
     : null;
