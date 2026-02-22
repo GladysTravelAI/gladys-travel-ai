@@ -46,6 +46,7 @@ import WeatherWidget from "@/components/WeatherWidget";
 import VoiceTripPlanner from "@/components/VoiceTripPlanner";
 import SavedTrips from "@/components/SavedTrips";
 import GladysChat from "@/components/GladysChat";
+import CityPicker from "@/components/CityPicker";
 
 // ==================== LIB IMPORTS ====================
 import { ItineraryData } from "@/lib/mock-itinerary";
@@ -74,7 +75,7 @@ interface SavedItem {
 }
 
 interface AgentResponse {
-  intent: 'event_trip' | 'destination_trip' | 'information_only';
+  intent: 'event_trip' | 'destination_trip' | 'information_only' | 'city_selection_required';
   destination: {
     city: string | null;
     country: string | null;
@@ -102,6 +103,45 @@ interface AgentResponse {
     esim: boolean;
   };
   message: string;
+  // From logic engine — real computed numbers
+  budget?: {
+    accommodation: number;
+    transport: number;
+    food: number;
+    event_tickets: number;
+    activities: number;
+    total: number;
+    currency: string;
+    per_day_average: number;
+    esim?: number;
+    insurance?: number;
+  };
+  travel_dates?: {
+    arrival_date: string;
+    departure_date: string;
+    total_nights: number;
+    day_slots: Array<{
+      date: string;
+      day_type: 'arrival' | 'pre_event' | 'event_day' | 'post_event' | 'departure';
+      label: string;
+    }>;
+  };
+  // City selection fields — present when intent === 'city_selection_required'
+  event_id?: string;
+  event_name?: string;
+  cities?: Array<{
+    city_id: string;
+    name: string;
+    country: string;
+    iata_code: string;
+    sessions: Array<{
+      session_id: string;
+      date: string;
+      time?: string;
+      round?: string;
+      description?: string;
+    }>;
+  }>;
 }
 
 // ==================== EVENT TYPE CONFIGURATION ====================
@@ -154,107 +194,144 @@ const EVENT_TYPES: EventTypeConfig[] = [
 
 // ==================== ITINERARY BUILDER ====================
 
+// ==================== BUDGET HELPERS ====================
+
+function fmt(amount: number, currency = 'USD'): string {
+  return `${currency} ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
 function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | null, endDate?: Date | null): ItineraryData {
   const totalDays = agentResponse.itinerary.length;
-  const eventDay = Math.ceil(totalDays / 2);
-  
-  const dates: string[] = [];
-  if (startDate && endDate) {
-    const start = new Date(startDate);
+
+  // ---- Dates: prefer travel_dates from logic engine, then user input, then derive from event date ----
+  let dates: string[] = [];
+  const daySlots = agentResponse.travel_dates?.day_slots;
+
+  if (daySlots && daySlots.length > 0) {
+    dates = daySlots.map(s => s.date);
+  } else if (startDate) {
     for (let i = 0; i < totalDays; i++) {
-      const date = new Date(start);
-      date.setDate(date.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().split('T')[0]);
     }
   } else {
-    const baseDate = agentResponse.event.date ? new Date(agentResponse.event.date) : new Date();
-    baseDate.setDate(baseDate.getDate() - (eventDay - 1));
+    const eventDay = Math.ceil(totalDays / 2);
+    const base = agentResponse.event.date ? new Date(agentResponse.event.date) : new Date();
+    base.setDate(base.getDate() - (eventDay - 1));
     for (let i = 0; i < totalDays; i++) {
-      const date = new Date(baseDate);
-      date.setDate(date.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      const d = new Date(base);
+      d.setDate(d.getDate() + i);
+      dates.push(d.toISOString().split('T')[0]);
     }
   }
 
-  // Map event type to valid ItineraryData eventType
+  // ---- Event day index ----
+  const eventDayIndex = daySlots
+    ? daySlots.findIndex(s => s.day_type === 'event_day')
+    : Math.ceil(totalDays / 2) - 1;
+  const eventDayNumber = eventDayIndex >= 0 ? eventDayIndex + 1 : Math.ceil(totalDays / 2);
+
+  // ---- Event type mapping ----
   let mappedEventType: 'sports' | 'music' | 'festivals';
-  if (agentResponse.event.type === 'festival') {
-    mappedEventType = 'festivals';
-  } else if (agentResponse.event.type === 'sports' || agentResponse.event.type === 'music') {
-    mappedEventType = agentResponse.event.type;
-  } else {
-    // Default to festivals for 'other', 'conference', etc.
-    mappedEventType = 'festivals';
-  }
+  if (agentResponse.event.type === 'festival') mappedEventType = 'festivals';
+  else if (agentResponse.event.type === 'sports' || agentResponse.event.type === 'music') mappedEventType = agentResponse.event.type;
+  else mappedEventType = 'festivals';
+
+  // ---- Budget: use real numbers from logic engine, fall back gracefully ----
+  const b = agentResponse.budget;
+  const cur = b?.currency || 'USD';
+
+  const budgetData: ItineraryData['budget'] = b ? {
+    totalBudget: fmt(b.total, cur),
+    dailyAverage: fmt(b.per_day_average, cur),
+    eventDayCost: fmt(b.event_tickets + b.per_day_average, cur),
+    breakdown: {
+      accommodation: fmt(b.accommodation, cur),
+      transport:     fmt(b.transport, cur),
+      food:          fmt(b.food, cur),
+      event:         fmt(b.event_tickets, cur),
+      activities:    fmt(b.activities, cur),
+    }
+  } : {
+    totalBudget:   'USD 1,850',
+    dailyAverage:  'USD 370',
+    eventDayCost:  'USD 650',
+    breakdown: {
+      accommodation: 'USD 600',
+      transport:     'USD 300',
+      food:          'USD 250',
+      event:         'USD 400',
+      activities:    'USD 300',
+    }
+  };
+
+  // ---- Per-slot cost splits (proportional from real budget) ----
+  const dailyAmt   = b?.per_day_average || 370;
+  const mornCost   = Math.round(dailyAmt * 0.15);
+  const aftnCost   = Math.round(dailyAmt * 0.25);
+  const eveCost    = Math.round(dailyAmt * 0.35);
+  const ticketCost = b?.event_tickets || 400;
 
   return {
     overview: `A perfectly structured ${mappedEventType}-centered trip designed around ${agentResponse.event.name || 'your main event'}, with pre and post exploration days.`,
     eventAnchor: {
-      eventName: agentResponse.event.name || "Featured Event",
+      eventName: agentResponse.event.name || 'Featured Event',
       eventType: mappedEventType,
-      eventDate: agentResponse.event.date || dates[eventDay - 1],
-      eventDay: eventDay,
-      venue: agentResponse.event.venue || "Event Venue",
-      city: agentResponse.destination.city || "Event City",
-      country: agentResponse.destination.country || "Event Country"
+      eventDate: agentResponse.event.date || dates[eventDayNumber - 1] || '',
+      eventDay:  eventDayNumber,
+      venue:     agentResponse.event.venue || 'Event Venue',
+      city:      agentResponse.destination.city || '',
+      country:   agentResponse.destination.country || '',
     },
     tripSummary: {
       totalDays,
-      cities: [agentResponse.destination.city || "Event City"],
+      cities:    [agentResponse.destination.city || ''],
       highlights: agentResponse.itinerary.map(d => d.title),
       eventPhases: {
-        preEvent: eventDay - 1,
-        eventDay: 1,
-        postEvent: totalDays - eventDay
+        preEvent:  eventDayNumber - 1,
+        eventDay:  1,
+        postEvent: totalDays - eventDayNumber,
       }
     },
-    budget: {
-      totalBudget: "USD 1,850",
-      dailyAverage: "USD 450",
-      eventDayCost: "USD 750",
-      breakdown: {
-        accommodation: "USD 600",
-        transport: "USD 300",
-        food: "USD 250",
-        event: "USD 400",
-        activities: "USD 300"
-      }
-    },
+    budget: budgetData,
     days: agentResponse.itinerary.map((day, idx) => {
-      const isEventDay = (idx + 1) === eventDay;
+      const isEventDay = (idx + 1) === eventDayNumber;
+      const slotLabel  = daySlots?.[idx]?.label || (isEventDay ? 'Event Day' : idx < eventDayNumber - 1 ? 'Pre-Event Day' : 'Post-Event Day');
       const activities = day.activities;
-      
+      const city       = agentResponse.destination.city || '';
+
       return {
-        day: day.day,
-        date: dates[idx] || new Date().toISOString().split('T')[0],
-        city: agentResponse.destination.city || "Event City",
-        theme: day.title,
-        label: isEventDay ? "EVENT DAY" : idx < eventDay - 1 ? "Pre-Event Day" : "Post-Event Day",
+        day:        day.day,
+        date:       dates[idx] || '',
+        city,
+        theme:      day.title,
+        label:      slotLabel,
         isEventDay,
         morning: {
-          time: "9:00 AM - 12:00 PM",
-          activities: activities[0] || "Morning activities",
-          location: agentResponse.destination.city || "City Center",
-          cost: "USD 60"
+          time:       '9:00 AM - 12:00 PM',
+          activities: activities[0] || 'Morning exploration',
+          location:   city,
+          cost:       fmt(mornCost, cur),
         },
         afternoon: {
-          time: "1:00 PM - 5:00 PM",
-          activities: activities[1] || (isEventDay ? "Pre-event build-up" : "Afternoon exploration"),
-          location: isEventDay ? (agentResponse.event.venue || "Event Area") : (agentResponse.destination.city || "City Center"),
-          cost: isEventDay ? "USD 80" : "USD 70"
+          time:       '1:00 PM - 5:00 PM',
+          activities: activities[1] || (isEventDay ? 'Pre-match build-up and fan zone' : 'Afternoon exploration'),
+          location:   isEventDay ? (agentResponse.event.venue || city) : city,
+          cost:       fmt(aftnCost, cur),
         },
         evening: {
-          time: isEventDay ? "7:00 PM - 11:00 PM" : "6:00 PM - 9:00 PM",
-          activities: activities[2] || (isEventDay ? `Attend ${agentResponse.event.name || 'the event'}` : "Evening activities"),
-          location: isEventDay ? (agentResponse.event.venue || "Event Venue") : (agentResponse.destination.city || "City Center"),
-          cost: isEventDay ? "USD 400" : "USD 60",
+          time:        isEventDay ? '6:00 PM - 11:00 PM' : '6:00 PM - 9:00 PM',
+          activities:  activities[2] || (isEventDay ? `Attend ${agentResponse.event.name || 'the event'}` : 'Evening activities'),
+          location:    isEventDay ? (agentResponse.event.venue || city) : city,
+          cost:        fmt(isEventDay ? ticketCost : eveCost, cur),
           isEventBlock: isEventDay,
           ...(isEventDay && {
             eventDetails: {
-              doors: "5:30 PM",
-              startTime: "7:00 PM",
-              duration: "2-3 hours",
-              ticketUrl: agentResponse.affiliate_links?.tickets || "https://tickets.com"
+              doors:     '5:30 PM',
+              startTime: '7:00 PM',
+              duration:  '2-3 hours',
+              ticketUrl: agentResponse.affiliate_links?.tickets || '',
             }
           })
         }
@@ -311,12 +388,9 @@ export default function HomeClient() {
   
   const currentEventConfig = EVENT_TYPES.find(e => e.id === eventType);
   const searchPlaceholder = currentEventConfig?.placeholder || "Select an event type above to get started";
-  
   const totalSavedItems = Object.values(savedItems).reduce((sum, items) => sum + items.length, 0);
-  
   const destination = agentResponse?.destination.city || "";
-  
-  const itineraryData: ItineraryData | null = agentResponse 
+  const itineraryData: ItineraryData | null = agentResponse && agentResponse.intent !== 'city_selection_required'
     ? buildEventItinerary(agentResponse, startDate, endDate)
     : null;
 
@@ -326,7 +400,6 @@ export default function HomeClient() {
     setEventType(type);
     setSearchQuery("");
     setAgentResponse(null);
-    
     if (user) {
       profileManager.trackTripPlanned(user.uid, `Event Type: ${type}`).catch(console.error);
     }
@@ -350,16 +423,12 @@ export default function HomeClient() {
       const typeKey = `${type}s` as keyof typeof prev;
       const currentItems = prev[typeKey] || [];
       const exists = currentItems.some(i => i.id === savedItem.id);
-      
       if (exists) {
         toast.success('Removed from trip');
         return { ...prev, [typeKey]: currentItems.filter(i => i.id !== savedItem.id) };
       } else {
         toast.success('Saved to trip!', {
-          action: {
-            label: 'View',
-            onClick: () => setShowTripSummary(true),
-          },
+          action: { label: 'View', onClick: () => setShowTripSummary(true) },
         });
         return { ...prev, [typeKey]: [...currentItems, savedItem] };
       }
@@ -385,7 +454,52 @@ export default function HomeClient() {
     toast.success('Item removed');
   };
 
-  // ==================== MAIN SEARCH - AGENT ORCHESTRATION ====================
+  // ==================== CITY SELECTION HANDLER ====================
+  // Fires when user picks a city + match date from CityPicker
+
+  const handleCitySelect = async (params: {
+    selected_event_id: string;
+    selected_city_id: string;
+    selected_match_date: string;
+  }) => {
+    setLoading(true);
+    setError(null);
+    const loadingToast = toast.loading('Building your trip...');
+
+    try {
+      const response = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: searchQuery,
+          ...params,
+          budget_level: tripPreferences?.budget === 'Budget' ? 'budget'
+            : tripPreferences?.budget === 'Luxury' || tripPreferences?.budget === 'Ultra-Luxury' ? 'luxury'
+            : 'mid',
+          origin_country_code: 'ZA',
+        })
+      });
+
+      if (!response.ok) throw new Error('Agent request failed');
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Agent processing failed');
+
+      setAgentResponse(result.data);
+      toast.success('Your trip is ready!', { id: loadingToast });
+
+      setTimeout(() => {
+        document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 300);
+
+    } catch (err: any) {
+      setError(err.message || 'Failed to build trip');
+      toast.error('Failed to build trip', { id: loadingToast, description: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== MAIN SEARCH ====================
   
   const handleSearch = async (query?: string, preferences?: TripPreferences) => {
     const location = query || searchQuery;
@@ -425,22 +539,16 @@ export default function HomeClient() {
         })
       });
 
-      if (!response.ok) {
-        throw new Error('Agent request failed');
-      }
+      if (!response.ok) throw new Error('Agent request failed');
 
       const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Agent processing failed');
-      }
+      if (!result.success) throw new Error(result.error || 'Agent processing failed');
 
       const agentData: AgentResponse = result.data;
       setAgentResponse(agentData);
 
       if (user) {
         await profileManager.trackTripPlanned(user.uid, location);
-        
         if (prefs) {
           await updateUserProfile({
             preferredTripTypes: prefs.tripType ? [prefs.tripType as any] : userProfile?.preferredTripTypes || [],
@@ -451,10 +559,18 @@ export default function HomeClient() {
         }
       }
 
-      toast.success(`Found amazing ${eventType} options!`, {
-        id: loadingToast,
-        description: `${agentData.hotels.length || 0} hotels, ${agentData.flights.length || 0} flights`
-      });
+      // Different toast for city selection vs full trip
+      if (agentData.intent === 'city_selection_required') {
+        toast.success(`${agentData.event_name} — pick your city`, {
+          id: loadingToast,
+          description: `${agentData.cities?.length || 0} host cities available`
+        });
+      } else {
+        toast.success(`Found amazing ${eventType} options!`, {
+          id: loadingToast,
+          description: `${agentData.hotels?.length || 0} hotels, ${agentData.flights?.length || 0} flights`
+        });
+      }
 
       setTimeout(() => {
         document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -474,9 +590,7 @@ export default function HomeClient() {
 
   const toggleVoiceInput = () => {
     setIsListening(!isListening);
-    if (!isListening) {
-      toast.success('Voice input activated');
-    }
+    if (!isListening) toast.success('Voice input activated');
   };
 
   const handleRefinementSubmit = async (preferences: TripPreferences) => {
@@ -491,7 +605,7 @@ export default function HomeClient() {
     <main className="min-h-screen bg-white">
       <Navbar />
 
-      {/* ==================== HERO SECTION - CATEGORY DEFINING ==================== */}
+      {/* ==================== HERO SECTION ==================== */}
       <section className="relative min-h-[90vh] flex items-center justify-center px-6 pt-32 pb-24">
         
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -562,10 +676,7 @@ export default function HomeClient() {
                       `}>
                         <Icon size={26} />
                       </div>
-                      <span className={`
-                        font-semibold text-base
-                        ${isSelected ? type.color : 'text-gray-700'}
-                      `}>
+                      <span className={`font-semibold text-base ${isSelected ? type.color : 'text-gray-700'}`}>
                         {type.label}
                       </span>
                     </div>
@@ -638,7 +749,6 @@ export default function HomeClient() {
                       value={startDate?.toISOString().split('T')[0] || ''}
                       onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)}
                       className="w-full h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-sm font-medium hover:border-gray-300 focus:border-blue-600 transition-all"
-                      placeholder="Start Date"
                     />
                   </div>
                   <ArrowRight className="text-gray-300 flex-shrink-0" size={20} />
@@ -648,7 +758,6 @@ export default function HomeClient() {
                       value={endDate?.toISOString().split('T')[0] || ''}
                       onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)}
                       className="w-full h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-sm font-medium hover:border-gray-300 focus:border-blue-600 transition-all"
-                      placeholder="End Date"
                     />
                   </div>
                 </motion.div>
@@ -671,30 +780,15 @@ export default function HomeClient() {
             </button>
 
             <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => setShowVoicePlanner(true)}
-                variant="ghost"
-                size="sm"
-                className="flex-1 text-gray-600"
-              >
+              <Button onClick={() => setShowVoicePlanner(true)} variant="ghost" size="sm" className="flex-1 text-gray-600">
                 <Mic size={16} className="mr-2" />
                 Voice Planner
               </Button>
-              <Button
-                onClick={() => setShowSavedTrips(true)}
-                variant="ghost"
-                size="sm"
-                className="flex-1 text-gray-600"
-              >
+              <Button onClick={() => setShowSavedTrips(true)} variant="ghost" size="sm" className="flex-1 text-gray-600">
                 <Bookmark size={16} className="mr-2" />
                 Saved Trips
               </Button>
-              <Button
-                onClick={() => router.push('/settings')}
-                variant="ghost"
-                size="sm"
-                className="text-gray-600"
-              >
+              <Button onClick={() => router.push('/settings')} variant="ghost" size="sm" className="text-gray-600">
                 <Settings size={16} />
               </Button>
             </div>
@@ -711,38 +805,24 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ==================== TRUST SIGNALS - MONETIZATION ==================== */}
+      {/* ==================== TRUST SIGNALS ==================== */}
       <section className="py-16 px-6 bg-gray-50 border-y border-gray-100">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Shield className="text-white" size={24} />
+            {[
+              { icon: Shield, title: 'Secure Booking', sub: 'Bank-level encryption' },
+              { icon: Ticket, title: 'Official Sources', sub: 'Ticketmaster, StubHub verified' },
+              { icon: CheckCircle2, title: 'Powered by TravelPayouts', sub: 'Trusted travel partners' },
+              { icon: Sparkles, title: 'AI-Optimized', sub: 'Smart event logistics' },
+            ].map(({ icon: Icon, title, sub }, idx) => (
+              <div key={idx} className="text-center">
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                  <Icon className="text-white" size={24} />
+                </div>
+                <h4 className="font-bold text-gray-900 mb-1 text-sm">{title}</h4>
+                <p className="text-xs text-gray-600">{sub}</p>
               </div>
-              <h4 className="font-bold text-gray-900 mb-1 text-sm">Secure Booking</h4>
-              <p className="text-xs text-gray-600">Bank-level encryption</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Ticket className="text-white" size={24} />
-              </div>
-              <h4 className="font-bold text-gray-900 mb-1 text-sm">Official Sources</h4>
-              <p className="text-xs text-gray-600">Ticketmaster, StubHub verified</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <CheckCircle2 className="text-white" size={24} />
-              </div>
-              <h4 className="font-bold text-gray-900 mb-1 text-sm">Powered by TravelPayouts</h4>
-              <p className="text-xs text-gray-600">Trusted travel partners</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="text-white" size={24} />
-              </div>
-              <h4 className="font-bold text-gray-900 mb-1 text-sm">AI-Optimized</h4>
-              <p className="text-xs text-gray-600">Smart event logistics</p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -757,24 +837,11 @@ export default function HomeClient() {
             <h2 className="text-5xl font-bold text-gray-900 mb-4">How it works</h2>
             <p className="text-xl text-gray-600">Three steps. One intelligent system.</p>
           </div>
-
           <div className="grid md:grid-cols-3 gap-12">
             {[
-              { 
-                step: "1", 
-                title: "Pick your event", 
-                desc: "Tell us what you're going to—sports, music, or festivals." 
-              },
-              { 
-                step: "2", 
-                title: "AI builds your stack", 
-                desc: "We find tickets, flights, hotels, and create your complete itinerary." 
-              },
-              { 
-                step: "3", 
-                title: "Book everything", 
-                desc: "Secure booking through our trusted partners. One trip, fully orchestrated." 
-              }
+              { step: "1", title: "Pick your event", desc: "Tell us what you're going to—sports, music, or festivals." },
+              { step: "2", title: "AI builds your stack", desc: "We find tickets, flights, hotels, and create your complete itinerary." },
+              { step: "3", title: "Book everything", desc: "Secure booking through our trusted partners. One trip, fully orchestrated." }
             ].map((item, idx) => (
               <motion.div
                 key={idx}
@@ -800,108 +867,115 @@ export default function HomeClient() {
         <section id="results-section" className="px-6 py-20 bg-gray-50">
           <div className="max-w-7xl mx-auto">
             
+            {/* Loading State */}
             {loading && (
               <div className="text-center py-32">
                 <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-6" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                  AI is orchestrating your {eventType} trip...
+                  {agentResponse?.intent === 'city_selection_required'
+                    ? 'Building your trip...'
+                    : `AI is orchestrating your ${eventType} trip...`
+                  }
                 </h3>
-                <p className="text-gray-600">
-                  Finding tickets, flights, hotels, and building your itinerary
-                </p>
+                <p className="text-gray-600">Finding tickets, flights, hotels, and building your itinerary</p>
               </div>
             )}
 
+            {/* Results */}
             {!loading && agentResponse && (
               <>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-8"
-                >
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
-                      <h2 className="text-4xl font-bold text-gray-900 mb-2">
-                        {agentResponse.event.name || `Your ${currentEventConfig?.label} Trip`}
-                      </h2>
-                      <p className="text-gray-600 text-lg">
-                        {destination}
-                        {startDate && endDate && ` • ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`}
-                      </p>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      {currentWeather && (
-                        <Button onClick={() => setShowWeather(true)} variant="outline" size="sm">
-                          <CloudRain size={16} className="mr-2" />
-                          {currentWeather.temp}°
-                        </Button>
-                      )}
-                      
-                      <Button onClick={() => setShowMaps(true)} variant="outline" size="sm">
-                        <MapPin size={16} className="mr-2" />
-                        Map
-                      </Button>
-                      
-                      {totalSavedItems > 0 && (
-                        <Button
-                          onClick={() => setShowTripSummary(true)}
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Bookmark size={16} className="mr-2" />
-                          Trip ({totalSavedItems})
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {eventType && (
-                    <Badge variant="secondary" className="text-sm">
-                      {currentEventConfig?.icon && <currentEventConfig.icon size={14} className="mr-1" />}
-                      {currentEventConfig?.label} Event
-                    </Badge>
-                  )}
-                </motion.div>
-
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="w-full justify-start mb-8 bg-white p-2 rounded-2xl shadow-sm">
-                    <TabsTrigger value="itinerary" className="flex items-center gap-2">
-                      <Sparkles size={16} />
-                      Itinerary
-                    </TabsTrigger>
-                    <TabsTrigger value="hotels" className="flex items-center gap-2">
-                      <Hotel size={16} />
-                      Hotels
-                      {agentResponse.hotels.length > 0 && <Badge variant="secondary">{agentResponse.hotels.length}</Badge>}
-                    </TabsTrigger>
-                    <TabsTrigger value="flights" className="flex items-center gap-2">
-                      <Plane size={16} />
-                      Flights
-                      {agentResponse.flights.length > 0 && <Badge variant="secondary">{agentResponse.flights.length}</Badge>}
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="itinerary">
-                    {itineraryData && <ItineraryView data={itineraryData} />}
-                  </TabsContent>
-
-                  <TabsContent value="hotels">
-                    <HotelResults 
-                      hotels={agentResponse.hotels} 
-                      onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')}
-                      loading={false}
+                {/* ---- CITY SELECTION (multi-city events like World Cup) ---- */}
+                {agentResponse.intent === 'city_selection_required' && agentResponse.cities ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="py-8"
+                  >
+                    <CityPicker
+                      eventId={agentResponse.event_id!}
+                      eventName={agentResponse.event_name || agentResponse.event.name || 'Event'}
+                      cities={agentResponse.cities}
+                      onSelect={handleCitySelect}
                     />
-                  </TabsContent>
+                  </motion.div>
 
-                  <TabsContent value="flights">
-                    <FlightResults 
-                      flights={agentResponse.flights} 
-                      onSaveItem={(flight) => handleSaveItem(flight, 'flight')}
-                      loading={false}
-                    />
-                  </TabsContent>
-                </Tabs>
+                ) : (
+                  // ---- FULL TRIP RESULTS ----
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-8"
+                    >
+                      <div className="flex items-start justify-between mb-6">
+                        <div>
+                          <h2 className="text-4xl font-bold text-gray-900 mb-2">
+                            {agentResponse.event.name || `Your ${currentEventConfig?.label} Trip`}
+                          </h2>
+                          <p className="text-gray-600 text-lg">
+                            {destination}
+                            {startDate && endDate && ` • ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`}
+                          </p>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                          {currentWeather && (
+                            <Button onClick={() => setShowWeather(true)} variant="outline" size="sm">
+                              <CloudRain size={16} className="mr-2" />
+                              {currentWeather.temp}°
+                            </Button>
+                          )}
+                          <Button onClick={() => setShowMaps(true)} variant="outline" size="sm">
+                            <MapPin size={16} className="mr-2" />
+                            Map
+                          </Button>
+                          {totalSavedItems > 0 && (
+                            <Button onClick={() => setShowTripSummary(true)} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                              <Bookmark size={16} className="mr-2" />
+                              Trip ({totalSavedItems})
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {eventType && (
+                        <Badge variant="secondary" className="text-sm">
+                          {currentEventConfig?.icon && <currentEventConfig.icon size={14} className="mr-1" />}
+                          {currentEventConfig?.label} Event
+                        </Badge>
+                      )}
+                    </motion.div>
+
+                    <Tabs value={activeTab} onValueChange={setActiveTab}>
+                      <TabsList className="w-full justify-start mb-8 bg-white p-2 rounded-2xl shadow-sm">
+                        <TabsTrigger value="itinerary" className="flex items-center gap-2">
+                          <Sparkles size={16} />
+                          Itinerary
+                        </TabsTrigger>
+                        <TabsTrigger value="hotels" className="flex items-center gap-2">
+                          <Hotel size={16} />
+                          Hotels
+                          {agentResponse.hotels?.length > 0 && <Badge variant="secondary">{agentResponse.hotels.length}</Badge>}
+                        </TabsTrigger>
+                        <TabsTrigger value="flights" className="flex items-center gap-2">
+                          <Plane size={16} />
+                          Flights
+                          {agentResponse.flights?.length > 0 && <Badge variant="secondary">{agentResponse.flights.length}</Badge>}
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="itinerary">
+                        {itineraryData && <ItineraryView data={itineraryData} />}
+                      </TabsContent>
+                      <TabsContent value="hotels">
+                        <HotelResults hotels={agentResponse.hotels || []} onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')} loading={false} />
+                      </TabsContent>
+                      <TabsContent value="flights">
+                        <FlightResults flights={agentResponse.flights || []} onSaveItem={(flight) => handleSaveItem(flight, 'flight')} loading={false} />
+                      </TabsContent>
+                    </Tabs>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -915,28 +989,23 @@ export default function HomeClient() {
       
       {showRefinement && (
         <TripRefinementModal
-  isOpen={showRefinement}
-  onClose={() => setShowRefinement(false)}
-  onGenerate={handleRefinementSubmit}
-  destination={destination}
-  isLoading={loading}
-  eventContext={
-  agentResponse?.event?.name
-    ? {
-        name: agentResponse.event.name,
-        date: agentResponse.event.date || '',
-        type:
-          agentResponse.event.type === 'festival'
-            ? 'festivals'
-            : agentResponse.event.type === 'conference'
-            ? 'other'
-            : agentResponse.event.type || 'other',
-      }
-    : undefined
-}
-
-/>
-
+          isOpen={showRefinement}
+          onClose={() => setShowRefinement(false)}
+          onGenerate={handleRefinementSubmit}
+          destination={destination}
+          isLoading={loading}
+          eventContext={
+            agentResponse?.event?.name
+              ? {
+                  name: agentResponse.event.name,
+                  date: agentResponse.event.date || '',
+                  type: agentResponse.event.type === 'festival' ? 'festivals'
+                    : agentResponse.event.type === 'conference' ? 'other'
+                    : agentResponse.event.type || 'other',
+                }
+              : undefined
+          }
+        />
       )}
 
       {showTripSummary && (
@@ -954,12 +1023,7 @@ export default function HomeClient() {
           <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
             <div className="p-6 border-b flex items-center justify-between">
               <h3 className="text-2xl font-bold">Map & Directions</h3>
-              <button
-                onClick={() => setShowMaps(false)}
-                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowMaps(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">✕</button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]">
               <MapsDirections destination={destination} defaultOrigin={origin} />
@@ -973,20 +1037,10 @@ export default function HomeClient() {
           <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl">
             <div className="p-6 border-b flex items-center justify-between">
               <h3 className="text-2xl font-bold">Weather Forecast</h3>
-              <button
-                onClick={() => setShowWeather(false)}
-                className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
+              <button onClick={() => setShowWeather(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">✕</button>
             </div>
             <div className="p-6">
-              <WeatherWidget 
-                destination={destination}
-                showRecommendations={true}
-                showHourlyForecast={false}
-                onWeatherLoad={setCurrentWeather}
-              />
+              <WeatherWidget destination={destination} showRecommendations={true} showHourlyForecast={false} onWeatherLoad={setCurrentWeather} />
             </div>
           </div>
         </div>

@@ -6,33 +6,29 @@ import {
   Trash2,
   Calendar,
   MapPin,
-  DollarSign,
   Plus,
   Search,
   Hotel,
   Plane,
-  Activity,
-  Utensils,
   Eye,
-  Edit2,
   Download,
   Share2,
   Copy,
   Archive,
-  TrendingUp,
   Clock,
-  Star,
   Heart,
   AlertCircle,
-  Filter,
-  SortAsc,
-  RefreshCw,
+  Trophy,
+  Music,
+  PartyPopper,
+  Sparkles,
   MoreVertical,
+  ArrowRight,
+  Ticket,
+  TrendingUp,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -44,10 +40,13 @@ interface SavedTrip {
   id: string;
   destination: string;
   country: string;
+  eventName?: string;
+  eventType?: 'sports' | 'music' | 'festivals' | 'other';
+  eventDate?: string;
+  venue?: string;
   startDate: string;
   endDate: string;
   createdAt: string;
-  updatedAt?: string;
   budget: 'Budget' | 'Mid-range' | 'Luxury' | 'Ultra-Luxury';
   travelers: number;
   status: 'planning' | 'booked' | 'completed' | 'archived';
@@ -59,12 +58,49 @@ interface SavedTrip {
     restaurants: number;
   };
   estimatedTotal: number;
-  notes?: string;
+  currency?: string;
   tags?: string[];
   isFavorite?: boolean;
 }
 
 type SortOption = 'date' | 'budget' | 'destination' | 'created';
+type FilterStatus = 'all' | 'planning' | 'booked' | 'completed' | 'archived';
+
+// ==================== EVENT CONFIG ====================
+
+const EVENT_CONFIG = {
+  sports: {
+    icon: Trophy,
+    label: 'Sports',
+    gradient: 'from-blue-600 to-cyan-500',
+    light: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  music: {
+    icon: Music,
+    label: 'Music',
+    gradient: 'from-purple-600 to-pink-500',
+    light: 'bg-purple-50 text-purple-700 border-purple-200',
+  },
+  festivals: {
+    icon: PartyPopper,
+    label: 'Festival',
+    gradient: 'from-orange-500 to-rose-500',
+    light: 'bg-orange-50 text-orange-700 border-orange-200',
+  },
+  other: {
+    icon: Sparkles,
+    label: 'Event',
+    gradient: 'from-slate-500 to-slate-600',
+    light: 'bg-slate-50 text-slate-700 border-slate-200',
+  },
+};
+
+const STATUS_CONFIG = {
+  planning: { label: 'Planning', dot: 'bg-blue-500' },
+  booked: { label: 'Booked', dot: 'bg-green-500' },
+  completed: { label: 'Completed', dot: 'bg-gray-400' },
+  archived: { label: 'Archived', dot: 'bg-orange-400' },
+};
 
 // ==================== MAIN COMPONENT ====================
 
@@ -73,476 +109,260 @@ export default function SavedTrips() {
   const [trips, setTrips] = useState<SavedTrip[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'planning' | 'booked' | 'completed' | 'archived'>('all');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortBy, setSortBy] = useState<SortOption>('date');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-
-  // ==================== LOAD TRIPS ====================
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   useEffect(() => {
     loadTrips();
   }, [user]);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handler = () => setActiveMenu(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
+  const storageKey = `gladys_saved_trips_${user?.uid || 'guest'}`;
+
   const loadTrips = async () => {
     setLoading(true);
-    
     try {
-      // Load from localStorage (in production, fetch from API)
-      const storageKey = `gladys_saved_trips_${user?.uid || 'guest'}`;
       const stored = localStorage.getItem(storageKey);
-      
-      if (stored) {
-        const loadedTrips = JSON.parse(stored);
-        setTrips(loadedTrips);
-      } else {
-        // Demo data for first-time users
-        setTrips(getDemoTrips());
-      }
-    } catch (error) {
-      console.error('❌ Failed to load trips:', error);
-      toast.error('Load failed', {
-        description: 'Could not load your saved trips',
-      });
+      setTrips(stored ? JSON.parse(stored) : getDemoTrips());
+    } catch {
+      toast.error('Could not load your saved trips');
     } finally {
       setLoading(false);
     }
   };
 
-  // ==================== SAVE TRIPS ====================
-
-  const saveTrips = (updatedTrips: SavedTrip[]) => {
-    try {
-      const storageKey = `gladys_saved_trips_${user?.uid || 'guest'}`;
-      localStorage.setItem(storageKey, JSON.stringify(updatedTrips));
-      setTrips(updatedTrips);
-    } catch (error) {
-      console.error('❌ Failed to save trips:', error);
-      toast.error('Save failed', {
-        description: 'Could not save changes',
-      });
-    }
+  const persist = (updated: SavedTrip[]) => {
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+    setTrips(updated);
   };
 
-  // ==================== TRIP ACTIONS ====================
-
-  const handleDeleteTrip = (tripId: string) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-
-    const updatedTrips = trips.filter(t => t.id !== tripId);
-    saveTrips(updatedTrips);
-
-    toast.success('Trip deleted', {
-      description: `${trip.destination} has been removed`,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          saveTrips([...updatedTrips, trip]);
-        },
-      },
+  const handleDelete = (id: string) => {
+    const trip = trips.find(t => t.id === id)!;
+    const next = trips.filter(t => t.id !== id);
+    persist(next);
+    toast.success('Trip removed', {
+      action: { label: 'Undo', onClick: () => persist([...next, trip]) },
     });
   };
 
-  const handleToggleFavorite = (tripId: string) => {
-    const updatedTrips = trips.map(trip =>
-      trip.id === tripId ? { ...trip, isFavorite: !trip.isFavorite } : trip
+  const handleFavorite = (id: string) => {
+    const next = trips.map(t => t.id === id ? { ...t, isFavorite: !t.isFavorite } : t);
+    persist(next);
+    const trip = next.find(t => t.id === id);
+    toast.success(trip?.isFavorite ? '❤️ Added to favorites' : 'Removed from favorites');
+  };
+
+  const handleArchive = (id: string) => {
+    const next = trips.map(t =>
+      t.id === id ? { ...t, status: (t.status === 'archived' ? 'planning' : 'archived') as SavedTrip['status'] } : t
     );
-    saveTrips(updatedTrips);
-
-    const trip = updatedTrips.find(t => t.id === tripId);
-    toast.success(
-      trip?.isFavorite ? 'Added to favorites' : 'Removed from favorites',
-      {
-        description: trip?.destination,
-      }
-    );
+    persist(next);
+    const trip = next.find(t => t.id === id);
+    toast.success(trip?.status === 'archived' ? 'Trip archived' : 'Trip restored');
   };
 
-  const handleArchiveTrip = (tripId: string) => {
-    const updatedTrips = trips.map(trip => {
-      if (trip.id !== tripId) return trip;
-      
-      const newStatus: SavedTrip['status'] = trip.status === 'archived' ? 'planning' : 'archived';
-      return { ...trip, status: newStatus };
-    });
-    saveTrips(updatedTrips);
-
-    const trip = updatedTrips.find(t => t.id === tripId);
-    toast.success(
-      trip?.status === 'archived' ? 'Trip archived' : 'Trip restored',
-      {
-        description: trip?.destination,
-      }
-    );
+  const handleDuplicate = (id: string) => {
+    const trip = trips.find(t => t.id === id)!;
+    persist([{ ...trip, id: Date.now().toString(), destination: `${trip.destination} (Copy)`, createdAt: new Date().toISOString(), status: 'planning' }, ...trips]);
+    toast.success('Trip duplicated');
   };
 
-  const handleDuplicateTrip = (tripId: string) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-
-    const duplicatedTrip: SavedTrip = {
-      ...trip,
-      id: Date.now().toString(),
-      destination: `${trip.destination} (Copy)`,
-      createdAt: new Date().toISOString(),
-      status: 'planning',
-    };
-
-    saveTrips([duplicatedTrip, ...trips]);
-
-    toast.success('Trip duplicated', {
-      description: `Created a copy of ${trip.destination}`,
-    });
+  const handleExport = (id: string) => {
+    const trip = trips.find(t => t.id === id)!;
+    const blob = new Blob([JSON.stringify(trip, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${trip.destination.toLowerCase().replace(/\s+/g, '-')}-trip.json`;
+    a.click();
+    toast.success('Trip exported');
   };
 
-  const handleExportTrip = (tripId: string) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-
-    const dataStr = JSON.stringify(trip, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${trip.destination.toLowerCase().replace(/\s+/g, '-')}-trip.json`;
-    link.click();
-
-    toast.success('Trip exported', {
-      description: `Downloaded ${trip.destination} trip data`,
-    });
-  };
-
-  const handleShareTrip = async (tripId: string) => {
-    const trip = trips.find(t => t.id === tripId);
-    if (!trip) return;
-
-    const shareData = {
-      title: `${trip.destination} Trip`,
-      text: `Check out my ${trip.destination} trip plan! ${trip.startDate} to ${trip.endDate}`,
-      url: window.location.href,
-    };
-
+  const handleShare = async (id: string) => {
+    const trip = trips.find(t => t.id === id)!;
     try {
       if (navigator.share) {
-        await navigator.share(shareData);
-        toast.success('Shared successfully');
+        await navigator.share({ title: `${trip.destination} Trip`, url: window.location.href });
       } else {
-        // Fallback: Copy to clipboard
-        await navigator.clipboard.writeText(shareData.url);
-        toast.success('Link copied', {
-          description: 'Trip link copied to clipboard',
-        });
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copied to clipboard');
       }
-    } catch (error) {
-      console.error('❌ Share failed:', error);
-    }
+    } catch {}
   };
 
-  // ==================== FILTERING & SORTING ====================
-
-  const filteredAndSortedTrips = useMemo(() => {
-    let result = [...trips];
-
-    // Filter by search
-    if (searchQuery) {
-      result = result.filter(
-        trip =>
-          trip.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          trip.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          trip.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-    }
-
-    // Filter by status
-    if (filterStatus !== 'all') {
-      result = result.filter(trip => trip.status === filterStatus);
-    }
-
-    // Filter by favorites
-    if (showFavoritesOnly) {
-      result = result.filter(trip => trip.isFavorite);
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'date':
-          return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-        case 'budget':
-          return b.estimatedTotal - a.estimatedTotal;
-        case 'destination':
-          return a.destination.localeCompare(b.destination);
-        case 'created':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        default:
-          return 0;
-      }
+  const filtered = useMemo(() => {
+    let r = [...trips];
+    if (searchQuery) r = r.filter(t =>
+      t.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.eventName?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (filterStatus !== 'all') r = r.filter(t => t.status === filterStatus);
+    if (showFavoritesOnly) r = r.filter(t => t.isFavorite);
+    r.sort((a, b) => {
+      if (sortBy === 'date') return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+      if (sortBy === 'budget') return b.estimatedTotal - a.estimatedTotal;
+      if (sortBy === 'destination') return a.destination.localeCompare(b.destination);
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-
-    return result;
+    return r;
   }, [trips, searchQuery, filterStatus, showFavoritesOnly, sortBy]);
 
-  // ==================== STATS ====================
-
   const stats = useMemo(() => {
-    const activeTrips = trips.filter(t => t.status !== 'archived');
-    
+    const active = trips.filter(t => t.status !== 'archived');
     return {
-      totalDestinations: activeTrips.length,
-      totalDays: activeTrips.reduce((sum, trip) => {
-        const days = Math.ceil(
-          (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) /
-            (1000 * 60 * 60 * 24)
-        );
-        return sum + days;
-      }, 0),
-      totalBudget: activeTrips.reduce((sum, trip) => sum + trip.estimatedTotal, 0),
-      totalItems: activeTrips.reduce(
-        (sum, trip) =>
-          sum +
-          trip.items.hotels +
-          trip.items.flights +
-          trip.items.activities +
-          trip.items.restaurants,
-        0
-      ),
-      upcomingTrips: activeTrips.filter(
-        t => new Date(t.startDate) > new Date() && t.status !== 'completed'
-      ).length,
+      total: active.length,
+      upcoming: active.filter(t => new Date(t.startDate) > new Date() && t.status !== 'completed').length,
+      totalSpend: active.reduce((s, t) => s + t.estimatedTotal, 0),
       favorites: trips.filter(t => t.isFavorite).length,
     };
   }, [trips]);
 
-  // ==================== RENDER ====================
+  const FILTER_TABS: { value: FilterStatus; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'planning', label: 'Planning' },
+    { value: 'booked', label: 'Booked' },
+    { value: 'completed', label: 'Completed' },
+    { value: 'archived', label: 'Archived' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 py-12 px-6 relative overflow-hidden"
-      >
-        {/* Animated background */}
-        <div className="absolute inset-0 opacity-10">
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle, white 1px, transparent 1px)',
-              backgroundSize: '30px 30px',
-            }}
-          ></div>
-        </div>
+    <div className="min-h-screen bg-white">
 
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* ==================== HEADER ==================== */}
+      <div className="bg-gray-950 px-6 pt-16 pb-20">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-start justify-between gap-6">
             <div>
-              <motion.h1
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-4xl md:text-5xl font-bold text-white mb-2 flex items-center gap-3"
-              >
-                <Bookmark size={40} />
-                My Saved Trips
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-white/90 text-lg"
-              >
-                Plan, save, and book your dream vacations
-              </motion.p>
+              <p className="text-gray-500 text-sm font-semibold uppercase tracking-widest mb-3">GladysTravel</p>
+              <h1 className="text-5xl font-black text-white tracking-tight leading-none mb-3">
+                My Trips
+              </h1>
+              <p className="text-gray-400 text-lg">
+                {stats.total} saved · {stats.upcoming} upcoming
+              </p>
             </div>
+            <Link href="/">
+              <button className="flex items-center gap-2 bg-white text-gray-950 font-bold px-5 py-3 rounded-2xl hover:bg-gray-100 transition-colors text-sm mt-2">
+                <Plus size={16} />
+                New Trip
+              </button>
+            </Link>
+          </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Link href="/">
-                <Button className="bg-white text-purple-600 hover:bg-white/90 shadow-xl hover:shadow-2xl transition-all">
-                  <Plus size={20} className="mr-2" />
-                  Plan New Trip
-                </Button>
-              </Link>
-            </motion.div>
+          {/* Stats strip */}
+          <div className="grid grid-cols-3 gap-4 mt-10">
+            {[
+              { label: 'Saved Trips', value: stats.total },
+              { label: 'Upcoming', value: stats.upcoming },
+              { label: 'Est. Spend', value: `$${(stats.totalSpend / 1000).toFixed(1)}k` },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-white/5 rounded-2xl px-5 py-4 border border-white/10">
+                <div className="text-2xl font-black text-white">{value}</div>
+                <div className="text-xs text-gray-500 font-medium mt-0.5">{label}</div>
+              </div>
+            ))}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Quick Stats Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="max-w-7xl mx-auto px-6 -mt-8 mb-6"
-      >
-        <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <QuickStat
-              icon={MapPin}
-              label="Destinations"
-              value={stats.totalDestinations}
-              color="purple"
-            />
-            <QuickStat
-              icon={Calendar}
-              label="Days"
-              value={stats.totalDays}
-              color="blue"
-            />
-            <QuickStat
-              icon={DollarSign}
-              label="Budget"
-              value={`$${(stats.totalBudget / 1000).toFixed(1)}k`}
-              color="green"
-            />
-            <QuickStat
-              icon={Clock}
-              label="Upcoming"
-              value={stats.upcomingTrips}
-              color="orange"
-            />
-            <QuickStat
-              icon={Heart}
-              label="Favorites"
-              value={stats.favorites}
-              color="pink"
-            />
-            <QuickStat
-              icon={Bookmark}
-              label="Saved Items"
-              value={stats.totalItems}
-              color="indigo"
-            />
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Filters & Search */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="max-w-7xl mx-auto px-6 mb-8"
-      >
-        <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
+      {/* ==================== CONTROLS ==================== */}
+      <div className="max-w-6xl mx-auto px-6 -mt-6 mb-8">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-5 space-y-4">
+          <div className="flex gap-3">
             <div className="relative flex-1">
-              <Search
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
-                size={20}
-              />
-              <Input
-                placeholder="Search destinations, countries, or tags..."
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                placeholder="Search trips, events, destinations..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-12 pr-4 py-6 rounded-xl border-gray-200"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-gray-400 transition-colors"
               />
             </div>
-
-            {/* Sort */}
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-3 border border-gray-200 rounded-xl bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="px-4 py-3 border border-gray-200 rounded-2xl text-sm font-medium focus:outline-none bg-white"
             >
-              <option value="date">Sort by Date</option>
-              <option value="budget">Sort by Budget</option>
-              <option value="destination">Sort by Name</option>
-              <option value="created">Sort by Created</option>
+              <option value="date">By Date</option>
+              <option value="budget">By Budget</option>
+              <option value="destination">A–Z</option>
+              <option value="created">Recently Added</option>
             </select>
-
-            {/* Favorites Toggle */}
-            <Button
+            <button
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-              variant={showFavoritesOnly ? 'default' : 'outline'}
-              className={showFavoritesOnly ? 'bg-pink-600 hover:bg-pink-700' : ''}
+              className={`px-4 py-3 rounded-2xl text-sm font-semibold border transition-all flex items-center gap-2 ${
+                showFavoritesOnly
+                  ? 'bg-rose-500 text-white border-rose-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+              }`}
             >
-              <Heart size={16} className="mr-2" />
-              Favorites
-            </Button>
+              <Heart size={15} fill={showFavoritesOnly ? 'white' : 'none'} />
+              {stats.favorites}
+            </button>
           </div>
 
-          {/* Status Filter Tabs */}
-          <div className="mt-4">
-            <Tabs
-              value={filterStatus}
-              onValueChange={v => setFilterStatus(v as any)}
-            >
-              <TabsList className="bg-gray-100 p-1 rounded-xl w-full grid grid-cols-5">
-                <TabsTrigger value="all" className="rounded-lg">
-                  All
-                </TabsTrigger>
-                <TabsTrigger value="planning" className="rounded-lg">
-                  Planning
-                </TabsTrigger>
-                <TabsTrigger value="booked" className="rounded-lg">
-                  Booked
-                </TabsTrigger>
-                <TabsTrigger value="completed" className="rounded-lg">
-                  Completed
-                </TabsTrigger>
-                <TabsTrigger value="archived" className="rounded-lg">
-                  Archived
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          {/* Filter tabs */}
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+            {FILTER_TABS.map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setFilterStatus(tab.value)}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                  filterStatus === tab.value
+                    ? 'bg-gray-950 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Trips Grid */}
-      <div className="max-w-7xl mx-auto px-6 pb-12">
+      {/* ==================== GRID ==================== */}
+      <div className="max-w-6xl mx-auto px-6 pb-20">
         <AnimatePresence mode="wait">
           {loading ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
+            <motion.div key="loading" className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
               {[1, 2, 3].map(i => (
-                <div
-                  key={i}
-                  className="bg-white rounded-2xl p-6 animate-pulse"
-                >
-                  <div className="h-48 bg-gray-200 rounded-xl mb-4"></div>
-                  <div className="h-6 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                </div>
+                <div key={i} className="bg-gray-100 rounded-3xl h-80 animate-pulse" />
               ))}
             </motion.div>
-          ) : filteredAndSortedTrips.length === 0 ? (
-            <EmptyState
-              searchQuery={searchQuery}
-              filterStatus={filterStatus}
-              showFavoritesOnly={showFavoritesOnly}
-            />
+          ) : filtered.length === 0 ? (
+            <EmptyState searchQuery={searchQuery} filterStatus={filterStatus} showFavoritesOnly={showFavoritesOnly} />
           ) : (
             <motion.div
-              key="trips"
+              key="grid"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid md:grid-cols-2 lg:grid-cols-3 gap-5"
             >
-              {filteredAndSortedTrips.map((trip, index) => (
+              {filtered.map((trip, idx) => (
                 <TripCard
                   key={trip.id}
                   trip={trip}
-                  index={index}
-                  onDelete={() => handleDeleteTrip(trip.id)}
-                  onToggleFavorite={() => handleToggleFavorite(trip.id)}
-                  onArchive={() => handleArchiveTrip(trip.id)}
-                  onDuplicate={() => handleDuplicateTrip(trip.id)}
-                  onExport={() => handleExportTrip(trip.id)}
-                  onShare={() => handleShareTrip(trip.id)}
+                  index={idx}
+                  isMenuOpen={activeMenu === trip.id}
+                  onMenuToggle={(e) => {
+                    e.stopPropagation();
+                    setActiveMenu(activeMenu === trip.id ? null : trip.id);
+                  }}
+                  onDelete={() => handleDelete(trip.id)}
+                  onFavorite={() => handleFavorite(trip.id)}
+                  onArchive={() => handleArchive(trip.id)}
+                  onDuplicate={() => handleDuplicate(trip.id)}
+                  onExport={() => handleExport(trip.id)}
+                  onShare={() => handleShare(trip.id)}
                 />
               ))}
             </motion.div>
@@ -555,150 +375,98 @@ export default function SavedTrips() {
 
 // ==================== TRIP CARD ====================
 
-interface TripCardProps {
+function TripCard({
+  trip, index, isMenuOpen,
+  onMenuToggle, onDelete, onFavorite, onArchive, onDuplicate, onExport, onShare
+}: {
   trip: SavedTrip;
   index: number;
+  isMenuOpen: boolean;
+  onMenuToggle: (e: React.MouseEvent) => void;
   onDelete: () => void;
-  onToggleFavorite: () => void;
+  onFavorite: () => void;
   onArchive: () => void;
   onDuplicate: () => void;
   onExport: () => void;
   onShare: () => void;
-}
-
-function TripCard({
-  trip,
-  index,
-  onDelete,
-  onToggleFavorite,
-  onArchive,
-  onDuplicate,
-  onExport,
-  onShare,
-}: TripCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
-
-  const statusConfig = {
-    planning: { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: '📝' },
-    booked: { color: 'bg-green-100 text-green-700 border-green-200', icon: '✓' },
-    completed: { color: 'bg-gray-100 text-gray-700 border-gray-200', icon: '✓' },
-    archived: { color: 'bg-orange-100 text-orange-700 border-orange-200', icon: '📦' },
-  };
-
-  const config = statusConfig[trip.status];
+}) {
+  const eventCfg = EVENT_CONFIG[trip.eventType || 'other'];
+  const EventIcon = eventCfg.icon;
+  const status = STATUS_CONFIG[trip.status];
+  const cur = trip.currency || 'USD';
+  const nights = Math.max(1, Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86400000));
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 group"
+      transition={{ delay: index * 0.05, duration: 0.3 }}
+      className="bg-white rounded-3xl border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 group"
     >
-      {/* Image */}
-      <div className="relative h-48 overflow-hidden">
+      {/* Image / Gradient top */}
+      <div className="relative h-44 overflow-hidden">
         {trip.image ? (
           <img
             src={trip.image}
             alt={trip.destination}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-400 via-pink-400 to-purple-500"></div>
+          <div className={`w-full h-full bg-gradient-to-br ${eventCfg.gradient}`} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Top badges */}
-        <div className="absolute top-4 left-4 right-4 flex items-start justify-between">
-          <Badge className={`${config.color} border capitalize`}>
-            {config.icon} {trip.status}
-          </Badge>
-
-          <div className="flex gap-2">
-            {/* Favorite */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={onToggleFavorite}
-              className={`w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md transition-colors ${
-                trip.isFavorite
-                  ? 'bg-pink-500 text-white'
-                  : 'bg-white/90 text-gray-700'
+        {/* Top row */}
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/20">
+            <EventIcon size={12} className="text-white" />
+            <span className="text-white text-xs font-semibold">{eventCfg.label}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onFavorite}
+              className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md transition-all ${
+                trip.isFavorite ? 'bg-rose-500 text-white' : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <Heart
-                size={18}
-                fill={trip.isFavorite ? 'white' : 'none'}
-              />
-            </motion.button>
-
-            {/* Menu */}
+              <Heart size={14} fill={trip.isFavorite ? 'white' : 'none'} />
+            </button>
             <div className="relative">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={() => setShowMenu(!showMenu)}
-                className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center text-gray-700"
+              <button
+                onClick={onMenuToggle}
+                className="w-8 h-8 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-all"
               >
-                <MoreVertical size={18} />
-              </motion.button>
-
+                <MoreVertical size={14} />
+              </button>
               <AnimatePresence>
-                {showMenu && (
+                {isMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                    initial={{ opacity: 0, scale: 0.9, y: -5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-10"
+                    exit={{ opacity: 0, scale: 0.9, y: -5 }}
+                    className="absolute right-0 top-10 w-44 bg-white rounded-2xl shadow-2xl border border-gray-100 py-1.5 z-20"
                   >
+                    {[
+                      { icon: Copy, label: 'Duplicate', action: onDuplicate },
+                      { icon: Download, label: 'Export', action: onExport },
+                      { icon: Share2, label: 'Share', action: onShare },
+                      { icon: Archive, label: trip.status === 'archived' ? 'Restore' : 'Archive', action: onArchive },
+                    ].map(({ icon: Icon, label, action }) => (
+                      <button
+                        key={label}
+                        onClick={action}
+                        className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700 font-medium"
+                      >
+                        <Icon size={14} className="text-gray-400" />
+                        {label}
+                      </button>
+                    ))}
+                    <div className="border-t border-gray-100 my-1" />
                     <button
-                      onClick={() => {
-                        onDuplicate();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                      onClick={onDelete}
+                      className="w-full px-4 py-2.5 text-left text-sm hover:bg-red-50 flex items-center gap-3 text-red-600 font-medium"
                     >
-                      <Copy size={16} />
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => {
-                        onExport();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Download size={16} />
-                      Export
-                    </button>
-                    <button
-                      onClick={() => {
-                        onShare();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Share2 size={16} />
-                      Share
-                    </button>
-                    <button
-                      onClick={() => {
-                        onArchive();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                    >
-                      <Archive size={16} />
-                      {trip.status === 'archived' ? 'Restore' : 'Archive'}
-                    </button>
-                    <div className="border-t border-gray-200 my-1"></div>
-                    <button
-                      onClick={() => {
-                        onDelete();
-                        setShowMenu(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                    >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                       Delete
                     </button>
                   </motion.div>
@@ -708,89 +476,69 @@ function TripCard({
           </div>
         </div>
 
-        {/* Destination Name */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <h3 className="text-2xl font-bold text-white mb-1">
-            {trip.destination}
+        {/* Bottom */}
+        <div className="absolute bottom-3 left-4 right-4">
+          <div className="flex items-center gap-1.5 mb-1">
+            <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+            <span className="text-white/70 text-xs font-medium">{status.label}</span>
+          </div>
+          <h3 className="text-white font-black text-xl leading-tight">
+            {trip.eventName || trip.destination}
           </h3>
-          <p className="text-white/90 text-sm flex items-center gap-1">
-            <MapPin size={14} />
-            {trip.country}
-          </p>
+          {trip.eventName && (
+            <p className="text-white/70 text-xs mt-0.5 flex items-center gap-1">
+              <MapPin size={11} />
+              {trip.destination}, {trip.country}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6">
-        {/* Dates */}
-        <div className="flex items-center text-sm text-gray-600 mb-4">
-          <Calendar size={16} className="mr-2 flex-shrink-0" />
-          <span>
-            {new Date(trip.startDate).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-            })}{' '}
-            -{' '}
-            {new Date(trip.endDate).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+      {/* Body */}
+      <div className="p-5 space-y-4">
+
+        {/* Date + nights */}
+        <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center gap-2 text-gray-600">
+            <Calendar size={14} className="text-gray-400" />
+            <span>
+              {new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {' – '}
+              {new Date(trip.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+            {nights}n
           </span>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-2 mb-4 pb-4 border-b border-gray-200">
-          <StatBubble icon={Hotel} value={trip.items.hotels} label="Hotels" color="purple" />
-          <StatBubble icon={Plane} value={trip.items.flights} label="Flights" color="blue" />
-          <StatBubble icon={Activity} value={trip.items.activities} label="Things" color="green" />
-          <StatBubble icon={Utensils} value={trip.items.restaurants} label="Dining" color="orange" />
+        {/* Saved items */}
+        <div className="flex items-center gap-3">
+          {[
+            { icon: Hotel, val: trip.items.hotels, label: 'hotels' },
+            { icon: Plane, val: trip.items.flights, label: 'flights' },
+            { icon: Ticket, val: trip.items.activities, label: 'activities' },
+          ].filter(i => i.val > 0).map(({ icon: Icon, val, label }) => (
+            <div key={label} className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 px-2.5 py-1.5 rounded-xl">
+              <Icon size={12} className="text-gray-400" />
+              <span className="font-semibold text-gray-700">{val}</span>
+              <span>{label}</span>
+            </div>
+          ))}
         </div>
 
-        {/* Budget & Travelers */}
-        <div className="flex items-center justify-between mb-4 text-sm">
-          <div className="flex items-center gap-2">
-            <DollarSign size={16} className="text-gray-400" />
-            <span className="font-semibold text-gray-900">{trip.budget}</span>
+        {/* Budget + CTA */}
+        <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+          <div>
+            <p className="text-xs text-gray-400 font-medium">Est. Total</p>
+            <p className="text-xl font-black text-gray-950">
+              {cur} {trip.estimatedTotal.toLocaleString()}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600">Travelers:</span>
-            <span className="font-semibold text-gray-900">{trip.travelers}</span>
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="flex items-center justify-between mb-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-          <span className="text-sm font-medium text-gray-700">Estimated Total:</span>
-          <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            ${trip.estimatedTotal.toLocaleString()}
-          </span>
-        </div>
-
-        {/* Tags */}
-        {trip.tags && trip.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {trip.tags.map((tag, idx) => (
-              <Badge key={idx} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="grid grid-cols-2 gap-3">
           <Link href={`/?destination=${trip.destination}`}>
-            <Button variant="default" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-              <Eye size={16} className="mr-2" />
-              View
-            </Button>
-          </Link>
-          <Link href={`/trips/${trip.id}/edit`}>
-            <Button variant="outline" className="w-full">
-              <Edit2 size={16} className="mr-2" />
-              Edit
-            </Button>
+            <button className="flex items-center gap-2 bg-gray-950 text-white text-sm font-bold px-4 py-2.5 rounded-2xl hover:bg-gray-800 transition-colors">
+              View <ChevronRight size={15} />
+            </button>
           </Link>
         </div>
       </div>
@@ -798,172 +546,110 @@ function TripCard({
   );
 }
 
-// ==================== HELPER COMPONENTS ====================
+// ==================== EMPTY STATE ====================
 
-function QuickStat({
-  icon: Icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string | number;
-  color: string;
-}) {
-  const colorClasses: Record<string, string> = {
-    purple: 'from-purple-500 to-purple-600',
-    blue: 'from-blue-500 to-blue-600',
-    green: 'from-green-500 to-green-600',
-    orange: 'from-orange-500 to-orange-600',
-    pink: 'from-pink-500 to-pink-600',
-    indigo: 'from-indigo-500 to-indigo-600',
-  };
-
-  return (
-    <div className="text-center">
-      <div
-        className={`w-12 h-12 bg-gradient-to-br ${colorClasses[color]} rounded-xl flex items-center justify-center mx-auto mb-2`}
-      >
-        <Icon className="text-white" size={20} />
-      </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-600">{label}</p>
-    </div>
-  );
-}
-
-function StatBubble({
-  icon: Icon,
-  value,
-  label,
-  color,
-}: {
-  icon: React.ElementType;
-  value: number;
-  label: string;
-  color: string;
-}) {
-  const colorClasses: Record<string, string> = {
-    purple: 'text-purple-600',
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    orange: 'text-orange-600',
-  };
-
-  return (
-    <div className="text-center">
-      <Icon className={`mx-auto ${colorClasses[color]} mb-1`} size={18} />
-      <p className="text-xs font-semibold text-gray-900">{value}</p>
-      <p className="text-xs text-gray-500">{label}</p>
-    </div>
-  );
-}
-
-function EmptyState({
-  searchQuery,
-  filterStatus,
-  showFavoritesOnly,
-}: {
+function EmptyState({ searchQuery, filterStatus, showFavoritesOnly }: {
   searchQuery: string;
   filterStatus: string;
   showFavoritesOnly: boolean;
 }) {
+  const isFiltered = searchQuery || filterStatus !== 'all' || showFavoritesOnly;
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="text-center py-20"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="text-center py-24"
     >
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', duration: 0.6 }}
-        className="w-24 h-24 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6"
-      >
-        {searchQuery || filterStatus !== 'all' || showFavoritesOnly ? (
-          <AlertCircle className="text-purple-600" size={48} />
-        ) : (
-          <Bookmark className="text-purple-600" size={48} />
-        )}
-      </motion.div>
-
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">
-        {searchQuery || filterStatus !== 'all' || showFavoritesOnly
-          ? 'No Trips Found'
-          : 'No Saved Trips Yet'}
+      <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+        {isFiltered ? <AlertCircle className="text-gray-400" size={32} /> : <Bookmark className="text-gray-400" size={32} />}
+      </div>
+      <h2 className="text-2xl font-black text-gray-950 mb-2">
+        {isFiltered ? 'No trips found' : 'No saved trips yet'}
       </h2>
-
-      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+      <p className="text-gray-500 mb-8 max-w-sm mx-auto">
         {searchQuery
-          ? 'Try adjusting your search terms or filters'
+          ? `No results for "${searchQuery}"`
           : filterStatus !== 'all'
-          ? `No trips with status: ${filterStatus}`
+          ? `No ${filterStatus} trips`
           : showFavoritesOnly
-          ? 'No favorite trips yet. Add some favorites!'
-          : 'Start planning your first adventure and save it here!'}
+          ? 'No favorites yet — heart a trip to save it here'
+          : 'Search for an event above to start planning'}
       </p>
-
       <Link href="/">
-        <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-xl">
-          <Plus size={20} className="mr-2" />
+        <button className="flex items-center gap-2 bg-gray-950 text-white font-bold px-6 py-3.5 rounded-2xl hover:bg-gray-800 transition-colors mx-auto">
+          <Plus size={18} />
           Plan Your First Trip
-        </Button>
+        </button>
       </Link>
     </motion.div>
   );
 }
 
-// ==================== DEMO DATA ====================
+// ==================== DEMO DATA (event-centric) ====================
 
 function getDemoTrips(): SavedTrip[] {
   return [
     {
       id: '1',
-      destination: 'Paris',
-      country: 'France',
-      startDate: '2025-06-15',
-      endDate: '2025-06-22',
-      createdAt: '2025-01-10T10:00:00Z',
+      destination: 'New York',
+      country: 'United States',
+      eventName: 'FIFA World Cup 2026 — Final',
+      eventType: 'sports',
+      eventDate: '2026-07-19',
+      venue: 'MetLife Stadium',
+      startDate: '2026-07-17',
+      endDate: '2026-07-21',
+      createdAt: new Date().toISOString(),
       budget: 'Luxury',
       travelers: 2,
       status: 'planning',
-      image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800',
-      items: { hotels: 2, flights: 1, activities: 5, restaurants: 3 },
-      estimatedTotal: 5400,
-      tags: ['Romantic', 'Culture', 'Food'],
+      image: 'https://images.unsplash.com/photo-1508098682722-e99c643e7f0b?w=800',
+      items: { hotels: 1, flights: 1, activities: 3, restaurants: 2 },
+      estimatedTotal: 4200,
+      currency: 'USD',
+      tags: ['World Cup', 'Football', 'NYC'],
       isFavorite: true,
     },
     {
       id: '2',
-      destination: 'Tokyo',
-      country: 'Japan',
-      startDate: '2025-08-01',
-      endDate: '2025-08-10',
-      createdAt: '2025-01-12T14:30:00Z',
+      destination: 'Los Angeles',
+      country: 'United States',
+      eventName: 'Coachella Valley Music Festival',
+      eventType: 'music',
+      eventDate: '2026-04-11',
+      venue: 'Empire Polo Club',
+      startDate: '2026-04-10',
+      endDate: '2026-04-14',
+      createdAt: new Date().toISOString(),
       budget: 'Mid-range',
-      travelers: 1,
+      travelers: 3,
       status: 'planning',
-      image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=800',
-      items: { hotels: 1, flights: 1, activities: 8, restaurants: 4 },
-      estimatedTotal: 3200,
-      tags: ['Solo', 'Adventure', 'Culture'],
+      image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800',
+      items: { hotels: 1, flights: 1, activities: 5, restaurants: 4 },
+      estimatedTotal: 2800,
+      currency: 'USD',
+      tags: ['Music', 'Festival', 'LA'],
     },
     {
       id: '3',
-      destination: 'Dubai',
-      country: 'UAE',
-      startDate: '2025-03-10',
-      endDate: '2025-03-17',
-      createdAt: '2025-01-08T09:15:00Z',
-      budget: 'Luxury',
-      travelers: 4,
+      destination: 'Rio de Janeiro',
+      country: 'Brazil',
+      eventName: 'Rio Carnival 2026',
+      eventType: 'festivals',
+      eventDate: '2026-02-16',
+      venue: 'Sambadrome Marquês de Sapucaí',
+      startDate: '2026-02-14',
+      endDate: '2026-02-22',
+      createdAt: new Date().toISOString(),
+      budget: 'Mid-range',
+      travelers: 2,
       status: 'booked',
-      image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=800',
+      image: 'https://images.unsplash.com/photo-1518391846015-55a9cc003b25?w=800',
       items: { hotels: 1, flights: 1, activities: 6, restaurants: 5 },
-      estimatedTotal: 8900,
-      tags: ['Family', 'Luxury', 'Shopping'],
-      isFavorite: false,
+      estimatedTotal: 3500,
+      currency: 'USD',
+      tags: ['Carnival', 'Culture', 'Brazil'],
+      isFavorite: true,
     },
   ];
 }

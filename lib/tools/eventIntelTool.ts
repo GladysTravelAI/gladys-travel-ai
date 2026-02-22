@@ -1,8 +1,9 @@
 // lib/tools/eventIntelTool.ts
 // 🎫 EVENT INTELLIGENCE TOOL
-// Searches internal events + Ticketmaster
+// Searches: new registry (UniversalEvent) + old eventService + Ticketmaster
 
 import { getAllEvents } from '@/lib/eventService';
+import { searchEvents as registrySearch } from '@/lib/data/eventRegistry';
 import { searchTicketmasterEvents } from '@/lib/ticketmasterService';
 
 export const eventIntelToolDefinition = {
@@ -39,62 +40,82 @@ export async function executeEventSearch(args: {
 }) {
   try {
     const { query, city } = args;
-    
-    // LAYER 1: Internal structured events
-    let internalEvents = getAllEvents().filter(e =>
+
+    // LAYER 1: New UniversalEvent registry (World Cup, etc.)
+    const registryEvents = registrySearch(query).map(e => ({
+      id: e.event_id,
+      name: e.name,
+      type: e.category,
+      date: e.start_date,
+      end_date: e.end_date,
+      venue: e.multi_city ? 'Multiple Venues' : (e.venues[0]?.name || e.cities[0]?.name),
+      city: e.multi_city ? 'Multiple Cities' : e.cities[0]?.name,
+      country: e.multi_city ? 'Multiple Countries' : e.cities[0]?.country,
+      multi_city: e.multi_city,
+      source: 'registry'
+    }));
+
+    // LAYER 2: Old internal event service
+    let legacyEvents = getAllEvents().filter(e =>
       e.name.toLowerCase().includes(query.toLowerCase()) ||
       e.location.city.toLowerCase().includes(query.toLowerCase())
     );
-    
+
     if (city) {
-      internalEvents = internalEvents.filter(e =>
+      legacyEvents = legacyEvents.filter(e =>
         e.location.city.toLowerCase().includes(city.toLowerCase())
       );
     }
-    
-    // LAYER 2: Ticketmaster fallback
+
+    const formattedLegacy = legacyEvents.map(e => ({
+      id: e.id,
+      name: e.name,
+      type: e.type,
+      date: e.startDate,
+      venue: e.location.venue || e.location.city,
+      city: e.location.city,
+      country: e.location.country,
+      price_range: e.priceRange,
+      image: e.heroImage,
+      multi_city: false,
+      source: 'internal'
+    }));
+
+    // Deduplicate — registry takes priority over legacy for same event
+    const registryIds = new Set(registryEvents.map(e => e.id));
+    const dedupedLegacy = formattedLegacy.filter(e => !registryIds.has(e.id));
+
+    const combinedInternal = [...registryEvents, ...dedupedLegacy];
+
+    // LAYER 3: Ticketmaster fallback if no internal results
     let externalEvents: any[] = [];
-    if (internalEvents.length === 0) {
+    if (combinedInternal.length === 0) {
       try {
-        externalEvents = await searchTicketmasterEvents(query, city);
+        const tmResults = await searchTicketmasterEvents(query, city);
+        externalEvents = tmResults.map(e => ({
+          id: e.id,
+          name: e.name,
+          type: e.type,
+          date: e.startDate,
+          venue: e.location.venue || e.location.city,
+          city: e.location.city,
+          country: e.location.country,
+          price_range: e.priceRange,
+          image: e.heroImage,
+          multi_city: false,
+          source: 'ticketmaster'
+        }));
       } catch (error) {
         console.warn('Ticketmaster search failed:', error);
       }
     }
-    
-    // Merge and format
-    const allEvents = [
-      ...internalEvents.map(e => ({
-        id: e.id,
-        name: e.name,
-        type: e.type,
-        date: e.startDate,
-        venue: e.location.venue || e.location.city,
-        city: e.location.city,
-        country: e.location.country,
-        price_range: e.priceRange,
-        image: e.heroImage,
-        source: 'internal'
-      })),
-      ...externalEvents.map(e => ({
-        id: e.id,
-        name: e.name,
-        type: e.type,
-        date: e.startDate,
-        venue: e.location.venue || e.location.city,
-        city: e.location.city,
-        country: e.location.country,
-        price_range: e.priceRange,
-        image: e.heroImage,
-        source: 'ticketmaster'
-      }))
-    ];
-    
-    // Sort by date, limit to 10
+
+    const allEvents = [...combinedInternal, ...externalEvents];
+
     return allEvents
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 10);
-    
+
   } catch (error) {
     console.error('Event search failed:', error);
     return [];
