@@ -29,7 +29,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-// ==================== COMPONENTS ====================
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EventsBanner from '@/components/EventsBanner';
@@ -48,12 +47,10 @@ import SavedTrips from "@/components/SavedTrips";
 import GladysChat from "@/components/GladysChat";
 import CityPicker from "@/components/CityPicker";
 
-// ==================== LIB IMPORTS ====================
 import { ItineraryData } from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
 import { useAuth } from "@/lib/AuthContext";
 
-// ==================== UI COMPONENTS ====================
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -76,11 +73,11 @@ interface SavedItem {
 
 interface AgentResponse {
   intent: 'event_trip' | 'destination_trip' | 'information_only' | 'city_selection_required';
-  destination: {
+  destination?: {
     city: string | null;
     country: string | null;
   };
-  event: {
+  event?: {
     name: string | null;
     type: 'sports' | 'music' | 'festival' | 'conference' | 'other' | null;
     date: string | null;
@@ -103,7 +100,6 @@ interface AgentResponse {
     esim: boolean;
   };
   message: string;
-  // From logic engine — real computed numbers
   budget?: {
     accommodation: number;
     transport: number;
@@ -126,7 +122,6 @@ interface AgentResponse {
       label: string;
     }>;
   };
-  // City selection fields — present when intent === 'city_selection_required'
   event_id?: string;
   event_name?: string;
   cities?: Array<{
@@ -192,18 +187,30 @@ const EVENT_TYPES: EventTypeConfig[] = [
   }
 ];
 
-// ==================== ITINERARY BUILDER ====================
-
 // ==================== BUDGET HELPERS ====================
 
 function fmt(amount: number, currency = 'USD'): string {
   return `${currency} ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
-function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | null, endDate?: Date | null): ItineraryData {
-  const totalDays = agentResponse.itinerary.length;
+// ==================== ITINERARY BUILDER ====================
 
-  // ---- Dates: prefer travel_dates from logic engine, then user input, then derive from event date ----
+function buildEventItinerary(
+  agentResponse: AgentResponse,
+  startDate?: Date | null,
+  endDate?: Date | null
+): ItineraryData {
+  const totalDays = agentResponse.itinerary?.length || 0;
+  if (totalDays === 0) {
+    return {
+      overview: '',
+      tripSummary: { totalDays: 0, cities: [] },
+      budget: { totalBudget: '', dailyAverage: '' },
+      days: []
+    };
+  }
+
+  // ---- Dates ----
   let dates: string[] = [];
   const daySlots = agentResponse.travel_dates?.day_slots;
 
@@ -217,7 +224,9 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
     }
   } else {
     const eventDay = Math.ceil(totalDays / 2);
-    const base = agentResponse.event.date ? new Date(agentResponse.event.date) : new Date();
+    const base = agentResponse.event?.date
+      ? new Date(agentResponse.event.date)
+      : new Date();
     base.setDate(base.getDate() - (eventDay - 1));
     for (let i = 0; i < totalDays; i++) {
       const d = new Date(base);
@@ -233,17 +242,17 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
   const eventDayNumber = eventDayIndex >= 0 ? eventDayIndex + 1 : Math.ceil(totalDays / 2);
 
   // ---- Event type mapping ----
-  let mappedEventType: 'sports' | 'music' | 'festivals';
-  if (agentResponse.event.type === 'festival') mappedEventType = 'festivals';
-  else if (agentResponse.event.type === 'sports' || agentResponse.event.type === 'music') mappedEventType = agentResponse.event.type;
-  else mappedEventType = 'festivals';
+  let mappedEventType: 'sports' | 'music' | 'festivals' = 'festivals';
+  const evType = agentResponse.event?.type;
+  if (evType === 'festival') mappedEventType = 'festivals';
+  else if (evType === 'sports' || evType === 'music') mappedEventType = evType;
 
-  // ---- Budget: use real numbers from logic engine, fall back gracefully ----
+  // ---- Budget ----
   const b = agentResponse.budget;
   const cur = b?.currency || 'USD';
 
   const budgetData: ItineraryData['budget'] = b ? {
-    totalBudget: fmt(b.total, cur),
+    totalBudget:  fmt(b.total, cur),
     dailyAverage: fmt(b.per_day_average, cur),
     eventDayCost: fmt(b.event_tickets + b.per_day_average, cur),
     breakdown: {
@@ -266,27 +275,33 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
     }
   };
 
-  // ---- Per-slot cost splits (proportional from real budget) ----
+  // ---- Per-slot cost splits ----
   const dailyAmt   = b?.per_day_average || 370;
   const mornCost   = Math.round(dailyAmt * 0.15);
   const aftnCost   = Math.round(dailyAmt * 0.25);
   const eveCost    = Math.round(dailyAmt * 0.35);
   const ticketCost = b?.event_tickets || 400;
 
+  const city    = agentResponse.destination?.city || '';
+  const country = agentResponse.destination?.country || '';
+  const evName  = agentResponse.event?.name || 'Featured Event';
+  const evDate  = agentResponse.event?.date || dates[eventDayNumber - 1] || '';
+  const evVenue = agentResponse.event?.venue || 'Event Venue';
+
   return {
-    overview: `A perfectly structured ${mappedEventType}-centered trip designed around ${agentResponse.event.name || 'your main event'}, with pre and post exploration days.`,
+    overview: `A perfectly structured ${mappedEventType}-centered trip designed around ${evName}, with pre and post exploration days.`,
     eventAnchor: {
-      eventName: agentResponse.event.name || 'Featured Event',
+      eventName: evName,
       eventType: mappedEventType,
-      eventDate: agentResponse.event.date || dates[eventDayNumber - 1] || '',
+      eventDate: evDate,
       eventDay:  eventDayNumber,
-      venue:     agentResponse.event.venue || 'Event Venue',
-      city:      agentResponse.destination.city || '',
-      country:   agentResponse.destination.country || '',
+      venue:     evVenue,
+      city,
+      country,
     },
     tripSummary: {
       totalDays,
-      cities:    [agentResponse.destination.city || ''],
+      cities:    [city],
       highlights: agentResponse.itinerary.map(d => d.title),
       eventPhases: {
         preEvent:  eventDayNumber - 1,
@@ -297,9 +312,9 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
     budget: budgetData,
     days: agentResponse.itinerary.map((day, idx) => {
       const isEventDay = (idx + 1) === eventDayNumber;
-      const slotLabel  = daySlots?.[idx]?.label || (isEventDay ? 'Event Day' : idx < eventDayNumber - 1 ? 'Pre-Event Day' : 'Post-Event Day');
-      const activities = day.activities;
-      const city       = agentResponse.destination.city || '';
+      const slotLabel  = daySlots?.[idx]?.label
+        || (isEventDay ? 'Event Day' : idx < eventDayNumber - 1 ? 'Pre-Event Day' : 'Post-Event Day');
+      const activities = day.activities || [];
 
       return {
         day:        day.day,
@@ -317,14 +332,14 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
         afternoon: {
           time:       '1:00 PM - 5:00 PM',
           activities: activities[1] || (isEventDay ? 'Pre-match build-up and fan zone' : 'Afternoon exploration'),
-          location:   isEventDay ? (agentResponse.event.venue || city) : city,
+          location:   isEventDay ? (evVenue || city) : city,
           cost:       fmt(aftnCost, cur),
         },
         evening: {
-          time:        isEventDay ? '6:00 PM - 11:00 PM' : '6:00 PM - 9:00 PM',
-          activities:  activities[2] || (isEventDay ? `Attend ${agentResponse.event.name || 'the event'}` : 'Evening activities'),
-          location:    isEventDay ? (agentResponse.event.venue || city) : city,
-          cost:        fmt(isEventDay ? ticketCost : eveCost, cur),
+          time:         isEventDay ? '6:00 PM - 11:00 PM' : '6:00 PM - 9:00 PM',
+          activities:   activities[2] || (isEventDay ? `Attend ${evName}` : 'Evening activities'),
+          location:     isEventDay ? (evVenue || city) : city,
+          cost:         fmt(isEventDay ? ticketCost : eveCost, cur),
           isEventBlock: isEventDay,
           ...(isEventDay && {
             eventDetails: {
@@ -345,64 +360,56 @@ function buildEventItinerary(agentResponse: AgentResponse, startDate?: Date | nu
 export default function HomeClient() {
   const router = useRouter();
   const { user, userProfile, updateUserProfile } = useAuth();
-  
-  // ==================== CORE STATE ====================
-  
+
   const [eventType, setEventType] = useState<EventType>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [origin, setOrigin] = useState("Johannesburg, South Africa");
-  
+
   const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [activeTab, setActiveTab] = useState("itinerary");
   const [isListening, setIsListening] = useState(false);
-  
+
   const [showRefinement, setShowRefinement] = useState(false);
   const [showTripSummary, setShowTripSummary] = useState(false);
   const [showMaps, setShowMaps] = useState(false);
   const [showWeather, setShowWeather] = useState(false);
   const [showVoicePlanner, setShowVoicePlanner] = useState(false);
   const [showSavedTrips, setShowSavedTrips] = useState(false);
-  
+
   const [tripPreferences, setTripPreferences] = useState<TripPreferences | null>(null);
-  
+
   const [savedItems, setSavedItems] = useState<{
     hotels: SavedItem[];
     flights: SavedItem[];
     restaurants: SavedItem[];
     activities: SavedItem[];
-  }>({
-    hotels: [],
-    flights: [],
-    restaurants: [],
-    activities: []
-  });
+  }>({ hotels: [], flights: [], restaurants: [], activities: [] });
 
   const [currentWeather, setCurrentWeather] = useState<any>(null);
 
-  // ==================== COMPUTED VALUES ====================
-  
+  // ==================== COMPUTED ====================
+
   const currentEventConfig = EVENT_TYPES.find(e => e.id === eventType);
   const searchPlaceholder = currentEventConfig?.placeholder || "Select an event type above to get started";
   const totalSavedItems = Object.values(savedItems).reduce((sum, items) => sum + items.length, 0);
   const destination = agentResponse?.destination?.city || "";
-  const itineraryData: ItineraryData | null = agentResponse && agentResponse.intent !== 'city_selection_required'
-    ? buildEventItinerary(agentResponse, startDate, endDate)
-    : null;
+  const itineraryData: ItineraryData | null =
+    agentResponse && agentResponse.intent !== 'city_selection_required'
+      ? buildEventItinerary(agentResponse, startDate, endDate)
+      : null;
 
   // ==================== HANDLERS ====================
-  
+
   const handleEventTypeSelect = (type: EventType) => {
     setEventType(type);
     setSearchQuery("");
     setAgentResponse(null);
-    if (user) {
-      profileManager.trackTripPlanned(user.uid, `Event Type: ${type}`).catch(console.error);
-    }
+    if (user) profileManager.trackTripPlanned(user.uid, `Event Type: ${type}`).catch(console.error);
   };
 
   const handleSaveItem = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
@@ -421,17 +428,14 @@ export default function HomeClient() {
 
     setSavedItems(prev => {
       const typeKey = `${type}s` as keyof typeof prev;
-      const currentItems = prev[typeKey] || [];
-      const exists = currentItems.some(i => i.id === savedItem.id);
+      const current = prev[typeKey] || [];
+      const exists = current.some(i => i.id === savedItem.id);
       if (exists) {
         toast.success('Removed from trip');
-        return { ...prev, [typeKey]: currentItems.filter(i => i.id !== savedItem.id) };
-      } else {
-        toast.success('Saved to trip!', {
-          action: { label: 'View', onClick: () => setShowTripSummary(true) },
-        });
-        return { ...prev, [typeKey]: [...currentItems, savedItem] };
+        return { ...prev, [typeKey]: current.filter(i => i.id !== savedItem.id) };
       }
+      toast.success('Saved to trip!', { action: { label: 'View', onClick: () => setShowTripSummary(true) } });
+      return { ...prev, [typeKey]: [...current, savedItem] };
     });
 
     if (user) {
@@ -448,14 +452,12 @@ export default function HomeClient() {
   const handleRemoveItem = (type: string, id: string) => {
     setSavedItems(prev => {
       const typeKey = (type + 's') as keyof typeof prev;
-      const currentItems = prev[typeKey] || [];
-      return { ...prev, [typeKey]: currentItems.filter((item: SavedItem) => item.id !== id) };
+      return { ...prev, [typeKey]: (prev[typeKey] || []).filter((i: SavedItem) => i.id !== id) };
     });
     toast.success('Item removed');
   };
 
-  // ==================== CITY SELECTION HANDLER ====================
-  // Fires when user picks a city + match date from CityPicker
+  // ==================== CITY SELECTION ====================
 
   const handleCitySelect = async (params: {
     selected_event_id: string;
@@ -486,11 +488,7 @@ export default function HomeClient() {
 
       setAgentResponse(result.data);
       toast.success('Your trip is ready!', { id: loadingToast });
-
-      setTimeout(() => {
-        document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
-      }, 300);
-
+      setTimeout(() => document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' }), 300);
     } catch (err: any) {
       setError(err.message || 'Failed to build trip');
       toast.error('Failed to build trip', { id: loadingToast, description: err.message });
@@ -500,26 +498,18 @@ export default function HomeClient() {
   };
 
   // ==================== MAIN SEARCH ====================
-  
+
   const handleSearch = async (query?: string, preferences?: TripPreferences) => {
     const location = query || searchQuery;
-    
-    if (!location.trim()) {
-      toast.error('Please enter an event or destination');
-      return;
-    }
 
-    if (!eventType) {
-      toast.error('Please select an event type first');
-      return;
-    }
+    if (!location.trim()) { toast.error('Please enter an event or destination'); return; }
+    if (!eventType)        { toast.error('Please select an event type first');    return; }
 
     const prefs = preferences || tripPreferences;
     setLoading(true);
     setError(null);
-    
     const loadingToast = toast.loading(`Finding the best ${eventType} travel options...`);
-    
+
     try {
       const response = await fetch('/api/agent', {
         method: 'POST',
@@ -540,7 +530,6 @@ export default function HomeClient() {
       });
 
       if (!response.ok) throw new Error('Agent request failed');
-
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Agent processing failed');
 
@@ -559,7 +548,6 @@ export default function HomeClient() {
         }
       }
 
-      // Different toast for city selection vs full trip
       if (agentData.intent === 'city_selection_required') {
         toast.success(`${agentData.event_name} — pick your city`, {
           id: loadingToast,
@@ -572,17 +560,11 @@ export default function HomeClient() {
         });
       }
 
-      setTimeout(() => {
-        document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
-      }, 500);
-      
+      setTimeout(() => document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' }), 500);
     } catch (err: any) {
       console.error('Search error:', err);
       setError(err.message || 'Search failed. Please try again.');
-      toast.error('Search failed', {
-        id: loadingToast,
-        description: err.message || 'Please try again'
-      });
+      toast.error('Search failed', { id: loadingToast, description: err.message || 'Please try again' });
     } finally {
       setLoading(false);
     }
@@ -600,21 +582,20 @@ export default function HomeClient() {
   };
 
   // ==================== RENDER ====================
-  
+
   return (
     <main className="min-h-screen bg-white">
       <Navbar />
 
-      {/* ==================== HERO SECTION ==================== */}
+      {/* ==================== HERO ==================== */}
       <section className="relative min-h-[90vh] flex items-center justify-center px-6 pt-32 pb-24">
-        
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-3xl opacity-40"></div>
-          <div className="absolute bottom-1/3 right-1/4 w-[500px] h-[500px] bg-purple-50 rounded-full blur-3xl opacity-40"></div>
+          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-3xl opacity-40" />
+          <div className="absolute bottom-1/3 right-1/4 w-[500px] h-[500px] bg-purple-50 rounded-full blur-3xl opacity-40" />
         </div>
-        
+
         <div className="max-w-5xl mx-auto text-center w-full space-y-16 relative z-10">
-          
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -625,7 +606,7 @@ export default function HomeClient() {
               <Sparkles className="text-blue-600" size={16} />
               <span className="text-sm font-semibold text-blue-600">Powered by AI Event Intelligence</span>
             </div>
-            
+
             <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-gray-900 leading-[1.05]">
               You pick the event.
               <br />
@@ -633,54 +614,47 @@ export default function HomeClient() {
                 We build the trip.
               </span>
             </h1>
-            
+
             <p className="text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               The global intelligence layer for event travel. One search finds your tickets, flights, hotels, and complete itinerary.
             </p>
           </motion.div>
 
+          {/* Event type selector */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
             className="max-w-2xl mx-auto space-y-4"
           >
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-              Select Event Type
-            </p>
-            
+            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Select Event Type</p>
+
             <div className="grid grid-cols-3 gap-3">
               {EVENT_TYPES.map((type) => {
                 const Icon = type.icon;
                 const isSelected = eventType === type.id;
-                
                 return (
                   <button
                     key={type.id}
                     onClick={() => handleEventTypeSelect(type.id)}
-                    className={`
-                      relative p-6 rounded-2xl border-2 transition-all duration-300
-                      ${isSelected 
-                        ? `${type.bgColor} border-current shadow-xl scale-[1.02]` 
+                    className={`relative p-6 rounded-2xl border-2 transition-all duration-300 ${
+                      isSelected
+                        ? `${type.bgColor} border-current shadow-xl scale-[1.02]`
                         : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'
-                      }
-                    `}
+                    }`}
                   >
                     <div className="flex flex-col items-center gap-3">
-                      <div className={`
-                        w-14 h-14 rounded-xl flex items-center justify-center transition-all
-                        ${isSelected 
-                          ? `bg-gradient-to-br ${type.gradient} text-white shadow-lg` 
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${
+                        isSelected
+                          ? `bg-gradient-to-br ${type.gradient} text-white shadow-lg`
                           : 'bg-gray-50 text-gray-400'
-                        }
-                      `}>
+                      }`}>
                         <Icon size={26} />
                       </div>
                       <span className={`font-semibold text-base ${isSelected ? type.color : 'text-gray-700'}`}>
                         {type.label}
                       </span>
                     </div>
-                    
                     {isSelected && (
                       <motion.div
                         layoutId="selected-event"
@@ -694,6 +668,7 @@ export default function HomeClient() {
             </div>
           </motion.div>
 
+          {/* Search */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -702,34 +677,28 @@ export default function HomeClient() {
           >
             <div className="relative group">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={24} />
-              <Input 
+              <Input
                 placeholder={searchPlaceholder}
-                value={searchQuery} 
+                value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && eventType && handleSearch()}
                 disabled={!eventType}
-                className={`
-                  w-full h-20 pl-16 pr-24 text-lg font-medium rounded-3xl border-2 
-                  bg-white shadow-xl transition-all
-                  ${!eventType 
-                    ? 'border-gray-200 opacity-60 cursor-not-allowed' 
+                className={`w-full h-20 pl-16 pr-24 text-lg font-medium rounded-3xl border-2 bg-white shadow-xl transition-all ${
+                  !eventType
+                    ? 'border-gray-200 opacity-60 cursor-not-allowed'
                     : 'border-gray-300 hover:border-gray-400 focus:border-blue-600 focus:shadow-2xl'
-                  }
-                `}
+                }`}
               />
-              <button 
-                onClick={toggleVoiceInput} 
+              <button
+                onClick={toggleVoiceInput}
                 disabled={!eventType}
-                className={`
-                  absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl 
-                  flex items-center justify-center transition-all
-                  ${isListening 
-                    ? 'bg-blue-600 text-white shadow-lg' 
+                className={`absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
+                  isListening
+                    ? 'bg-blue-600 text-white shadow-lg'
                     : !eventType
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'hover:bg-gray-100 text-gray-600'
-                  }
-                `}
+                }`}
               >
                 {isListening ? <MicOff size={22} /> : <Mic size={22} />}
               </button>
@@ -764,8 +733,8 @@ export default function HomeClient() {
               )}
             </AnimatePresence>
 
-            <button 
-              onClick={() => handleSearch()} 
+            <button
+              onClick={() => handleSearch()}
               disabled={!searchQuery.trim() || !eventType || loading}
               className="w-full h-16 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-3xl text-lg transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400"
             >
@@ -781,12 +750,10 @@ export default function HomeClient() {
 
             <div className="flex gap-2 pt-2">
               <Button onClick={() => setShowVoicePlanner(true)} variant="ghost" size="sm" className="flex-1 text-gray-600">
-                <Mic size={16} className="mr-2" />
-                Voice Planner
+                <Mic size={16} className="mr-2" />Voice Planner
               </Button>
               <Button onClick={() => setShowSavedTrips(true)} variant="ghost" size="sm" className="flex-1 text-gray-600">
-                <Bookmark size={16} className="mr-2" />
-                Saved Trips
+                <Bookmark size={16} className="mr-2" />Saved Trips
               </Button>
               <Button onClick={() => router.push('/settings')} variant="ghost" size="sm" className="text-gray-600">
                 <Settings size={16} />
@@ -794,12 +761,7 @@ export default function HomeClient() {
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className="pt-12"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="pt-12">
             <ChevronDown className="w-6 h-6 text-gray-300 animate-bounce mx-auto" />
           </motion.div>
         </div>
@@ -810,10 +772,10 @@ export default function HomeClient() {
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-4 gap-8">
             {[
-              { icon: Shield, title: 'Secure Booking', sub: 'Bank-level encryption' },
-              { icon: Ticket, title: 'Official Sources', sub: 'Ticketmaster, StubHub verified' },
+              { icon: Shield,       title: 'Secure Booking',          sub: 'Bank-level encryption' },
+              { icon: Ticket,       title: 'Official Sources',         sub: 'Ticketmaster, StubHub verified' },
               { icon: CheckCircle2, title: 'Powered by TravelPayouts', sub: 'Trusted travel partners' },
-              { icon: Sparkles, title: 'AI-Optimized', sub: 'Smart event logistics' },
+              { icon: Sparkles,     title: 'AI-Optimized',             sub: 'Smart event logistics' },
             ].map(({ icon: Icon, title, sub }, idx) => (
               <div key={idx} className="text-center">
                 <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -827,7 +789,6 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ==================== FEATURED EVENTS ==================== */}
       <EventsBanner />
 
       {/* ==================== HOW IT WORKS ==================== */}
@@ -839,9 +800,9 @@ export default function HomeClient() {
           </div>
           <div className="grid md:grid-cols-3 gap-12">
             {[
-              { step: "1", title: "Pick your event", desc: "Tell us what you're going to—sports, music, or festivals." },
+              { step: "1", title: "Pick your event",      desc: "Tell us what you're going to—sports, music, or festivals." },
               { step: "2", title: "AI builds your stack", desc: "We find tickets, flights, hotels, and create your complete itinerary." },
-              { step: "3", title: "Book everything", desc: "Secure booking through our trusted partners. One trip, fully orchestrated." }
+              { step: "3", title: "Book everything",      desc: "Secure booking through our trusted partners. One trip, fully orchestrated." }
             ].map((item, idx) => (
               <motion.div
                 key={idx}
@@ -862,86 +823,71 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ==================== RESULTS SECTION ==================== */}
+      {/* ==================== RESULTS ==================== */}
       {(agentResponse || loading) && (
         <section id="results-section" className="px-6 py-20 bg-gray-50">
           <div className="max-w-7xl mx-auto">
-            
-            {/* Loading State */}
+
             {loading && (
               <div className="text-center py-32">
                 <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-6" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">
                   {agentResponse?.intent === 'city_selection_required'
                     ? 'Building your trip...'
-                    : `AI is orchestrating your ${eventType} trip...`
-                  }
+                    : `AI is orchestrating your ${eventType} trip...`}
                 </h3>
                 <p className="text-gray-600">Finding tickets, flights, hotels, and building your itinerary</p>
               </div>
             )}
 
-            {/* Results */}
             {!loading && agentResponse && (
               <>
-                {/* ---- CITY SELECTION (multi-city events like World Cup) ---- */}
+                {/* City picker */}
                 {agentResponse.intent === 'city_selection_required' && agentResponse.cities ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="py-8"
-                  >
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="py-8">
                     <CityPicker
                       eventId={agentResponse.event_id!}
-                      eventName={agentResponse.event_name || agentResponse.event.name || 'Event'}
+                      eventName={agentResponse.event_name || agentResponse.event?.name || 'Event'}
                       cities={agentResponse.cities}
                       onSelect={handleCitySelect}
                     />
                   </motion.div>
 
                 ) : (
-                  // ---- FULL TRIP RESULTS ----
                   <>
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mb-8"
-                    >
+                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
                       <div className="flex items-start justify-between mb-6">
                         <div>
                           <h2 className="text-4xl font-bold text-gray-900 mb-2">
-                            {agentResponse.event.name || `Your ${currentEventConfig?.label} Trip`}
+                            {agentResponse.event?.name || `Your ${currentEventConfig?.label} Trip`}
                           </h2>
                           <p className="text-gray-600 text-lg">
                             {destination}
                             {startDate && endDate && ` • ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`}
                           </p>
                         </div>
-                        
+
                         <div className="flex gap-3">
                           {currentWeather && (
                             <Button onClick={() => setShowWeather(true)} variant="outline" size="sm">
-                              <CloudRain size={16} className="mr-2" />
-                              {currentWeather.temp}°
+                              <CloudRain size={16} className="mr-2" />{currentWeather.temp}°
                             </Button>
                           )}
                           <Button onClick={() => setShowMaps(true)} variant="outline" size="sm">
-                            <MapPin size={16} className="mr-2" />
-                            Map
+                            <MapPin size={16} className="mr-2" />Map
                           </Button>
                           {totalSavedItems > 0 && (
                             <Button onClick={() => setShowTripSummary(true)} size="sm" className="bg-blue-600 hover:bg-blue-700">
-                              <Bookmark size={16} className="mr-2" />
-                              Trip ({totalSavedItems})
+                              <Bookmark size={16} className="mr-2" />Trip ({totalSavedItems})
                             </Button>
                           )}
                         </div>
                       </div>
 
-                      {eventType && (
+                      {eventType && currentEventConfig && (
                         <Badge variant="secondary" className="text-sm">
-                          {currentEventConfig?.icon && <currentEventConfig.icon size={14} className="mr-1" />}
-                          {currentEventConfig?.label} Event
+                          <currentEventConfig.icon size={14} className="mr-1" />
+                          {currentEventConfig.label} Event
                         </Badge>
                       )}
                     </motion.div>
@@ -949,17 +895,14 @@ export default function HomeClient() {
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                       <TabsList className="w-full justify-start mb-8 bg-white p-2 rounded-2xl shadow-sm">
                         <TabsTrigger value="itinerary" className="flex items-center gap-2">
-                          <Sparkles size={16} />
-                          Itinerary
+                          <Sparkles size={16} />Itinerary
                         </TabsTrigger>
                         <TabsTrigger value="hotels" className="flex items-center gap-2">
-                          <Hotel size={16} />
-                          Hotels
+                          <Hotel size={16} />Hotels
                           {agentResponse.hotels?.length > 0 && <Badge variant="secondary">{agentResponse.hotels.length}</Badge>}
                         </TabsTrigger>
                         <TabsTrigger value="flights" className="flex items-center gap-2">
-                          <Plane size={16} />
-                          Flights
+                          <Plane size={16} />Flights
                           {agentResponse.flights?.length > 0 && <Badge variant="secondary">{agentResponse.flights.length}</Badge>}
                         </TabsTrigger>
                       </TabsList>
@@ -968,10 +911,10 @@ export default function HomeClient() {
                         {itineraryData && <ItineraryView data={itineraryData} />}
                       </TabsContent>
                       <TabsContent value="hotels">
-                        <HotelResults hotels={agentResponse.hotels || []} onSaveItem={(hotel) => handleSaveItem(hotel, 'hotel')} loading={false} />
+                        <HotelResults hotels={agentResponse.hotels || []} onSaveItem={(h) => handleSaveItem(h, 'hotel')} loading={false} />
                       </TabsContent>
                       <TabsContent value="flights">
-                        <FlightResults flights={agentResponse.flights || []} onSaveItem={(flight) => handleSaveItem(flight, 'flight')} loading={false} />
+                        <FlightResults flights={agentResponse.flights || []} onSaveItem={(f) => handleSaveItem(f, 'flight')} loading={false} />
                       </TabsContent>
                     </Tabs>
                   </>
@@ -982,11 +925,10 @@ export default function HomeClient() {
         </section>
       )}
 
-      {/* ==================== FOOTER ==================== */}
       <Footer />
 
       {/* ==================== MODALS ==================== */}
-      
+
       {showRefinement && (
         <TripRefinementModal
           isOpen={showRefinement}
@@ -1000,8 +942,8 @@ export default function HomeClient() {
                   name: agentResponse.event.name,
                   date: agentResponse.event.date || '',
                   type: agentResponse.event.type === 'festival' ? 'festivals'
-                    : agentResponse.event.type === 'conference' ? 'other'
-                    : agentResponse.event.type || 'other',
+                      : agentResponse.event.type === 'conference' ? 'other'
+                      : agentResponse.event.type || 'other',
                 }
               : undefined
           }
