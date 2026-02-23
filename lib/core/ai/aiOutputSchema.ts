@@ -7,7 +7,7 @@ import { TripPlan, DaySlot } from '@/lib/core/engine/tripLogicEngine';
 // ==================== AI INPUT CONTRACT ====================
 
 export interface AIGenerationInput {
-  trip_plan: TripPlan;           // From logic engine — AI reads this
+  trip_plan?: TripPlan;           // From logic engine — AI reads this
   event_name: string;
   city_name: string;
   country: string;
@@ -15,6 +15,7 @@ export interface AIGenerationInput {
   event_category: string;
   day_slots: DaySlot[];          // AI uses these to structure itinerary
   budget_level: string;
+  
 }
 
 // ==================== AI OUTPUT SCHEMA ====================

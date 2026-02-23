@@ -1,36 +1,61 @@
 // app/api/agent/route.ts
 // 🤖 GLADYS AGENT - INFRASTRUCTURE GRADE
-// Orchestrates: EventRegistry → LogicEngine → AI Content → AffiliateWrapper
+// Orchestrates: EventRegistry → Ticketmaster → LogicEngine → AI Content → AffiliateWrapper
 
 import { NextRequest, NextResponse } from 'next/server';
 import { openai, OPENAI_CONFIG } from '@/lib/openai/client';
 import { buildAISystemPrompt, buildAIUserPrompt } from '@/lib/core/ai/aiOutputSchema';
 import { generateTripPlan } from '@/lib/core/engine/tripLogicEngine';
 import { buildFlightUrl, buildHotelUrl, buildESimUrl, buildInsuranceUrl, buildTransferUrl, buildAirHelpUrl } from '@/lib/core/monetization/affiliateWrapper';
-import { searchEvents, findEventById, isMultiCityEvent, getCitiesForEvent } from '@/lib/data/eventRegistry';
-import { executeEventSearch, eventIntelToolDefinition } from '@/lib/tools/eventIntelTool';
-import { executeHotelSearch, hotelSearchToolDefinition } from '@/lib/tools/travelpayoutsHotelTool';
-import { executeFlightSearch, flightSearchToolDefinition } from '@/lib/tools/travelpayoutsFlightTool';
-const TOOLS = [eventIntelToolDefinition, hotelSearchToolDefinition, flightSearchToolDefinition];
+import { searchEvents, findEventById, getCitiesForEvent } from '@/lib/data/eventRegistry';
+import { executeHotelSearch } from '@/lib/tools/travelpayoutsHotelTool';
+import { executeFlightSearch } from '@/lib/tools/travelpayoutsFlightTool';
+import { findBestEventMatch, type NormalizedEvent } from '@/lib/services/ticketmaster';
+
+// ==================== TYPES ====================
+
+type BudgetLevel = 'budget' | 'mid' | 'luxury';
+type DayType = 'arrival' | 'pre_event' | 'event_day' | 'post_event' | 'departure';
+
+// ==================== HELPERS ====================
 
 function safeJSONParse(content: string) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(content); } catch { return null; }
 }
 
-// ==================== MULTI-CITY HANDLER ====================
-// Returns city selection data instead of a full trip
-// Frontend shows city picker UI before generating trip
+function mapTMCategory(category: NormalizedEvent['category']): string {
+  if (category === 'sports')   return 'sports';
+  if (category === 'music')    return 'music';
+  if (category === 'festival') return 'festival';
+  return 'other';
+}
+
+function estimateBudget(budgetLevel: BudgetLevel) {
+  const m: Record<BudgetLevel, number> = { budget: 0.6, mid: 1, luxury: 2 };
+  const x = m[budgetLevel];
+  return {
+    accommodation:   Math.round(400 * x),
+    transport:       Math.round(350 * x),
+    food:            Math.round(200 * x),
+    event_tickets:   Math.round(300 * x),
+    activities:      Math.round(200 * x),
+    total:           Math.round(1450 * x),
+    currency:        'USD',
+    per_day_average: Math.round(290 * x),
+  };
+}
+
+function parseBudgetLevel(raw: string): BudgetLevel {
+  if (raw === 'budget' || raw === 'luxury') return raw;
+  return 'mid';
+}
+
+// ==================== CITY SELECTION RESPONSE ====================
 
 function buildCitySelectionResponse(eventId: string) {
   const event = findEventById(eventId);
   if (!event) return null;
-
   const cities = getCitiesForEvent(eventId);
-
   return {
     intent: 'city_selection_required',
     event_id: event.event_id,
@@ -58,189 +83,286 @@ function buildCitySelectionResponse(eventId: string) {
   };
 }
 
+// ==================== MAIN ROUTE ====================
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      message,
-      context,
-      // City selection params — sent after user picks a city
-      selected_event_id,
-      selected_city_id,
-      selected_match_date,
+      message, context,
+      selected_event_id, selected_city_id, selected_match_date,
       budget_level = 'mid',
-      origin_country_code,
-      user_session,
+      origin_country_code, user_session,
     } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
+    const budgetLevel: BudgetLevel = parseBudgetLevel(budget_level);
     console.log('🧠 Agent received:', message);
 
-    // =========================
-    // PHASE 0: Check if city was already selected
-    // (user came back after city picker)
-    // =========================
+    // PHASE 0: City already selected
     if (selected_event_id && selected_city_id && selected_match_date) {
-      return await buildFullTripResponse({
+      return await buildRegistryTripResponse({
         eventId: selected_event_id,
         cityId: selected_city_id,
         matchDate: selected_match_date,
-        budgetLevel: budget_level,
+        budgetLevel,
         originCountryCode: origin_country_code,
         userSession: user_session,
       });
     }
 
-    // =========================
-    // PHASE 1: Check internal event registry first
-    // =========================
+    // PHASE 1: Internal registry (World Cup, F1, etc.)
     const registryResults = searchEvents(message);
-
     if (registryResults.length > 0) {
       const event = registryResults[0];
-
-      // Multi-city event → return city picker
       if (event.multi_city) {
-        console.log('🌍 Multi-city event detected:', event.name);
-        const citySelection = buildCitySelectionResponse(event.event_id);
-        return NextResponse.json({ success: true, data: citySelection });
+        console.log('🌍 Multi-city event:', event.name);
+        return NextResponse.json({ success: true, data: buildCitySelectionResponse(event.event_id) });
       }
-
-      // Single-city event → build trip directly
       const city = event.cities[0];
-      return await buildFullTripResponse({
+      return await buildRegistryTripResponse({
         eventId: event.event_id,
         cityId: city.city_id,
         matchDate: event.start_date,
-        budgetLevel: budget_level,
+        budgetLevel,
         originCountryCode: origin_country_code,
         userSession: user_session,
       });
     }
 
-    // =========================
-    // PHASE 2: No registry match → fall back to OpenAI tool orchestration
-    // (handles Ticketmaster events, artist searches, etc.)
-    // =========================
-    console.log('📡 No registry match, using OpenAI tool orchestration');
-
-    const userPayload = `User message: ${message}\nContext: ${JSON.stringify(context || {})}\nReturn STRICT JSON only.`;
-
-    const initialCompletion = await openai.chat.completions.create({
-      ...OPENAI_CONFIG,
-      messages: [
-        { role: 'system', content: buildAISystemPrompt() },
-        { role: 'user', content: userPayload }
-      ],
-      tools: TOOLS,
-      tool_choice: 'auto'
-    });
-
-    const initialMessage = initialCompletion.choices[0].message;
-
-    if (initialMessage.tool_calls?.length) {
-      const toolResults = await Promise.all(
-        initialMessage.tool_calls.map(async (toolCall) => {
-          if (toolCall.type !== 'function') {
-            return { tool_call_id: toolCall.id, role: 'tool' as const, name: 'unknown', content: JSON.stringify({ error: 'Unsupported tool type' }) };
-          }
-
-          const functionName = toolCall.function.name;
-          const functionArgs = safeJSONParse(toolCall.function.arguments || '{}') || {};
-          let result: any = {};
-
-          try {
-            switch (functionName) {
-              case 'search_events':  result = await executeEventSearch(functionArgs); break;
-              case 'search_hotels':  result = await executeHotelSearch(functionArgs); break;
-              case 'search_flights': result = await executeFlightSearch(functionArgs); break;
-              default: result = { error: 'Unknown tool' };
-            }
-          } catch (toolError: any) {
-            console.error(`❌ Tool error (${functionName}):`, toolError);
-            result = { error: toolError.message || 'Tool execution failed' };
-          }
-
-          return { tool_call_id: toolCall.id, role: 'tool' as const, name: functionName, content: JSON.stringify(result) };
-        })
-      );
-
-      const finalCompletion = await openai.chat.completions.create({
-        ...OPENAI_CONFIG,
-        messages: [
-          { role: 'system', content: buildAISystemPrompt() },
-          { role: 'user', content: userPayload },
-          initialMessage,
-          ...toolResults
-        ],
-        response_format: { type: 'json_object' }
+    // PHASE 2: Ticketmaster — real event data for everything else
+    console.log('🎟️ Checking Ticketmaster for:', message);
+    const tmEvent = await findBestEventMatch(message);
+    if (tmEvent) {
+      console.log(`✅ TM found: ${tmEvent.name} @ ${tmEvent.venue}, ${tmEvent.city}`);
+      return await buildTicketmasterTripResponse({
+        tmEvent,
+        message,
+        budgetLevel,
+        originCountryCode: origin_country_code,
+        userSession: user_session,
+        context,
       });
-
-      const finalContent = finalCompletion.choices[0].message.content;
-      const parsedResponse = safeJSONParse(finalContent || '');
-
-      if (!parsedResponse) throw new Error('Invalid JSON from OpenAI');
-
-      return NextResponse.json({ success: true, data: parsedResponse, usage: finalCompletion.usage });
     }
 
-    // No tools needed
-    const directContent = initialMessage.content;
-    const parsedResponse = safeJSONParse(directContent || '');
-    if (!parsedResponse) throw new Error('Invalid JSON from OpenAI');
-
-    return NextResponse.json({ success: true, data: parsedResponse, usage: initialCompletion.usage });
+    // PHASE 3: Pure AI fallback
+    console.log('🤖 No event found anywhere, using AI fallback');
+    return await buildAIFallbackResponse({ message, context, budgetLevel });
 
   } catch (error: any) {
     console.error('❌ Agent error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message || 'Agent processing failed',
-        data: {
-          intent: 'information_only',
-          destination: { city: null, country: null },
-          event: { name: null, type: null, date: null, venue: null },
-          itinerary: [], hotels: [], flights: [],
-          affiliate_links: { hotel: '', flight: '', tickets: '' },
-          upsells: { insurance: false, esim: false },
-          message: 'Agent execution fallback triggered.'
-        }
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error.message || 'Agent processing failed',
+      data: {
+        intent: 'information_only',
+        destination: { city: null, country: null },
+        event: { name: null, type: null, date: null, venue: null },
+        itinerary: [], hotels: [], flights: [],
+        affiliate_links: { hotel: '', flight: '', tickets: '' },
+        upsells: { insurance: false, esim: false },
+        message: 'Agent execution fallback triggered.'
+      }
+    }, { status: 500 });
   }
 }
 
-// ==================== FULL TRIP BUILDER ====================
+// ==================== TICKETMASTER TRIP BUILDER ====================
 
-async function buildFullTripResponse({
-  eventId,
-  cityId,
-  matchDate,
-  budgetLevel,
-  originCountryCode,
-  userSession,
+async function buildTicketmasterTripResponse({
+  tmEvent, message, budgetLevel, originCountryCode, userSession, context,
+}: {
+  tmEvent: NormalizedEvent;
+  message: string;
+  budgetLevel: BudgetLevel;
+  originCountryCode?: string;
+  userSession?: string;
+  context?: any;
+}) {
+  const totalDays = context?.days || 5;
+  const budget = estimateBudget(budgetLevel);
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+
+  const eventDate = new Date(tmEvent.date);
+  const arrivalDate = new Date(eventDate);
+  arrivalDate.setDate(arrivalDate.getDate() - 2);
+  const departureDate = new Date(eventDate);
+  departureDate.setDate(departureDate.getDate() + (totalDays - 3));
+
+  // Stable event_id for affiliate tracking
+  const tmEventId = `tm-${tmEvent.id}`;
+
+  // Build day slots with strict DayType
+  const daySlots = Array.from({ length: totalDays }, (_, i) => {
+    const d = new Date(arrivalDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = fmt(d);
+    const isEvent = dateStr === tmEvent.date;
+
+    const dayType: DayType =
+      i === 0               ? 'arrival'
+      : isEvent              ? 'event_day'
+      : d < eventDate        ? 'pre_event'
+      : i === totalDays - 1  ? 'departure'
+      : 'post_event';
+
+    return {
+      date: dateStr,
+      day_type: dayType,
+      label:
+        dayType === 'event_day'    ? 'Event Day'
+        : dayType === 'arrival'    ? 'Arrival Day'
+        : dayType === 'departure'  ? 'Departure Day'
+        : dayType === 'pre_event'  ? 'Pre-Event Day'
+        : 'Post-Event Day',
+    };
+  });
+
+  const originIATA = originCountryCode === 'ZA' ? 'JNB' : (context?.origin || 'NYC');
+
+  const [hotels, flights] = await Promise.all([
+    executeHotelSearch({
+      city: tmEvent.city,
+      check_in: fmt(arrivalDate),
+      check_out: fmt(departureDate),
+      guests: context?.groupSize || 1,
+    }).catch(() => []),
+    executeFlightSearch({
+      origin: originIATA,
+      destination: tmEvent.countryCode,
+      departure_date: fmt(arrivalDate),
+      return_date: fmt(departureDate),
+    }).catch(() => []),
+  ]);
+
+  const aiCompletion = await openai.chat.completions.create({
+    ...OPENAI_CONFIG,
+    messages: [
+      { role: 'system', content: buildAISystemPrompt() },
+      {
+        role: 'user',
+        content: buildAIUserPrompt({
+          event_name: tmEvent.name,
+          city_name: tmEvent.city,
+          country: tmEvent.country,
+          event_date: tmEvent.date,
+          event_category: tmEvent.category,
+          
+          
+          
+          budget_level: budgetLevel,
+          day_slots: daySlots,
+        })
+      }
+    ],
+    response_format: { type: 'json_object' }
+  });
+
+  const aiContent = safeJSONParse(aiCompletion.choices[0].message.content || '');
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      intent: 'event_trip',
+      source: 'ticketmaster',
+      destination: { city: tmEvent.city, country: tmEvent.country },
+      event: {
+        name: tmEvent.name,
+        type: mapTMCategory(tmEvent.category),
+        date: tmEvent.date,
+        time: tmEvent.time,
+        venue: tmEvent.venue,
+        image: tmEvent.image,
+        ticketUrl: tmEvent.ticketUrl,
+        priceMin: tmEvent.priceMin,
+        priceMax: tmEvent.priceMax,
+        currency: tmEvent.currency,
+        attraction: tmEvent.attraction,
+      },
+      travel_dates: {
+        arrival_date: fmt(arrivalDate),
+        departure_date: fmt(departureDate),
+        total_nights: totalDays - 1,
+        day_slots: daySlots,
+      },
+      budget,
+      hotels,
+      flights,
+      itinerary: aiContent?.daily_itinerary || [],
+      affiliate_links: {
+        hotel: buildHotelUrl({
+          city: tmEvent.city,
+          check_in: fmt(arrivalDate),
+          check_out: fmt(departureDate),
+          event_id: tmEventId,        // ✅ required field satisfied
+          budget_level: budgetLevel,
+          user_session: userSession,
+        }).url,
+        flight: buildFlightUrl({
+          origin_iata: originIATA,
+          dest_iata: tmEvent.countryCode,
+          depart_date: fmt(arrivalDate),
+          return_date: fmt(departureDate),
+          city: tmEvent.city,
+          event_id: tmEventId,        // ✅ required field satisfied
+          budget_level: budgetLevel,
+          user_session: userSession,
+        }).url,
+        tickets: tmEvent.ticketUrl,
+      },
+      upsells: { insurance: true, esim: true },
+      message: `Your trip to ${tmEvent.name} in ${tmEvent.city} is ready.`,
+    }
+  });
+}
+
+// ==================== AI FALLBACK ====================
+
+async function buildAIFallbackResponse({
+  message, context, budgetLevel,
+}: {
+  message: string;
+  context?: any;
+  budgetLevel: BudgetLevel;
+}) {
+  const completion = await openai.chat.completions.create({
+    ...OPENAI_CONFIG,
+    messages: [
+      { role: 'system', content: buildAISystemPrompt() },
+      {
+        role: 'user',
+        content: `User message: ${message}\nContext: ${JSON.stringify(context || {})}\nReturn STRICT JSON only.`
+      }
+    ],
+    response_format: { type: 'json_object' }
+  });
+  const content = safeJSONParse(completion.choices[0].message.content || '');
+  if (!content) throw new Error('Invalid JSON from AI fallback');
+  return NextResponse.json({ success: true, data: content, usage: completion.usage });
+}
+
+// ==================== REGISTRY TRIP BUILDER ====================
+
+async function buildRegistryTripResponse({
+  eventId, cityId, matchDate, budgetLevel, originCountryCode, userSession,
 }: {
   eventId: string;
   cityId: string;
   matchDate: string;
-  budgetLevel: 'budget' | 'mid' | 'luxury';
+  budgetLevel: BudgetLevel;
   originCountryCode?: string;
   userSession?: string;
 }) {
   const event = findEventById(eventId);
   if (!event) throw new Error(`Event not found: ${eventId}`);
-
   const city = event.cities.find(c => c.city_id === cityId);
   if (!city) throw new Error(`City not found: ${cityId}`);
 
   console.log(`🏗️ Building trip: ${event.name} → ${city.name} on ${matchDate}`);
 
-  // STEP 1: Logic engine computes dates, budget, upsells
   const tripPlan = generateTripPlan({
     event,
     selected_city: city,
@@ -249,7 +371,6 @@ async function buildFullTripResponse({
     origin_country_code: originCountryCode,
   });
 
-  // STEP 2: Fetch real hotels + flights in parallel
   const [hotels, flights] = await Promise.all([
     executeHotelSearch({
       city: city.name,
@@ -265,79 +386,29 @@ async function buildFullTripResponse({
     }).catch(() => []),
   ]);
 
-  // STEP 3: AI generates content only (no prices)
-  const aiInput = {
-    trip_plan: tripPlan,
-    event_name: event.name,
-    city_name: city.name,
-    country: city.country,
-    event_date: matchDate,
-    event_category: event.category,
-    day_slots: tripPlan.travel_dates.day_slots,
-    budget_level: budgetLevel,
-  };
-
   const aiCompletion = await openai.chat.completions.create({
     ...OPENAI_CONFIG,
     messages: [
       { role: 'system', content: buildAISystemPrompt() },
-      { role: 'user', content: buildAIUserPrompt(aiInput) }
+      {
+        role: 'user',
+        content: buildAIUserPrompt({
+          trip_plan: tripPlan,
+          event_name: event.name,
+          city_name: city.name,
+          country: city.country,
+          event_date: matchDate,
+          event_category: event.category,
+          day_slots: tripPlan.travel_dates.day_slots,
+          budget_level: budgetLevel,
+        })
+      }
     ],
     response_format: { type: 'json_object' }
   });
 
   const aiContent = safeJSONParse(aiCompletion.choices[0].message.content || '');
 
-  // STEP 4: Build affiliate URLs with tracking
-  const affiliateLinks = {
-    hotel: buildHotelUrl({
-      city: city.name,
-      check_in: tripPlan.travel_dates.arrival_date,
-      check_out: tripPlan.travel_dates.departure_date,
-      event_id: eventId,
-      budget_level: budgetLevel,
-      user_session: userSession,
-    }).url,
-    flight: buildFlightUrl({
-      origin_iata: 'JNB',
-      dest_iata: city.iata_code,
-      depart_date: tripPlan.travel_dates.arrival_date,
-      return_date: tripPlan.travel_dates.departure_date,
-      event_id: eventId,
-      city: city.name,
-      budget_level: budgetLevel,
-      user_session: userSession,
-    }).url,
-    esim: tripPlan.upsells.esim ? buildESimUrl({
-      destination_country: city.country,
-      event_id: eventId,
-      city: city.name,
-      user_session: userSession,
-    }).url : null,
-    insurance: tripPlan.upsells.insurance ? buildInsuranceUrl({
-      destination: city.country,
-      start_date: tripPlan.travel_dates.arrival_date,
-      end_date: tripPlan.travel_dates.departure_date,
-      event_id: eventId,
-      city: city.name,
-      user_session: userSession,
-    }).url : null,
-    transfer: buildTransferUrl({
-      from: `${city.iata_code} Airport`,
-      to: city.name,
-      date: tripPlan.travel_dates.arrival_date,
-      event_id: eventId,
-      city: city.name,
-      user_session: userSession,
-    }).url,
-    airhelp: buildAirHelpUrl({
-      event_id: eventId,
-      city: city.name,
-      user_session: userSession,
-    }).url,
-  };
-
-  // STEP 5: Assemble final response
   return NextResponse.json({
     success: true,
     data: {
@@ -355,21 +426,67 @@ async function buildFullTripResponse({
         date: matchDate,
         venue: event.venues.find(v => v.city_id === cityId)?.name || city.name,
       },
-      // From logic engine — source of truth for all numbers
       travel_dates: tripPlan.travel_dates,
       budget: tripPlan.budget,
       upsells: tripPlan.upsells,
-      // From real APIs
       hotels,
       flights,
-      // From AI — content only
       itinerary: aiContent?.daily_itinerary || [],
       local_experiences: aiContent?.local_experiences || [],
       food_recommendations: aiContent?.food_recommendations || [],
       hidden_gems: aiContent?.hidden_gems || [],
       event_tips: aiContent?.event_tips || [],
-      // Tracked affiliate links
-      affiliate_links: affiliateLinks,
+      affiliate_links: {
+        hotel: buildHotelUrl({
+          city: city.name,
+          check_in: tripPlan.travel_dates.arrival_date,
+          check_out: tripPlan.travel_dates.departure_date,
+          event_id: eventId,
+          budget_level: budgetLevel,
+          user_session: userSession,
+        }).url,
+        flight: buildFlightUrl({
+          origin_iata: 'JNB',
+          dest_iata: city.iata_code,
+          depart_date: tripPlan.travel_dates.arrival_date,
+          return_date: tripPlan.travel_dates.departure_date,
+          event_id: eventId,
+          city: city.name,
+          budget_level: budgetLevel,
+          user_session: userSession,
+        }).url,
+        esim: tripPlan.upsells.esim
+          ? buildESimUrl({
+              destination_country: city.country,
+              event_id: eventId,
+              city: city.name,
+              user_session: userSession,
+            }).url
+          : null,
+        insurance: tripPlan.upsells.insurance
+          ? buildInsuranceUrl({
+              destination: city.country,
+              start_date: tripPlan.travel_dates.arrival_date,
+              end_date: tripPlan.travel_dates.departure_date,
+              event_id: eventId,
+              city: city.name,
+              user_session: userSession,
+            }).url
+          : null,
+        transfer: buildTransferUrl({
+          from: `${city.iata_code} Airport`,
+          to: city.name,
+          date: tripPlan.travel_dates.arrival_date,
+          event_id: eventId,
+          city: city.name,
+          user_session: userSession,
+        }).url,
+        airhelp: buildAirHelpUrl({
+          event_id: eventId,
+          city: city.name,
+          user_session: userSession,
+        }).url,
+      },
       message: `Your ${budgetLevel} trip to ${event.name} in ${city.name} is ready.`
     }
   });

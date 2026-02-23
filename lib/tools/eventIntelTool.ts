@@ -1,10 +1,9 @@
 // lib/tools/eventIntelTool.ts
 // 🎫 EVENT INTELLIGENCE TOOL
-// Searches: new registry (UniversalEvent) + old eventService + Ticketmaster
+// Searches: UniversalEvent registry + Ticketmaster (new service)
 
-import { getAllEvents } from '@/lib/eventService';
 import { searchEvents as registrySearch } from '@/lib/data/eventRegistry';
-import { searchTicketmasterEvents } from '@/lib/ticketmasterService';
+import { searchTicketmasterEvents } from '@/lib/services/ticketmaster';
 
 export const eventIntelToolDefinition = {
   type: 'function' as const,
@@ -41,7 +40,7 @@ export async function executeEventSearch(args: {
   try {
     const { query, city } = args;
 
-    // LAYER 1: New UniversalEvent registry (World Cup, etc.)
+    // LAYER 1: Internal registry (World Cup, F1, etc.) — highest priority
     const registryEvents = registrySearch(query).map(e => ({
       id: e.event_id,
       name: e.name,
@@ -52,72 +51,52 @@ export async function executeEventSearch(args: {
       city: e.multi_city ? 'Multiple Cities' : e.cities[0]?.name,
       country: e.multi_city ? 'Multiple Countries' : e.cities[0]?.country,
       multi_city: e.multi_city,
-      source: 'registry'
+      source: 'registry',
     }));
 
-    // LAYER 2: Old internal event service
-    let legacyEvents = getAllEvents().filter(e =>
-      e.name.toLowerCase().includes(query.toLowerCase()) ||
-      e.location.city.toLowerCase().includes(query.toLowerCase())
-    );
-
-    if (city) {
-      legacyEvents = legacyEvents.filter(e =>
-        e.location.city.toLowerCase().includes(city.toLowerCase())
-      );
-    }
-
-    const formattedLegacy = legacyEvents.map(e => ({
-      id: e.id,
-      name: e.name,
-      type: e.type,
-      date: e.startDate,
-      venue: e.location.venue || e.location.city,
-      city: e.location.city,
-      country: e.location.country,
-      price_range: e.priceRange,
-      image: e.heroImage,
-      multi_city: false,
-      source: 'internal'
-    }));
-
-    // Deduplicate — registry takes priority over legacy for same event
-    const registryIds = new Set(registryEvents.map(e => e.id));
-    const dedupedLegacy = formattedLegacy.filter(e => !registryIds.has(e.id));
-
-    const combinedInternal = [...registryEvents, ...dedupedLegacy];
-
-    // LAYER 3: Ticketmaster fallback if no internal results
+    // LAYER 2: Ticketmaster fallback if no registry results
     let externalEvents: any[] = [];
-    if (combinedInternal.length === 0) {
+    if (registryEvents.length === 0) {
       try {
-        const tmResults = await searchTicketmasterEvents(query, city);
+        const tmResults = await searchTicketmasterEvents({
+          keyword: query,
+          city,
+          size: 10,
+        });
+
         externalEvents = tmResults.map(e => ({
-          id: e.id,
+          id: `tm-${e.id}`,
           name: e.name,
-          type: e.type,
-          date: e.startDate,
-          venue: e.location.venue || e.location.city,
-          city: e.location.city,
-          country: e.location.country,
-          price_range: e.priceRange,
-          image: e.heroImage,
+          type: e.category,
+          date: e.date,
+          time: e.time,
+          venue: e.venue,
+          city: e.city,
+          country: e.country,
+          countryCode: e.countryCode,
+          ticketUrl: e.ticketUrl,
+          image: e.image,
+          priceMin: e.priceMin,
+          priceMax: e.priceMax,
+          currency: e.currency,
+          attraction: e.attraction,
+          status: e.status,
           multi_city: false,
-          source: 'ticketmaster'
+          source: 'ticketmaster',
         }));
       } catch (error) {
-        console.warn('Ticketmaster search failed:', error);
+        console.warn('⚠️ Ticketmaster search failed:', error);
       }
     }
 
-    const allEvents = [...combinedInternal, ...externalEvents];
+    const allEvents = [...registryEvents, ...externalEvents];
 
     return allEvents
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       .slice(0, 10);
 
   } catch (error) {
-    console.error('Event search failed:', error);
+    console.error('❌ Event search failed:', error);
     return [];
   }
 }
