@@ -159,8 +159,9 @@ export async function searchPHQEvents(params: {
 
     const today = new Date().toISOString().split('T')[0];
     return events
+      .filter(e => e.state !== 'cancelled' && e.state !== 'deleted' && e.state !== 'postponed')
       .map(normalize)
-      .filter(e => e.date >= today && e.state !== 'cancelled')
+      .filter(e => e.date >= today)
       .sort((a, b) => b.rank - a.rank); // highest impact first
 
   } catch (err) {
