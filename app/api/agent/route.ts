@@ -11,6 +11,7 @@ import { searchEvents, findEventById, getCitiesForEvent } from '@/lib/data/event
 import { executeHotelSearch } from '@/lib/tools/travelpayoutsHotelTool';
 import { executeFlightSearch } from '@/lib/tools/travelpayoutsFlightTool';
 import { findBestEventMatch, type NormalizedEvent } from '@/lib/services/ticketmaster';
+import { findBestPHQMatch } from '@/lib/services/predicthq';
 
 // ==================== TYPES ====================
 
@@ -148,7 +149,36 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // PHASE 3: Pure AI fallback
+    // PHASE 3: PredictHQ — soccer globally, African/Asian festivals, free events
+    console.log('🌍 Checking PredictHQ for:', message);
+    const phqEvent = await findBestPHQMatch(message);
+    if (phqEvent) {
+      console.log(`✅ PHQ found: ${phqEvent.name} in ${phqEvent.city}`);
+      const mappedEvent: NormalizedEvent = {
+        id: phqEvent.id,
+        name: phqEvent.name,
+        category: phqEvent.category,
+        date: phqEvent.date,
+        venue: phqEvent.venue || phqEvent.city,
+        city: phqEvent.city,
+        country: phqEvent.country,
+        countryCode: phqEvent.countryCode,
+        ticketUrl: '',
+        image: undefined,
+        status: 'onsale',
+        attraction: undefined,
+      };
+      return await buildTicketmasterTripResponse({
+        tmEvent: mappedEvent,
+        message,
+        budgetLevel,
+        originCountryCode: origin_country_code,
+        userSession: user_session,
+        context,
+      });
+    }
+
+    // PHASE 4: Pure AI fallback
     console.log('🤖 No event found anywhere, using AI fallback');
     return await buildAIFallbackResponse({ message, context, budgetLevel });
 
