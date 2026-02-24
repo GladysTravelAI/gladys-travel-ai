@@ -124,7 +124,7 @@ interface LiveEvent {
   city: string;
   country: string;
   image?: string;
-  ticketUrl: string;
+  ticketUrl?: string;
   priceMin?: number;
   priceMax?: number;
   currency?: string;
@@ -250,8 +250,9 @@ function LiveEventCard({ event, onSearch }: { event: LiveEvent; onSearch: (name:
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onSearch(event.name); }}
-          className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all"
+          className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
         >
+          <Sparkles size={14} />
           Plan This Trip
         </button>
       </div>
