@@ -14,22 +14,20 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState(0);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-
+    const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Load cart count from localStorage
   useEffect(() => {
-    const savedContext = localStorage.getItem('gladys-agent-context');
-    if (savedContext) {
-      const context = JSON.parse(savedContext);
-      setCartCount(context.savedCarts?.length || 0);
-      setNotifications(context.watchlist?.filter((w: any) => w.alertEnabled).length || 0);
-    }
+    try {
+      const savedContext = localStorage.getItem('gladys-agent-context');
+      if (savedContext) {
+        const context = JSON.parse(savedContext);
+        setCartCount(context.savedCarts?.length || 0);
+        setNotifications(context.watchlist?.filter((w: any) => w.alertEnabled).length || 0);
+      }
+    } catch {}
   }, []);
 
   return (
@@ -38,75 +36,59 @@ export default function Navbar() {
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled 
-          ? 'bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl border-b border-zinc-200/50 dark:border-zinc-700/50 shadow-lg' 
-          : 'bg-transparent'
+        scrolled
+          ? 'bg-white/90 backdrop-blur-2xl border-b border-slate-200/60 shadow-sm'
+          : 'bg-white/70 backdrop-blur-md'
       }`}
+      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo - Apple Style */}
+
+          {/* ── LOGO ── */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-11 h-11">
-              {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-400 via-rose-400 to-purple-500 opacity-60 blur-md group-hover:opacity-80 transition-opacity"></div>
-              
-              {/* Main logo */}
-              <div className="relative w-full h-full bg-gradient-to-br from-amber-500 via-rose-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                <Sparkles className="w-6 h-6 text-white" strokeWidth={2.5} />
+              <div className="absolute inset-0 rounded-full opacity-40 blur-md group-hover:opacity-60 transition-opacity" style={{ background: 'linear-gradient(135deg, #38BDF8, #0EA5E9)' }} />
+              <div className="relative w-full h-full rounded-full flex items-center justify-center shadow-md" style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+                <Sparkles className="w-5 h-5 text-white" strokeWidth={2.5} />
               </div>
             </div>
-
             <div>
-              <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-zinc-900 to-zinc-700 dark:from-white dark:to-zinc-300 bg-clip-text text-transparent group-hover:from-amber-600 group-hover:to-purple-600 transition-all">
+              <h1 className="text-xl font-black tracking-tight text-slate-900 group-hover:text-sky-600 transition-colors">
                 Gladys
               </h1>
-              <p className="text-[10px] font-semibold tracking-wider uppercase bg-gradient-to-r from-amber-600 to-purple-600 bg-clip-text text-transparent">
+              <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: '#0EA5E9' }}>
                 Travel AI
               </p>
             </div>
           </Link>
 
-          {/* Navigation Links - Hidden on mobile */}
+          {/* ── NAV LINKS ── */}
           <div className="hidden md:flex items-center gap-8">
-            <Link 
-              href="/" 
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors"
-            >
-              Home
-            </Link>
-            <Link 
-              href="/events" 
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors"
-            >
-              Explore Events
-            </Link>
-            <Link 
-              href="/trips" 
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors"
-            >
-              My Trips
-            </Link>
-            <Link 
-              href="/about" 
-              className="text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors"
-            >
-              How It Works
-            </Link>
+            {[
+              { label: 'Home', href: '/' },
+              { label: 'Explore Events', href: '/events' },
+              { label: 'My Trips', href: '/trips' },
+              { label: 'How It Works', href: '/about' },
+            ].map(l => (
+              <Link key={l.label} href={l.href}
+                className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">
+                {l.label}
+              </Link>
+            ))}
           </div>
 
-          {/* Right Side Actions */}
-          <div className="flex items-center gap-3">
-            {/* Cart Icon */}
+          {/* ── RIGHT ACTIONS ── */}
+          <div className="flex items-center gap-2">
+
+            {/* Cart */}
             {user && (
-              <Link href="/cart" className="relative p-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                <ShoppingCart size={20} className="text-zinc-700 dark:text-zinc-300" />
+              <Link href="/cart" className="relative p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                <ShoppingCart size={20} className="text-slate-600" />
                 {cartCount > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
-                  >
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs font-bold rounded-full flex items-center justify-center"
+                    style={{ background: '#0EA5E9' }}>
                     {cartCount}
                   </motion.span>
                 )}
@@ -115,142 +97,96 @@ export default function Navbar() {
 
             {/* Notifications */}
             {user && (
-              <button className="relative p-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-                <Bell size={20} className="text-zinc-700 dark:text-zinc-300" />
+              <button className="relative p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
+                <Bell size={20} className="text-slate-600" />
                 {notifications > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-400 to-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center"
-                  >
+                  <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
                     {notifications}
                   </motion.span>
                 )}
               </button>
             )}
 
+            {/* User menu / auth */}
             {user ? (
               <div className="relative">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl px-3 py-2 transition-all"
-                >
+                  className="flex items-center gap-2 hover:bg-slate-100 rounded-xl px-3 py-2 transition-all">
                   {userProfile?.profileImage ? (
-                    <img
-                      src={userProfile.profileImage}
-                      alt={userProfile.name || 'User'}
-                      className="w-9 h-9 rounded-full object-cover border-2 border-amber-500"
-                    />
+                    <img src={userProfile.profileImage} alt={userProfile.name || 'User'}
+                      className="w-9 h-9 rounded-full object-cover border-2" style={{ borderColor: '#0EA5E9' }} />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-lg">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shadow"
+                      style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
                       {userProfile?.name?.[0]?.toUpperCase() || 'U'}
                     </div>
                   )}
                   <div className="hidden lg:block text-left">
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-white">
-                      {userProfile?.name || 'Traveler'}
-                    </p>
+                    <p className="text-sm font-bold text-slate-900">{userProfile?.name || 'Traveler'}</p>
                     <div className="flex items-center gap-1">
-                      <Trophy size={12} className="text-amber-500" />
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {userProfile?.status || 'Explorer'}
-                      </p>
+                      <Trophy size={11} style={{ color: '#0EA5E9' }} />
+                      <p className="text-xs text-slate-400">{userProfile?.status || 'Explorer'}</p>
                     </div>
                   </div>
                 </motion.button>
 
-                {/* Dropdown Menu */}
                 <AnimatePresence>
                   {showMenu && (
                     <>
-                      <div
-                        className="fixed inset-0 z-40"
-                        onClick={() => setShowMenu(false)}
-                      />
+                      <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        initial={{ opacity: 0, scale: 0.95, y: -8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -8 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        className="absolute right-0 mt-2 w-72 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                      >
-                        {/* Profile Header */}
-                        <div className="p-5 bg-gradient-to-r from-amber-50 via-rose-50 to-purple-50 dark:from-zinc-800 dark:to-zinc-800 border-b border-zinc-200 dark:border-zinc-700">
+                        className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden">
+
+                        {/* Profile header */}
+                        <div className="p-5 border-b border-slate-100" style={{ background: '#F0F9FF' }}>
                           <div className="flex items-center gap-3 mb-3">
                             {userProfile?.profileImage ? (
-                              <img
-                                src={userProfile.profileImage}
-                                alt={userProfile.name || 'User'}
-                                className="w-14 h-14 rounded-full object-cover border-2 border-amber-500"
-                              />
+                              <img src={userProfile.profileImage} alt="" className="w-14 h-14 rounded-full border-2" style={{ borderColor: '#0EA5E9' }} />
                             ) : (
-                              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 via-rose-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                              <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg shadow"
+                                style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
                                 {userProfile?.name?.[0]?.toUpperCase() || 'U'}
                               </div>
                             )}
-                            <div className="flex-1">
-                              <p className="font-bold text-zinc-900 dark:text-white">
-                                {userProfile?.name || 'Traveler'}
-                              </p>
-                              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                                {user.email}
-                              </p>
+                            <div>
+                              <p className="font-bold text-slate-900">{userProfile?.name || 'Traveler'}</p>
+                              <p className="text-sm text-slate-500">{user.email}</p>
                             </div>
                           </div>
-                          
                           <div className="flex items-center gap-2">
-                            <span className="flex-1 px-3 py-1.5 bg-gradient-to-r from-amber-100 to-rose-100 dark:from-amber-900/30 dark:to-rose-900/30 text-amber-900 dark:text-amber-100 rounded-lg text-xs font-bold flex items-center gap-1">
-                              <Trophy size={12} />
-                              {userProfile?.status || 'Explorer'}
+                            <span className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                              style={{ background: '#BAE6FD', color: '#0284C7' }}>
+                              <Trophy size={11} />{userProfile?.status || 'Explorer'}
                             </span>
-                            <span className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-semibold">
+                            <span className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold">
                               {userProfile?.totalTripsPlanned || 0} trips
                             </span>
                           </div>
                         </div>
-                        
-                        {/* Menu Items */}
+
                         <div className="py-2">
-                          <Link
-                            href="/profile"
-                            onClick={() => setShowMenu(false)}
-                            className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                          >
-                            <User size={18} className="text-zinc-600 dark:text-zinc-400" />
-                            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">View Profile</span>
-                          </Link>
-                          
-                          <Link
-                            href="/trips"
-                            onClick={() => setShowMenu(false)}
-                            className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                          >
-                            <Trophy size={18} className="text-zinc-600 dark:text-zinc-400" />
-                            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">My Trips</span>
-                          </Link>
-                          
-                          <Link
-                            href="/settings"
-                            onClick={() => setShowMenu(false)}
-                            className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
-                          >
-                            <Settings size={18} className="text-zinc-600 dark:text-zinc-400" />
-                            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Settings</span>
-                          </Link>
-                          
-                          <div className="my-2 border-t border-zinc-200 dark:border-zinc-700"></div>
-                          
-                          <button
-                            onClick={() => {
-                              logout();
-                              setShowMenu(false);
-                            }}
-                            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-left"
-                          >
-                            <LogOut size={18} className="text-red-600" />
-                            <span className="text-sm font-medium text-red-600">Sign Out</span>
+                          {[
+                            { icon: User, label: 'View Profile', href: '/profile' },
+                            { icon: Trophy, label: 'My Trips', href: '/trips' },
+                            { icon: Settings, label: 'Settings', href: '/settings' },
+                          ].map(item => (
+                            <Link key={item.label} href={item.href} onClick={() => setShowMenu(false)}
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                              <item.icon size={17} className="text-slate-500" />
+                              <span className="text-sm font-semibold text-slate-700">{item.label}</span>
+                            </Link>
+                          ))}
+                          <div className="my-2 border-t border-slate-100" />
+                          <button onClick={() => { logout(); setShowMenu(false); }}
+                            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 transition-colors text-left">
+                            <LogOut size={17} className="text-red-500" />
+                            <span className="text-sm font-semibold text-red-500">Sign Out</span>
                           </button>
                         </div>
                       </motion.div>
@@ -259,17 +195,13 @@ export default function Navbar() {
                 </AnimatePresence>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/login"
-                  className="text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors px-4 py-2"
-                >
+              <div className="flex items-center gap-2">
+                <Link href="/login" className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-4 py-2">
                   Sign In
                 </Link>
-                <Link
-                  href="/signup"
-                  className="px-5 py-2.5 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 hover:from-amber-600 hover:via-rose-600 hover:to-purple-700 text-white rounded-xl font-semibold transition-all shadow-lg text-sm"
-                >
+                <Link href="/signup"
+                  className="px-5 py-2.5 text-white rounded-xl font-bold transition-opacity hover:opacity-90 shadow-md text-sm"
+                  style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
                   Get Started
                 </Link>
               </div>
