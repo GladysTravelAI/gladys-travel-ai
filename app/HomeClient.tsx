@@ -1,32 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Mic, 
-  MicOff, 
-  ArrowRight, 
-  Calendar, 
-  Shield, 
-  Search, 
-  Sparkles, 
-  Ticket, 
-  ChevronDown,
-  MapPin,
-  Plane,
-  Hotel,
-  Bookmark,
-  Settings,
-  CloudRain,
-  Trophy,
-  Music,
-  PartyPopper,
-  CheckCircle2,
-  Loader2,
-  ExternalLink,
-  TrendingUp
+import {
+  Search, Sparkles, Trophy, Music, PartyPopper,
+  Loader2, ExternalLink, TrendingUp, Calendar, MapPin,
+  Plane, Hotel, Bookmark, Mic, Settings, CloudRain,
+  ArrowRight, ChevronDown, Ticket, Shield, CheckCircle,
+  Globe, Users, Zap, Star, Download
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
 import Navbar from "@/components/Navbar";
@@ -36,7 +18,6 @@ import HotelResults from "@/components/HotelResults";
 import FlightResults from "@/components/FlightResults";
 import ItineraryView from "@/components/ItineraryView";
 import MapsDirections from "@/components/MapsDirections";
-import TripRefinementModal, { TripPreferences } from "@/components/TripRefinementModal";
 import TripSummary from "@/components/TripSummary";
 import WeatherWidget from "@/components/WeatherWidget";
 import VoiceTripPlanner from "@/components/VoiceTripPlanner";
@@ -47,47 +28,29 @@ import CityPicker from "@/components/CityPicker";
 import { ItineraryData } from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
 import { useAuth } from "@/lib/AuthContext";
-
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TripPreferences } from "@/components/TripRefinementModal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 
-// ==================== INTERFACES ====================
+// ─── TYPES ────────────────────────────────────────────────────────────────────
 
 interface SavedItem {
   id: string;
   type: 'hotel' | 'flight' | 'restaurant' | 'activity';
-  name: string;
-  price: string;
-  location?: string;
-  date?: string;
-  image?: string;
-  affiliateUrl: string;
-  partner: string;
-  description?: string;
+  name: string; price: string; location?: string; date?: string;
+  image?: string; affiliateUrl: string; partner: string; description?: string;
 }
 
 interface AgentResponse {
   intent: 'event_trip' | 'destination_trip' | 'information_only' | 'city_selection_required';
   destination?: { city: string | null; country: string | null; };
   event?: {
-    name: string | null;
-    type: 'sports' | 'music' | 'festival' | 'conference' | 'other' | null;
-    date: string | null;
-    venue: string | null;
-    // ✅ NEW — real fields from Ticketmaster / PredictHQ
-    image?: string | null;
-    ticketUrl?: string | null;
-    priceMin?: number | null;
-    priceMax?: number | null;
-    currency?: string | null;
-    attraction?: string | null;
-    time?: string | null;
+    name: string | null; type: 'sports' | 'music' | 'festival' | 'conference' | 'other' | null;
+    date: string | null; venue: string | null; image?: string | null;
+    ticketUrl?: string | null; priceMin?: number | null; priceMax?: number | null;
+    currency?: string | null; attraction?: string | null; time?: string | null;
   };
   itinerary: Array<{ day: number; title: string; activities: string[]; }>;
-  hotels: any[];
-  flights: any[];
+  hotels: any[]; flights: any[];
   affiliate_links: { hotel: string; flight: string; tickets: string; };
   upsells: { insurance: boolean; esim: boolean; };
   message: string;
@@ -95,715 +58,730 @@ interface AgentResponse {
     accommodation: number; transport: number; food: number;
     event_tickets: number; activities: number; total: number;
     currency: string; per_day_average: number;
-    esim?: number; insurance?: number;
   };
   travel_dates?: {
     arrival_date: string; departure_date: string; total_nights: number;
-    day_slots: Array<{
-      date: string;
-      day_type: 'arrival' | 'pre_event' | 'event_day' | 'post_event' | 'departure';
-      label: string;
-    }>;
+    day_slots: Array<{ date: string; day_type: string; label: string; }>;
   };
-  event_id?: string;
-  event_name?: string;
+  event_id?: string; event_name?: string;
   cities?: Array<{
     city_id: string; name: string; country: string; iata_code: string;
     sessions: Array<{ session_id: string; date: string; time?: string; round?: string; description?: string; }>;
   }>;
 }
 
-// ✅ NEW — shape returned by /api/featured-events
 interface LiveEvent {
-  id: string;
-  name: string;
+  id: string; name: string;
   category: 'sports' | 'music' | 'festival' | 'other';
-  date: string;
-  time?: string;
-  venue: string;
-  city: string;
-  country: string;
-  image?: string;
-  ticketUrl?: string;
-  priceMin?: number;
-  priceMax?: number;
-  currency?: string;
-  attraction?: string;
+  date: string; time?: string; venue: string; city: string; country: string;
+  image?: string; ticketUrl?: string; priceMin?: number;
+  currency?: string; attraction?: string; rank?: number;
 }
-
-// ==================== EVENT TYPE CONFIGURATION ====================
 
 type EventType = 'sports' | 'music' | 'festivals' | null;
 
-interface EventTypeConfig {
-  id: EventType;
-  label: string;
-  icon: any;
-  placeholder: string;
-  examples: string[];
-  color: string;
-  bgColor: string;
-  gradient: string;
-}
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 
-const EVENT_TYPES: EventTypeConfig[] = [
-  {
-    id: 'sports',
-    label: 'Sports',
-    icon: Trophy,
-    placeholder: 'World Cup 2026, Super Bowl, NBA Finals...',
-    examples: ['World Cup 2026', 'NBA Finals', 'Wimbledon'],
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    gradient: 'from-blue-500 to-cyan-500'
-  },
-  {
-    id: 'music',
-    label: 'Music',
-    icon: Music,
-    placeholder: 'Taylor Swift, Coachella, Glastonbury...',
-    examples: ['Coachella', 'Beyoncé Tour', 'Glastonbury'],
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
-    gradient: 'from-purple-500 to-pink-500'
-  },
-  {
-    id: 'festivals',
-    label: 'Festivals',
-    icon: PartyPopper,
-    placeholder: 'Carnival, Oktoberfest, Burning Man...',
-    examples: ['Rio Carnival', 'Oktoberfest', 'La Tomatina'],
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-50',
-    gradient: 'from-orange-500 to-red-500'
-  }
-];
+const SKY = '#0EA5E9';
+const SKY_DARK = '#0284C7';
+const SKY_LIGHT = '#E0F2FE';
+const SKY_MID = '#BAE6FD';
 
-// ==================== HELPERS ====================
-
-const CATEGORY_CONFIG = {
-  sports:   { color: 'bg-blue-600',   label: 'Sports',   icon: Trophy },
-  music:    { color: 'bg-purple-600', label: 'Music',    icon: Music },
-  festival: { color: 'bg-orange-600', label: 'Festival', icon: PartyPopper },
-  other:    { color: 'bg-gray-600',   label: 'Event',    icon: Ticket },
+const EVENT_CFG = {
+  sports:   { accent: SKY,       bg: '#F0F9FF', border: '#BAE6FD', label: 'Sports',   Icon: Trophy,      placeholder: 'NBA Finals, World Cup, Wimbledon...' },
+  music:    { accent: '#8B5CF6', bg: '#F5F3FF', border: '#DDD6FE', label: 'Music',    Icon: Music,       placeholder: 'Taylor Swift, Coachella, Glastonbury...' },
+  festivals:{ accent: '#F97316', bg: '#FFF7ED', border: '#FED7AA', label: 'Festivals',Icon: PartyPopper, placeholder: 'Rio Carnival, Oktoberfest, Burning Man...' },
 };
 
-function fmt(amount: number, currency = 'USD'): string {
-  return `${currency} ${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+const SAMPLE_TRIPS = [
+  { event: 'Coachella 2025', category: 'music' as const, where: 'Indio, CA', nights: '4 nights', total: 'USD 2,840', saved: '23% cheaper', breakdown: { Tickets: 899, Flights: 620, Hotel: 980, Activities: 341 } },
+  { event: 'UEFA Champions League Final', category: 'sports' as const, where: 'Munich, Germany', nights: '3 nights', total: 'USD 3,210', saved: '18% cheaper', breakdown: { Tickets: 1200, Flights: 890, Hotel: 780, Activities: 340 } },
+  { event: 'Rio Carnival', category: 'festivals' as const, where: 'Rio de Janeiro', nights: '5 nights', total: 'USD 2,190', saved: '31% cheaper', breakdown: { Tickets: 320, Flights: 780, Hotel: 750, Activities: 340 } },
+];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+function fmt(n: number, cur = 'USD') {
+  return `${cur} ${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+function fmtDate(d: string) {
+  try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch { return d; }
+}
+function catColor(cat: string) {
+  if (cat === 'sports') return SKY;
+  if (cat === 'music' || cat === 'festival') return '#8B5CF6';
+  return '#F97316';
+}
+function catBg(cat: string) {
+  if (cat === 'sports') return '#F0F9FF';
+  if (cat === 'music' || cat === 'festival') return '#F5F3FF';
+  return '#FFF7ED';
 }
 
-function formatEventDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+// ─── ANIMATED COUNTER ─────────────────────────────────────────────────────────
+
+function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const [val, setVal] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const ran = useRef(false);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !ran.current) {
+        ran.current = true;
+        let cur = 0; const step = to / 60;
+        const t = setInterval(() => { cur += step; if (cur >= to) { setVal(to); clearInterval(t); } else setVal(Math.floor(cur)); }, 16);
+      }
     });
-  } catch { return dateStr; }
+    if (ref.current) io.observe(ref.current);
+    return () => io.disconnect();
+  }, [to]);
+  return <span ref={ref}>{val.toLocaleString()}{suffix}</span>;
 }
 
-// ==================== LIVE EVENT CARD ====================
+// ─── LIVE EVENT CARD ──────────────────────────────────────────────────────────
 
-function LiveEventCard({ event, onSearch }: { event: LiveEvent; onSearch: (name: string) => void }) {
-  const cat = CATEGORY_CONFIG[event.category as keyof typeof CATEGORY_CONFIG] || CATEGORY_CONFIG.other;
-  const CatIcon = cat.icon;
+function EventCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => void }) {
+  const color = catColor(ev.category);
+  const bg = catBg(ev.category);
+  const CatIcon = ev.category === 'sports' ? Trophy : ev.category === 'music' ? Music : PartyPopper;
 
   return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2 }}
-      className="group bg-white rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 border border-gray-100 cursor-pointer"
-      onClick={() => onSearch(event.name)}
+    <div
+      onClick={() => onSearch(ev.name)}
+      className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-slate-100 hover:border-slate-200 hover:shadow-xl transition-all duration-300"
+      style={{ transform: 'translateY(0)', transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease' }}
+      onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
+      onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
     >
-      {/* Image */}
-      <div className="relative h-48 overflow-hidden bg-gray-100">
-        {event.image
-          ? <img src={event.image} alt={event.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-          : <div className={`w-full h-full ${cat.color} flex items-center justify-center`}><CatIcon size={48} className="text-white opacity-30" /></div>
+      {/* image */}
+      <div className="relative h-44 overflow-hidden bg-slate-100">
+        {ev.image
+          ? <img src={ev.image} alt={ev.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          : <div className="w-full h-full flex items-center justify-center" style={{ background: bg }}>
+              <CatIcon size={40} style={{ color, opacity: 0.4 }} />
+            </div>
         }
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className={`absolute top-3 left-3 ${cat.color} text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1`}>
-          <CatIcon size={12} />{cat.label}
+        {/* category pill */}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-white shadow-sm" style={{ color }}>
+          <CatIcon size={11} />{ev.category === 'festival' ? 'Festival' : ev.category.charAt(0).toUpperCase() + ev.category.slice(1)}
         </div>
-        {event.priceMin && (
-          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-gray-900 text-xs font-bold px-3 py-1 rounded-full">
-            From {event.currency || 'USD'} {event.priceMin}
+        {ev.rank && ev.rank > 70 && (
+          <div className="absolute top-3 right-3 flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-white shadow-sm text-slate-600">
+            <TrendingUp size={10} />Hot
           </div>
         )}
       </div>
 
-      {/* Info */}
-      <div className="p-5">
-        <h3 className="font-bold text-gray-900 text-base leading-tight mb-1 line-clamp-2 group-hover:text-blue-600 transition-colors">
-          {event.name}
-        </h3>
-        {event.attraction && (
-          <p className="text-sm text-purple-600 font-medium mb-2 line-clamp-1">{event.attraction}</p>
-        )}
-        <div className="space-y-1.5 mb-4">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Calendar size={13} />
-            <span>{formatEventDate(event.date)}{event.time && ` · ${event.time}`}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <MapPin size={13} />
-            <span className="line-clamp-1">{event.venue}, {event.city}</span>
-          </div>
+      <div className="p-4">
+        <h3 className="font-bold text-slate-900 text-sm leading-tight mb-1 line-clamp-2">{ev.name}</h3>
+        {ev.attraction && <p className="text-xs mb-2 font-medium line-clamp-1" style={{ color }}>{ev.attraction}</p>}
+        <div className="space-y-1 mb-4">
+          <p className="flex items-center gap-1.5 text-xs text-slate-400"><Calendar size={11} />{fmtDate(ev.date)}</p>
+          <p className="flex items-center gap-1.5 text-xs text-slate-400"><MapPin size={11} />{ev.venue ? `${ev.venue}, ` : ''}{ev.city}</p>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); onSearch(event.name); }}
-          className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2"
+          onClick={e => { e.stopPropagation(); onSearch(ev.name); }}
+          className="w-full py-2.5 text-xs font-bold rounded-xl transition-all text-white flex items-center justify-center gap-1.5"
+          style={{ background: color }}
         >
-          <Sparkles size={14} />
-          Plan This Trip
+          <Sparkles size={12} />Plan This Trip
         </button>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// ==================== EVENT HERO CARD (shown in results) ====================
+// ─── SAMPLE TRIP CARD ─────────────────────────────────────────────────────────
 
-function EventHeroCard({ event, budget, ticketsUrl }: {
-  event: AgentResponse['event'];
-  budget?: AgentResponse['budget'];
-  ticketsUrl?: string;
-}) {
-  if (!event?.name) return null;
+function SampleCard({ trip }: { trip: typeof SAMPLE_TRIPS[0] }) {
+  const [open, setOpen] = useState(false);
+  const color = catColor(trip.category);
+  const bg = catBg(trip.category);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="relative rounded-3xl overflow-hidden mb-8 shadow-2xl min-h-[260px]"
-    >
-      {event.image
-        ? <div className="absolute inset-0"><img src={event.image} alt={event.name} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" /></div>
-        : <div className="absolute inset-0 bg-gradient-to-r from-gray-900 to-gray-700" />
-      }
-      <div className="relative z-10 p-8 md:p-12">
-        <div className="max-w-2xl">
-          {event.type && (
-            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white text-sm font-semibold px-4 py-2 rounded-full mb-4 border border-white/30">
-              {event.type === 'sports' ? <Trophy size={14} /> : event.type === 'music' ? <Music size={14} /> : <PartyPopper size={14} />}
-              {event.type.charAt(0).toUpperCase() + event.type.slice(1)} Event
-            </div>
-          )}
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-2 leading-tight">{event.name}</h1>
-          {event.attraction && event.attraction !== event.name && (
-            <p className="text-xl text-blue-300 font-medium mb-4">{event.attraction}</p>
-          )}
-          <div className="flex flex-wrap gap-4 mb-6 text-white/80 text-sm">
-            {event.date && <div className="flex items-center gap-2"><Calendar size={15} />{formatEventDate(event.date)}{event.time && ` · ${event.time}`}</div>}
-            {event.venue && <div className="flex items-center gap-2"><MapPin size={15} />{event.venue}</div>}
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow">
+      <div className="h-1.5" style={{ background: color }} />
+      <div className="p-5 cursor-pointer" onClick={() => setOpen(!open)}>
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ color, background: bg }}>{trip.category}</span>
+            <h3 className="text-lg font-black text-slate-900 mt-2 leading-tight">{trip.event}</h3>
+            <p className="text-sm text-slate-400 mt-0.5 flex items-center gap-1"><MapPin size={12} />{trip.where} · {trip.nights}</p>
           </div>
-          <div className="flex flex-wrap gap-3 items-center">
-            {(event.ticketUrl || ticketsUrl) && (
-              <a
-                href={event.ticketUrl || ticketsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-2 bg-white text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-gray-100 transition-all shadow-lg text-sm"
-              >
-                <Ticket size={16} />
-                Buy Tickets
-                {event.priceMin && <span className="text-blue-600">· From {event.currency || 'USD'} {event.priceMin}</span>}
-                <ExternalLink size={13} />
-              </a>
-            )}
-            {budget && (
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 text-white px-5 py-3 rounded-xl text-sm font-medium">
-                Trip budget: <span className="font-bold">{fmt(budget.total, budget.currency)}</span>
-              </div>
-            )}
+          <div className="text-right flex-shrink-0 ml-4">
+            <p className="text-2xl font-black text-slate-900">{trip.total}</p>
+            <p className="text-xs text-slate-400">per person</p>
           </div>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1" style={{ color, background: bg }}>
+            <TrendingUp size={11} />{trip.saved}
+          </span>
+          <span className="text-xs text-slate-400 flex items-center gap-1">
+            {open ? 'Hide' : 'See'} breakdown <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+          </span>
+        </div>
+        {open && (
+          <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-4 gap-3 text-center">
+            {Object.entries(trip.breakdown).map(([k, v]) => (
+              <div key={k}><p className="font-bold text-slate-900">${v}</p><p className="text-xs text-slate-400">{k}</p></div>
+            ))}
+          </div>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-// ==================== ITINERARY BUILDER ====================
+// ─── EVENT HERO (results) ─────────────────────────────────────────────────────
 
-function buildEventItinerary(
-  agentResponse: AgentResponse,
-  startDate?: Date | null,
-  endDate?: Date | null
-): ItineraryData {
-  const totalDays = agentResponse.itinerary?.length || 0;
-  if (totalDays === 0) {
-    return { overview: '', tripSummary: { totalDays: 0, cities: [] }, budget: { totalBudget: '', dailyAverage: '' }, days: [] };
-  }
+function EventHero({ event, budget, ticketsUrl }: { event: AgentResponse['event']; budget?: AgentResponse['budget']; ticketsUrl?: string }) {
+  if (!event?.name) return null;
+  const color = catColor(event.type || 'other');
+  const bg = catBg(event.type || 'other');
+  const CatIcon = event.type === 'sports' ? Trophy : event.type === 'music' ? Music : PartyPopper;
+
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm mb-6">
+      <div className="h-1.5" style={{ background: color }} />
+      {event.image && (
+        <div className="relative h-48 sm:h-64 overflow-hidden">
+          <img src={event.image} alt={event.name} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        </div>
+      )}
+      <div className="p-5 sm:p-8">
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full mb-3" style={{ color, background: bg }}>
+          <CatIcon size={12} />{(event.type || 'event').charAt(0).toUpperCase() + (event.type || 'event').slice(1)} Event
+        </div>
+        <h1 className="text-2xl sm:text-4xl font-black text-slate-900 mb-1 leading-tight">{event.name}</h1>
+        {event.attraction && event.attraction !== event.name && (
+          <p className="text-base font-semibold mb-3" style={{ color }}>{event.attraction}</p>
+        )}
+        <div className="flex flex-wrap gap-4 mb-5 text-slate-500 text-sm">
+          {event.date && <span className="flex items-center gap-1.5"><Calendar size={14} />{fmtDate(event.date)}{event.time && ` · ${event.time}`}</span>}
+          {event.venue && <span className="flex items-center gap-1.5"><MapPin size={14} />{event.venue}</span>}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {(event.ticketUrl || ticketsUrl) && (
+            <a href={event.ticketUrl || ticketsUrl} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-bold px-5 py-2.5 rounded-xl text-sm text-white transition-opacity hover:opacity-90"
+              style={{ background: color }}>
+              <Ticket size={15} />Buy Tickets{event.priceMin && ` · From ${event.currency || 'USD'} ${event.priceMin}`}<ExternalLink size={13} />
+            </a>
+          )}
+          {budget && (
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border border-slate-200 text-slate-600">
+              Full trip: <span className="font-black text-slate-900">{fmt(budget.total, budget.currency)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ITINERARY BUILDER ────────────────────────────────────────────────────────
+
+function buildItinerary(r: AgentResponse, start?: Date | null, end?: Date | null): ItineraryData {
+  const total = r.itinerary?.length || 0;
+  if (!total) return { overview: '', tripSummary: { totalDays: 0, cities: [] }, budget: { totalBudget: '', dailyAverage: '' }, days: [] };
 
   let dates: string[] = [];
-  const daySlots = agentResponse.travel_dates?.day_slots;
-
-  if (daySlots && daySlots.length > 0) {
-    dates = daySlots.map(s => s.date);
-  } else if (startDate) {
-    for (let i = 0; i < totalDays; i++) {
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + i);
-      dates.push(d.toISOString().split('T')[0]);
-    }
-  } else {
-    const eventDay = Math.ceil(totalDays / 2);
-    const base = agentResponse.event?.date ? new Date(agentResponse.event.date) : new Date();
-    base.setDate(base.getDate() - (eventDay - 1));
-    for (let i = 0; i < totalDays; i++) {
-      const d = new Date(base);
-      d.setDate(d.getDate() + i);
-      dates.push(d.toISOString().split('T')[0]);
-    }
+  const slots = r.travel_dates?.day_slots;
+  if (slots?.length) { dates = slots.map(s => s.date); }
+  else if (start) { for (let i = 0; i < total; i++) { const d = new Date(start); d.setDate(d.getDate() + i); dates.push(d.toISOString().split('T')[0]); } }
+  else {
+    const evDay = Math.ceil(total / 2);
+    const base = r.event?.date ? new Date(r.event.date) : new Date();
+    base.setDate(base.getDate() - (evDay - 1));
+    for (let i = 0; i < total; i++) { const d = new Date(base); d.setDate(d.getDate() + i); dates.push(d.toISOString().split('T')[0]); }
   }
 
-  const eventDayIndex = daySlots ? daySlots.findIndex(s => s.day_type === 'event_day') : Math.ceil(totalDays / 2) - 1;
-  const eventDayNumber = eventDayIndex >= 0 ? eventDayIndex + 1 : Math.ceil(totalDays / 2);
+  const evIdx = slots ? slots.findIndex(s => s.day_type === 'event_day') : Math.ceil(total / 2) - 1;
+  const evDayNum = evIdx >= 0 ? evIdx + 1 : Math.ceil(total / 2);
+  const evType: 'sports' | 'music' | 'festivals' = r.event?.type === 'festival' ? 'festivals' : r.event?.type === 'music' ? 'music' : 'sports';
+  const b = r.budget; const cur = b?.currency || 'USD';
+  const budgetData: ItineraryData['budget'] = b
+    ? { totalBudget: fmt(b.total, cur), dailyAverage: fmt(b.per_day_average, cur), eventDayCost: fmt(b.event_tickets + b.per_day_average, cur), breakdown: { accommodation: fmt(b.accommodation, cur), transport: fmt(b.transport, cur), food: fmt(b.food, cur), event: fmt(b.event_tickets, cur), activities: fmt(b.activities, cur) } }
+    : { totalBudget: 'USD 1,850', dailyAverage: 'USD 370', eventDayCost: 'USD 650', breakdown: { accommodation: 'USD 600', transport: 'USD 300', food: 'USD 250', event: 'USD 400', activities: 'USD 300' } };
 
-  let mappedEventType: 'sports' | 'music' | 'festivals' = 'festivals';
-  const evType = agentResponse.event?.type;
-  if (evType === 'festival') mappedEventType = 'festivals';
-  else if (evType === 'sports' || evType === 'music') mappedEventType = evType;
-
-  const b = agentResponse.budget;
-  const cur = b?.currency || 'USD';
-
-  const budgetData: ItineraryData['budget'] = b ? {
-    totalBudget:  fmt(b.total, cur),
-    dailyAverage: fmt(b.per_day_average, cur),
-    eventDayCost: fmt(b.event_tickets + b.per_day_average, cur),
-    breakdown: {
-      accommodation: fmt(b.accommodation, cur),
-      transport:     fmt(b.transport, cur),
-      food:          fmt(b.food, cur),
-      event:         fmt(b.event_tickets, cur),
-      activities:    fmt(b.activities, cur),
-    }
-  } : {
-    totalBudget: 'USD 1,850', dailyAverage: 'USD 370', eventDayCost: 'USD 650',
-    breakdown: { accommodation: 'USD 600', transport: 'USD 300', food: 'USD 250', event: 'USD 400', activities: 'USD 300' }
-  };
-
-  const dailyAmt   = b?.per_day_average || 370;
-  const mornCost   = Math.round(dailyAmt * 0.15);
-  const aftnCost   = Math.round(dailyAmt * 0.25);
-  const eveCost    = Math.round(dailyAmt * 0.35);
-  const ticketCost = b?.event_tickets || 400;
-
-  const city    = agentResponse.destination?.city || '';
-  const country = agentResponse.destination?.country || '';
-  const evName  = agentResponse.event?.name || 'Featured Event';
-  const evDate  = agentResponse.event?.date || dates[eventDayNumber - 1] || '';
-  const evVenue = agentResponse.event?.venue || 'Event Venue';
+  const dpa = b?.per_day_average || 370;
+  const city = r.destination?.city || '';
+  const evName = r.event?.name || 'Event';
+  const evDate = r.event?.date || dates[evDayNum - 1] || '';
+  const evVenue = r.event?.venue || 'Event Venue';
 
   return {
-    overview: `A perfectly structured ${mappedEventType}-centered trip designed around ${evName}, with pre and post exploration days.`,
-    eventAnchor: { eventName: evName, eventType: mappedEventType, eventDate: evDate, eventDay: eventDayNumber, venue: evVenue, city, country },
-    tripSummary: {
-      totalDays, cities: [city],
-      highlights: agentResponse.itinerary.map(d => d.title),
-      eventPhases: { preEvent: eventDayNumber - 1, eventDay: 1, postEvent: totalDays - eventDayNumber }
-    },
+    overview: `${total}-day ${evType} trip built around ${evName}.`,
+    eventAnchor: { eventName: evName, eventType: evType, eventDate: evDate, eventDay: evDayNum, venue: evVenue, city, country: r.destination?.country || '' },
+    tripSummary: { totalDays: total, cities: [city], highlights: r.itinerary.map(d => d.title), eventPhases: { preEvent: evDayNum - 1, eventDay: 1, postEvent: total - evDayNum } },
     budget: budgetData,
-    days: agentResponse.itinerary.map((day, idx) => {
-      const isEventDay = (idx + 1) === eventDayNumber;
-      const slotLabel  = daySlots?.[idx]?.label || (isEventDay ? 'Event Day' : idx < eventDayNumber - 1 ? 'Pre-Event Day' : 'Post-Event Day');
-      const activities = day.activities || [];
+    days: r.itinerary.map((day, idx) => {
+      const isEvDay = idx + 1 === evDayNum;
+      const label = slots?.[idx]?.label || (isEvDay ? 'Event Day' : idx < evDayNum - 1 ? 'Pre-Event' : 'Post-Event');
+      const acts = day.activities || [];
       return {
-        day: day.day, date: dates[idx] || '', city, theme: day.title, label: slotLabel, isEventDay,
-        morning:   { time: '9:00 AM - 12:00 PM', activities: activities[0] || 'Morning exploration', location: city, cost: fmt(mornCost, cur) },
-        afternoon: { time: '1:00 PM - 5:00 PM',  activities: activities[1] || (isEventDay ? 'Pre-match build-up and fan zone' : 'Afternoon exploration'), location: isEventDay ? (evVenue || city) : city, cost: fmt(aftnCost, cur) },
-        evening: {
-          time: isEventDay ? '6:00 PM - 11:00 PM' : '6:00 PM - 9:00 PM',
-          activities: activities[2] || (isEventDay ? `Attend ${evName}` : 'Evening activities'),
-          location: isEventDay ? (evVenue || city) : city,
-          cost: fmt(isEventDay ? ticketCost : eveCost, cur),
-          isEventBlock: isEventDay,
-          ...(isEventDay && { eventDetails: { doors: '5:30 PM', startTime: '7:00 PM', duration: '2-3 hours', ticketUrl: agentResponse.affiliate_links?.tickets || agentResponse.event?.ticketUrl || '' } })
-        }
+        day: day.day, date: dates[idx] || '', city, theme: day.title, label, isEventDay: isEvDay,
+        morning: { time: '9:00 AM', activities: acts[0] || 'Morning exploration', location: city, cost: fmt(Math.round(dpa * 0.15), cur) },
+        afternoon: { time: '1:00 PM', activities: acts[1] || (isEvDay ? 'Pre-event build-up' : 'Afternoon exploration'), location: isEvDay ? evVenue : city, cost: fmt(Math.round(dpa * 0.25), cur) },
+        evening: { time: isEvDay ? '6:00 PM' : '6:00 PM', activities: acts[2] || (isEvDay ? `Attend ${evName}` : 'Evening activities'), location: isEvDay ? evVenue : city, cost: fmt(isEvDay ? (b?.event_tickets || 400) : Math.round(dpa * 0.35), cur), isEventBlock: isEvDay, ...(isEvDay && { eventDetails: { doors: '5:30 PM', startTime: '7:00 PM', duration: '2-3 hours', ticketUrl: r.affiliate_links?.tickets || r.event?.ticketUrl || '' } }) }
       };
-    })
+    }),
   };
 }
 
-// ==================== MAIN COMPONENT ====================
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function HomeClient() {
   const router = useRouter();
-  const { user, userProfile, updateUserProfile } = useAuth();
+  const { user } = useAuth();
 
-  const [eventType, setEventType]   = useState<EventType>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [startDate, setStartDate]   = useState<Date | null>(null);
-  const [endDate, setEndDate]       = useState<Date | null>(null);
-  const [origin, setOrigin]         = useState("Johannesburg, South Africa");
+  // Search state
+  const [eventType, setEventType] = useState<EventType>(null);
+  const [query, setQuery] = useState('');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const origin = 'Johannesburg, South Africa';
 
-  const [agentResponse, setAgentResponse] = useState<AgentResponse | null>(null);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("itinerary");
-  const [isListening, setIsListening] = useState(false);
+  // Results state
+  const [response, setResponse] = useState<AgentResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState('itinerary');
 
-  const [showRefinement, setShowRefinement]   = useState(false);
-  const [showTripSummary, setShowTripSummary] = useState(false);
-  const [showMaps, setShowMaps]               = useState(false);
-  const [showWeather, setShowWeather]         = useState(false);
-  const [showVoicePlanner, setShowVoicePlanner] = useState(false);
-  const [showSavedTrips, setShowSavedTrips]   = useState(false);
+  // UI modals
+  const [showSummary, setShowSummary] = useState(false);
+  const [showMaps, setShowMaps] = useState(false);
+  const [showWeather, setShowWeather] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+  const [savedItems, setSavedItems] = useState<{ hotels: SavedItem[]; flights: SavedItem[]; restaurants: SavedItem[]; activities: SavedItem[]; }>({ hotels: [], flights: [], restaurants: [], activities: [] });
 
-  const [tripPreferences, setTripPreferences] = useState<TripPreferences | null>(null);
-  const [savedItems, setSavedItems] = useState<{
-    hotels: SavedItem[]; flights: SavedItem[]; restaurants: SavedItem[]; activities: SavedItem[];
-  }>({ hotels: [], flights: [], restaurants: [], activities: [] });
-  const [currentWeather, setCurrentWeather] = useState<any>(null);
+  // Live events
+  const [events, setEvents] = useState<LiveEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'sports' | 'music' | 'festival'>('all');
 
-  // ✅ Live events state
-  const [liveEvents, setLiveEvents]           = useState<LiveEvent[]>([]);
-  const [liveEventsLoading, setLiveEventsLoading] = useState(true);
-  const [activeCategory, setActiveCategory]   = useState<'all' | 'sports' | 'music' | 'festival'>('all');
+  // Date inputs visible
+  const [showDates, setShowDates] = useState(false);
 
-  // ✅ Fetch live events on mount
   useEffect(() => {
-    fetch('/api/featured-events')
-      .then(r => r.json())
-      .then(data => { if (data.success) setLiveEvents(data.events); })
+    fetch('/api/featured-events').then(r => r.json())
+      .then(d => { if (d.success) setEvents(d.events); })
       .catch(console.error)
-      .finally(() => setLiveEventsLoading(false));
+      .finally(() => setEventsLoading(false));
   }, []);
 
-  // ==================== COMPUTED ====================
+  const cfg = eventType ? EVENT_CFG[eventType] : null;
+  const totalSaved = Object.values(savedItems).reduce((s, a) => s + a.length, 0);
+  const destination = response?.destination?.city || '';
+  const filtered = activeFilter === 'all' ? events : events.filter(e => e.category === activeFilter || (activeFilter === 'festival' && e.category === 'festival'));
+  const itineraryData = response && response.intent !== 'city_selection_required' ? buildItinerary(response, startDate, endDate) : null;
 
-  const currentEventConfig = EVENT_TYPES.find(e => e.id === eventType);
-  const searchPlaceholder  = currentEventConfig?.placeholder || "Select an event type above to get started";
-  const totalSavedItems    = Object.values(savedItems).reduce((sum, items) => sum + items.length, 0);
-  const destination        = agentResponse?.destination?.city || "";
-  const filteredLiveEvents = activeCategory === 'all' ? liveEvents : liveEvents.filter(e => e.category === activeCategory);
-  const itineraryData: ItineraryData | null =
-    agentResponse && agentResponse.intent !== 'city_selection_required'
-      ? buildEventItinerary(agentResponse, startDate, endDate)
-      : null;
-
-  // ==================== HANDLERS ====================
-
-  const handleEventTypeSelect = (type: EventType) => {
-    setEventType(type);
-    setSearchQuery("");
-    setAgentResponse(null);
-    if (user) profileManager.trackTripPlanned(user.uid, `Event Type: ${type}`).catch(console.error);
+  const handleSave = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
+    const si: SavedItem = { id: item.id?.toString() || Math.random().toString(), type, name: item.name || 'Unnamed', price: item.price?.toString() || '$0', location: item.location || '', date: item.date || '', image: item.image || '', affiliateUrl: item.bookingUrl || '#', partner: item.partner || 'TravelPayouts', description: item.description || '' };
+    setSavedItems(prev => {
+      const k = `${type}s` as keyof typeof prev;
+      const cur = prev[k] || [];
+      if (cur.some(i => i.id === si.id)) { toast.success('Removed'); return { ...prev, [k]: cur.filter(i => i.id !== si.id) }; }
+      toast.success('Saved!', { action: { label: 'View', onClick: () => setShowSummary(true) } });
+      return { ...prev, [k]: [...cur, si] };
+    });
   };
 
-  // ✅ Clicking a live event card populates search and fires immediately
-  const handleLiveEventSearch = (eventName: string) => {
-    setSearchQuery(eventName);
+  const handleRemove = (type: string, id: string) => {
+    setSavedItems(prev => { const k = (type + 's') as keyof typeof prev; return { ...prev, [k]: (prev[k] || []).filter((i: SavedItem) => i.id !== id) }; });
+  };
+
+  const handleCitySelect = async (params: any) => {
+    setLoading(true);
+    const t = toast.loading('Building trip...');
+    try {
+      const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: query, ...params, budget_level: 'mid', origin_country_code: 'ZA' }) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+      setResponse(result.data);
+      toast.success('Trip ready!', { id: t });
+      setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 300);
+    } catch (e: any) { toast.error('Failed', { id: t }); }
+    finally { setLoading(false); }
+  };
+
+  const handleSearch = async (q?: string) => {
+    const loc = q || query;
+    if (!loc.trim()) { toast.error('Enter an event or destination'); return; }
+    if (!eventType) { toast.error('Select Sports, Music or Festivals first'); return; }
+    setLoading(true);
+    const t = toast.loading(`Searching "${loc}"...`);
+    try {
+      const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: loc, context: { eventType, origin, days: 5, startDate: startDate?.toISOString(), endDate: endDate?.toISOString() } }) });
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+      setResponse(result.data);
+      if (user) await profileManager.trackTripPlanned(user.uid, loc);
+      toast.success(result.data.intent === 'city_selection_required' ? `${result.data.event_name} — pick your city` : `Found: ${result.data.event?.name || loc}`, { id: t, description: `${result.data.hotels?.length || 0} hotels · ${result.data.flights?.length || 0} flights` });
+      setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 500);
+    } catch (e: any) { toast.error('Search failed', { id: t, description: (e as Error).message }); }
+    finally { setLoading(false); }
+  };
+
+  const handleEventSearch = (name: string) => {
+    setQuery(name);
     if (!eventType) setEventType('sports');
-    setTimeout(() => handleSearch(eventName), 50);
+    setTimeout(() => handleSearch(name), 50);
   };
 
-  const handleSaveItem = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
-    const savedItem: SavedItem = {
-      id: item.id?.toString() || Math.random().toString(),
-      type,
-      name:        item.name || item.airline || item.title || 'Unnamed Item',
-      price:       item.price?.toString() || item.estimatedCost?.toString() || '$0',
-      location:    item.location || item.address || item.destination || '',
-      date:        item.date || item.departureDate || '',
-      image:       item.image || item.photo || '',
-      affiliateUrl: item.bookingUrl || item.affiliateUrl || '#',
-      partner:     item.partner || 'TravelPayouts',
-      description: item.description || ''
-    };
-    setSavedItems(prev => {
-      const typeKey = `${type}s` as keyof typeof prev;
-      const current = prev[typeKey] || [];
-      const exists  = current.some(i => i.id === savedItem.id);
-      if (exists) { toast.success('Removed from trip'); return { ...prev, [typeKey]: current.filter(i => i.id !== savedItem.id) }; }
-      toast.success('Saved to trip!', { action: { label: 'View', onClick: () => setShowTripSummary(true) } });
-      return { ...prev, [typeKey]: [...current, savedItem] };
-    });
-    if (user) {
-      await profileManager.trackBooking(user.uid, {
-        type, name: savedItem.name, price: parseFloat(savedItem.price.replace(/[^0-9.]/g, '')) || 0,
-        rating: item.rating || 0, destination
-      });
-    }
-  };
-
-  const handleRemoveItem = (type: string, id: string) => {
-    setSavedItems(prev => {
-      const typeKey = (type + 's') as keyof typeof prev;
-      return { ...prev, [typeKey]: (prev[typeKey] || []).filter((i: SavedItem) => i.id !== id) };
-    });
-    toast.success('Item removed');
-  };
-
-  const handleCitySelect = async (params: { selected_event_id: string; selected_city_id: string; selected_match_date: string; }) => {
-    setLoading(true); setError(null);
-    const loadingToast = toast.loading('Building your trip...');
-    try {
-      const res    = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: searchQuery, ...params, budget_level: tripPreferences?.budget === 'Budget' ? 'budget' : tripPreferences?.budget === 'Luxury' || tripPreferences?.budget === 'Ultra-Luxury' ? 'luxury' : 'mid', origin_country_code: 'ZA' }) });
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || 'Agent processing failed');
-      setAgentResponse(result.data);
-      toast.success('Your trip is ready!', { id: loadingToast });
-      setTimeout(() => document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' }), 300);
-    } catch (err: any) {
-      setError(err.message || 'Failed to build trip');
-      toast.error('Failed to build trip', { id: loadingToast, description: err.message });
-    } finally { setLoading(false); }
-  };
-
-  const handleSearch = async (query?: string, preferences?: TripPreferences) => {
-    const location = query || searchQuery;
-    if (!location.trim()) { toast.error('Please enter an event or destination'); return; }
-    if (!eventType)        { toast.error('Please select an event type first');    return; }
-
-    const prefs = preferences || tripPreferences;
-    setLoading(true); setError(null);
-    const loadingToast = toast.loading(`Searching live events for "${location}"...`);
-
-    try {
-      const res    = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: location, context: { eventType, origin: prefs?.origin || origin, budget: prefs?.budget || 'moderate', days: prefs?.days || 5, groupSize: prefs?.groupSize || 1, groupType: prefs?.groupType || 'solo', startDate: startDate?.toISOString(), endDate: endDate?.toISOString() } }) });
-      const result = await res.json();
-      if (!result.success) throw new Error(result.error || 'Agent processing failed');
-
-      const agentData: AgentResponse = result.data;
-      setAgentResponse(agentData);
-
-      if (user) {
-        await profileManager.trackTripPlanned(user.uid, location);
-        if (prefs) await updateUserProfile({ preferredTripTypes: prefs.tripType ? [prefs.tripType as any] : userProfile?.preferredTripTypes || [], budgetRange: prefs.budget as any, typicalGroupSize: prefs.groupSize || 1, typicalGroupType: prefs.groupType as any });
-      }
-
-      if (agentData.intent === 'city_selection_required') {
-        toast.success(`${agentData.event_name} — pick your city`, { id: loadingToast, description: `${agentData.cities?.length || 0} host cities available` });
-      } else {
-        const evName = agentData.event?.name || location;
-        toast.success(`Found: ${evName}`, { id: loadingToast, description: `${agentData.hotels?.length || 0} hotels · ${agentData.flights?.length || 0} flights` });
-      }
-      setTimeout(() => document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' }), 500);
-    } catch (err: any) {
-      console.error('Search error:', err);
-      setError(err.message || 'Search failed. Please try again.');
-      toast.error('Search failed', { id: loadingToast, description: err.message || 'Please try again' });
-    } finally { setLoading(false); }
-  };
-
-  const toggleVoiceInput = () => { setIsListening(!isListening); if (!isListening) toast.success('Voice input activated'); };
-  const handleRefinementSubmit = async (preferences: TripPreferences) => { setTripPreferences(preferences); setShowRefinement(false); await handleSearch(searchQuery, preferences); };
-
-  // ==================== RENDER ====================
+  // ─── RENDER ─────────────────────────────────────────────────────────────────
 
   return (
-    <main className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white" style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
+      {/* Google Font */}
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
+
       <Navbar />
 
-      {/* HERO */}
-      <section className="relative min-h-[90vh] flex items-center justify-center px-6 pt-32 pb-24">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-3xl opacity-40" />
-          <div className="absolute bottom-1/3 right-1/4 w-[500px] h-[500px] bg-purple-50 rounded-full blur-3xl opacity-40" />
-        </div>
-        <div className="max-w-5xl mx-auto text-center w-full space-y-16 relative z-10">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} className="space-y-8">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-full border border-blue-100">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm font-semibold text-blue-600">Live Event Intelligence · Powered by AI</span>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HERO
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="min-h-[100svh] flex flex-col justify-center px-5 pt-24 pb-16 bg-white">
+        <div className="max-w-2xl mx-auto w-full space-y-10">
+
+          {/* Badge */}
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: SKY }} />
+              Live Event Intelligence · Powered by AI
             </div>
-            <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-gray-900 leading-[1.05]">
+          </div>
+
+          {/* Headline */}
+          <div className="text-center">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.0] text-slate-900 mb-5">
               You pick the event.<br />
-              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">We build the trip.</span>
+              <span style={{ color: SKY }}>We build the trip.</span>
             </h1>
-            <p className="text-xl sm:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              The global intelligence layer for event travel. One search finds your tickets, flights, hotels, and complete itinerary.
+            <p className="text-lg sm:text-xl text-slate-500 max-w-lg mx-auto leading-relaxed">
+              One search finds your tickets, flights, hotels, and complete itinerary.
             </p>
-          </motion.div>
+          </div>
 
           {/* Event type selector */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.1, ease: [0.16, 1, 0.3, 1] }} className="max-w-2xl mx-auto space-y-4">
-            <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Select Event Type</p>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 text-center mb-4">What are you going to?</p>
             <div className="grid grid-cols-3 gap-3">
-              {EVENT_TYPES.map((type) => {
-                const Icon = type.icon; const isSelected = eventType === type.id;
+              {(Object.entries(EVENT_CFG) as [EventType, typeof EVENT_CFG['sports']][]).map(([key, c]) => {
+                const Icon = c.Icon;
+                const selected = eventType === key;
                 return (
-                  <button key={type.id} onClick={() => handleEventTypeSelect(type.id)} className={`relative p-6 rounded-2xl border-2 transition-all duration-300 ${isSelected ? `${type.bgColor} border-current shadow-xl scale-[1.02]` : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-md'}`}>
-                    <div className="flex flex-col items-center gap-3">
-                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${isSelected ? `bg-gradient-to-br ${type.gradient} text-white shadow-lg` : 'bg-gray-50 text-gray-400'}`}><Icon size={26} /></div>
-                      <span className={`font-semibold text-base ${isSelected ? type.color : 'text-gray-700'}`}>{type.label}</span>
+                  <button key={key}
+                    onClick={() => { setEventType(key); setQuery(''); setResponse(null); }}
+                    className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border-2 transition-all duration-200"
+                    style={{
+                      borderColor: selected ? c.accent : '#E2E8F0',
+                      background: selected ? c.bg : 'white',
+                    }}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all" style={{ background: selected ? c.accent : '#F1F5F9' }}>
+                      <Icon size={22} style={{ color: selected ? 'white' : '#94A3B8' }} />
                     </div>
-                    {isSelected && <motion.div layoutId="selected-event" className="absolute inset-0 rounded-2xl border-2 border-blue-600" transition={{ type: "spring", stiffness: 500, damping: 30 }} />}
+                    <span className="font-bold text-sm" style={{ color: selected ? c.accent : '#64748B' }}>{c.label}</span>
                   </button>
                 );
               })}
             </div>
-          </motion.div>
+          </div>
 
           {/* Search */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.2, ease: [0.16, 1, 0.3, 1] }} className="max-w-3xl mx-auto space-y-4">
-            <div className="relative group">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-600 transition-colors" size={24} />
-              <Input
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchQuery.trim() && eventType && handleSearch()}
-                disabled={!eventType}
-                className={`w-full h-20 pl-16 pr-24 text-lg font-medium rounded-3xl border-2 bg-white shadow-xl transition-all ${!eventType ? 'border-gray-200 opacity-60 cursor-not-allowed' : 'border-gray-300 hover:border-gray-400 focus:border-blue-600 focus:shadow-2xl'}`}
+          <div className="space-y-3">
+            <div className="relative">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={e => { setQuery(e.target.value); if (e.target.value && !showDates) setShowDates(true); }}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                placeholder={cfg?.placeholder || 'Search any event worldwide...'}
+                className="w-full h-14 pl-12 pr-5 text-base rounded-2xl border-2 outline-none transition-all"
+                style={{
+                  borderColor: cfg ? cfg.border : '#E2E8F0',
+                  background: cfg ? cfg.bg : 'white',
+                }}
               />
-              <button onClick={toggleVoiceInput} disabled={!eventType} className={`absolute right-3 top-1/2 -translate-y-1/2 w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isListening ? 'bg-blue-600 text-white shadow-lg' : !eventType ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100 text-gray-600'}`}>
-                {isListening ? <MicOff size={22} /> : <Mic size={22} />}
+            </div>
+
+            {/* Date pickers — appear when typing */}
+            {showDates && (
+              <div className="flex gap-2 items-center">
+                <input type="date" value={startDate?.toISOString().split('T')[0] || ''} onChange={e => setStartDate(e.target.value ? new Date(e.target.value) : null)}
+                  className="flex-1 h-12 px-4 rounded-xl border-2 border-slate-200 text-sm text-slate-600 outline-none focus:border-sky-300" />
+                <ArrowRight size={16} className="text-slate-300 flex-shrink-0" />
+                <input type="date" value={endDate?.toISOString().split('T')[0] || ''} onChange={e => setEndDate(e.target.value ? new Date(e.target.value) : null)}
+                  className="flex-1 h-12 px-4 rounded-xl border-2 border-slate-200 text-sm text-slate-600 outline-none focus:border-sky-300" />
+              </div>
+            )}
+
+            <button
+              onClick={() => handleSearch()}
+              disabled={!query.trim() || !eventType || loading}
+              className="w-full h-14 font-bold rounded-2xl text-base transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40"
+              style={{ background: cfg?.accent || SKY }}
+            >
+              {loading ? <><Loader2 size={18} className="animate-spin" />Searching...</> : <><Sparkles size={18} />Find {cfg?.label || 'Event'} Travel</>}
+            </button>
+
+            {/* Quick actions */}
+            <div className="flex gap-2">
+              <button onClick={() => setShowVoice(true)} className="flex-1 h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all">
+                <Mic size={14} />Voice Search
+              </button>
+              <button onClick={() => setShowSaved(true)} className="flex-1 h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all">
+                <Bookmark size={14} />Saved Trips {totalSaved > 0 && `(${totalSaved})`}
               </button>
             </div>
-            <AnimatePresence>
-              {searchQuery && eventType && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="flex items-center gap-3">
-                  <input type="date" value={startDate?.toISOString().split('T')[0] || ''} onChange={(e) => setStartDate(e.target.value ? new Date(e.target.value) : null)} className="flex-1 h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-sm font-medium hover:border-gray-300 focus:border-blue-600 transition-all" />
-                  <ArrowRight className="text-gray-300 flex-shrink-0" size={20} />
-                  <input type="date" value={endDate?.toISOString().split('T')[0] || ''} onChange={(e) => setEndDate(e.target.value ? new Date(e.target.value) : null)} className="flex-1 h-14 px-4 bg-white border-2 border-gray-200 rounded-2xl text-sm font-medium hover:border-gray-300 focus:border-blue-600 transition-all" />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <button onClick={() => handleSearch()} disabled={!searchQuery.trim() || !eventType || loading} className="w-full h-16 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-3xl text-lg transition-all shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-400 disabled:to-gray-400">
-              {loading ? <span className="flex items-center justify-center gap-3"><Loader2 size={20} className="animate-spin" />AI is searching live events...</span> : `Find ${eventType ? currentEventConfig?.label : 'Event'} Travel`}
-            </button>
-            <div className="flex gap-2 pt-2">
-              <Button onClick={() => setShowVoicePlanner(true)} variant="ghost" size="sm" className="flex-1 text-gray-600"><Mic size={16} className="mr-2" />Voice Planner</Button>
-              <Button onClick={() => setShowSavedTrips(true)} variant="ghost" size="sm" className="flex-1 text-gray-600"><Bookmark size={16} className="mr-2" />Saved Trips</Button>
-              <Button onClick={() => router.push('/settings')} variant="ghost" size="sm" className="text-gray-600"><Settings size={16} /></Button>
-            </div>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="pt-12">
-            <ChevronDown className="w-6 h-6 text-gray-300 animate-bounce mx-auto" />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* TRUST SIGNALS */}
-      <section className="py-16 px-6 bg-gray-50 border-y border-gray-100">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-4 gap-8">
-          {[
-            { icon: Shield,       title: 'Secure Booking',          sub: 'Bank-level encryption' },
-            { icon: Ticket,       title: 'Live Event Data',          sub: 'Ticketmaster & PredictHQ' },
-            { icon: CheckCircle2, title: 'Powered by TravelPayouts', sub: 'Trusted travel partners' },
-            { icon: Sparkles,     title: 'AI-Optimized',             sub: 'Smart event logistics' },
-          ].map(({ icon: Icon, title, sub }, idx) => (
-            <div key={idx} className="text-center">
-              <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3"><Icon className="text-white" size={24} /></div>
-              <h4 className="font-bold text-gray-900 mb-1 text-sm">{title}</h4>
-              <p className="text-xs text-gray-600">{sub}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ✅ LIVE EVENTS DISCOVERY — replaces <EventsBanner /> */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-end justify-between mb-12">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-green-600 uppercase tracking-wider">Live from Ticketmaster</span>
-              </div>
-              <h2 className="text-4xl font-bold text-gray-900">Upcoming Events</h2>
-              <p className="text-gray-600 mt-2">Real events happening now. Click any to plan your trip instantly.</p>
-            </div>
-            <div className="hidden md:flex gap-2">
-              {(['all', 'sports', 'music', 'festival'] as const).map(cat => (
-                <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${activeCategory === cat ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-                  {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {liveEventsLoading ? (
-            <div className="grid md:grid-cols-3 gap-6">{[1,2,3,4,5,6].map(i => <div key={i} className="bg-gray-100 rounded-3xl h-80 animate-pulse" />)}</div>
-          ) : filteredLiveEvents.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredLiveEvents.map((event, idx) => (
-                <motion.div key={event.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}>
-                  <LiveEventCard event={event} onSearch={handleLiveEventSearch} />
-                </motion.div>
-              ))}
+          {/* Scroll indicator */}
+          <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-1 text-slate-300">
+              <p className="text-xs font-medium">Scroll to explore</p>
+              <ChevronDown size={20} className="animate-bounce" />
             </div>
-          ) : (
-            <div className="text-center py-20 text-gray-400">
-              <TrendingUp size={48} className="mx-auto mb-4 opacity-30" />
-              <p className="text-lg font-medium">No live events loaded</p>
-              <p className="text-sm mt-1">Search above for any event worldwide</p>
-            </div>
-          )}
+          </div>
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="py-32 px-6 bg-gray-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl font-bold text-gray-900 mb-4">How it works</h2>
-            <p className="text-xl text-gray-600">Three steps. One intelligent system.</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-12">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TRUST STATS — horizontal strip
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-10 border-y border-slate-100 bg-slate-50">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { step: "1", title: "Pick your event",      desc: "Tell us what you're going to—sports, music, or festivals." },
-              { step: "2", title: "AI builds your stack", desc: "We find tickets, flights, hotels, and create your complete itinerary." },
-              { step: "3", title: "Book everything",      desc: "Secure booking through our trusted partners. One trip, fully orchestrated." }
-            ].map((item, idx) => (
-              <motion.div key={idx} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: idx * 0.1, duration: 0.6 }} className="text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-3xl text-white text-2xl font-bold flex items-center justify-center mx-auto mb-6 shadow-lg">{item.step}</div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">{item.title}</h3>
-                <p className="text-gray-600 text-lg leading-relaxed">{item.desc}</p>
-              </motion.div>
+              { n: 12847, s: '+', l: 'Trips planned' },
+              { n: 150, s: '+', l: 'Countries' },
+              { n: 23, s: '%', l: 'Average savings' },
+              { n: 4, s: ' APIs', l: 'Live data sources' },
+            ].map((stat, i) => (
+              <div key={i}>
+                <p className="text-3xl sm:text-4xl font-black text-slate-900 mb-1" style={{ color: i === 0 ? SKY : 'inherit' }}>
+                  <Counter to={stat.n} suffix={stat.s} />
+                </p>
+                <p className="text-sm text-slate-500">{stat.l}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* RESULTS */}
-      {(agentResponse || loading) && (
-        <section id="results-section" className="px-6 py-20 bg-gray-50">
+      {/* ═══════════════════════════════════════════════════════════════════════
+          TRUST BADGES — clean horizontal row
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-10 border-b border-slate-100 bg-white">
+        <div className="max-w-5xl mx-auto px-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: Shield, label: 'Secure Booking', sub: 'Bank-level encryption', color: SKY },
+              { icon: Ticket, label: 'Live Event Data', sub: 'Ticketmaster & PredictHQ', color: '#8B5CF6' },
+              { icon: CheckCircle, label: 'Trusted Partners', sub: 'TravelPayouts network', color: '#10B981' },
+              { icon: Sparkles, label: 'AI-Optimised', sub: 'Smart event logistics', color: '#F97316' },
+            ].map((b, i) => (
+              <div key={i} className="flex items-center gap-3 p-4 rounded-2xl border border-slate-100">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: b.color + '15' }}>
+                  <b.icon size={18} style={{ color: b.color }} />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-sm leading-tight">{b.label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{b.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SAMPLE TRIPS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-20 px-5 bg-slate-50">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-10 text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Real trip examples</p>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">What Gladys builds for you</h2>
+            <p className="text-slate-500 mt-2">Click any to see the full cost breakdown</p>
+          </div>
+          <div className="space-y-4">
+            {SAMPLE_TRIPS.map((trip, i) => <SampleCard key={i} trip={trip} />)}
+          </div>
+          <div className="mt-6 p-5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between">
+            <p className="text-slate-600 text-sm font-medium">Ready to plan yours?</p>
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="text-sm font-bold px-5 py-2 rounded-xl text-white transition-opacity hover:opacity-90" style={{ background: SKY }}>
+              Start free →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          LIVE EVENTS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-20 px-5 bg-white border-t border-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-10">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">Live · Updated now</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Upcoming Events</h2>
+              <p className="text-slate-500 mt-1">Real events worldwide. Click any to plan instantly.</p>
+            </div>
+            {/* Filter pills */}
+            <div className="flex gap-2 flex-wrap">
+              {(['all', 'sports', 'music', 'festival'] as const).map(f => (
+                <button key={f} onClick={() => setActiveFilter(f)}
+                  className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
+                  style={{
+                    background: activeFilter === f ? (f === 'all' ? SKY : catColor(f)) : '#F1F5F9',
+                    color: activeFilter === f ? 'white' : '#64748B',
+                  }}>
+                  {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {eventsLoading ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[1,2,3,4,5,6].map(i => <div key={i} className="h-72 rounded-2xl bg-slate-100 animate-pulse" />)}
+            </div>
+          ) : filtered.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filtered.map(ev => <EventCard key={ev.id} ev={ev} onSearch={handleEventSearch} />)}
+            </div>
+          ) : (
+            <div className="py-24 text-center text-slate-400">
+              <Globe size={48} className="mx-auto mb-4 opacity-30" />
+              <p className="text-lg font-semibold text-slate-500">Events loading...</p>
+              <p className="text-sm mt-1">Or search for any event above</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          HOW IT WORKS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-5 bg-slate-50 border-t border-slate-100">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">How it works</h2>
+            <p className="text-slate-500 mt-2 text-lg">Three steps. One intelligent system.</p>
+          </div>
+          <div className="space-y-6">
+            {[
+              { n: '1', title: 'Name your event', desc: 'Concert, sport, festival — anywhere on earth. We search Ticketmaster, PredictHQ and 150+ sources simultaneously.', color: SKY },
+              { n: '2', title: 'AI orchestrates everything', desc: 'Tickets, flights from your city, hotels near the venue, a day-by-day itinerary — all built in seconds.', color: '#8B5CF6' },
+              { n: '3', title: 'Book with one click', desc: 'Every link goes directly to trusted partners. No middleman. No markup. Best price, every time.', color: '#F97316' },
+            ].map((step, i) => (
+              <div key={i} className="flex gap-5 items-start bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-white font-black text-lg" style={{ background: step.color }}>
+                  {step.n}
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">{step.title}</h3>
+                  <p className="text-slate-500 leading-relaxed">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          FEATURES GRID
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-5 bg-white border-t border-slate-100">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Built for event travelers</h2>
+            <p className="text-slate-500 mt-2">Not for generic vacations. For events.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { icon: Globe, title: 'Cheapest city finder', desc: 'Same artist, 5 cities — we show you the most affordable option including travel.', color: SKY, soon: false },
+              { icon: Users, title: 'Group coordination', desc: 'Everyone from different cities? One destination, multiple origins handled.', color: '#8B5CF6', soon: true },
+              { icon: Zap, title: 'Price intelligence', desc: 'PredictHQ demand scores warn you when hotel prices will spike.', color: '#F97316', soon: false },
+              { icon: Shield, title: 'Trip insurance', desc: 'Event cancelled? Coverage integrated from the moment you book.', color: '#10B981', soon: false },
+              { icon: Star, title: 'Fan zone guides', desc: 'Pre-event meetups, watch parties, local fan bars — curated per event.', color: '#F59E0B', soon: true },
+              { icon: MapPin, title: 'Venue proximity', desc: 'Hotels sorted by walking time to the venue, not just price.', color: '#EF4444', soon: false },
+            ].map((f, i) => (
+              <div key={i} className="relative p-5 rounded-2xl border-2 border-slate-100 hover:border-slate-200 hover:shadow-md transition-all bg-white">
+                {f.soon && <span className="absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">Soon</span>}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: f.color + '15' }}>
+                  <f.icon size={18} style={{ color: f.color }} />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm mb-1.5">{f.title}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          CTA BAND
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <section className="py-20 px-5" style={{ background: SKY }}>
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl sm:text-4xl font-black text-white mb-4">Your next event trip starts here.</h2>
+          <p className="text-sky-100 text-lg mb-8">Tickets, flights, hotel and itinerary — all in one search.</p>
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="inline-flex items-center gap-2 bg-white font-bold px-8 py-4 rounded-2xl text-base transition-opacity hover:opacity-90"
+            style={{ color: SKY }}>
+            <Sparkles size={18} />Plan my event trip →
+          </button>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          RESULTS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {(response || loading) && (
+        <section id="results" className="px-5 py-16 bg-slate-50 border-t border-slate-200">
           <div className="max-w-7xl mx-auto">
             {loading && (
-              <div className="text-center py-32">
-                <Loader2 size={48} className="animate-spin text-blue-600 mx-auto mb-6" />
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{agentResponse?.intent === 'city_selection_required' ? 'Building your trip...' : `AI is orchestrating your ${eventType} trip...`}</h3>
-                <p className="text-gray-600">Finding tickets, flights, hotels, and building your itinerary</p>
+              <div className="text-center py-24">
+                <Loader2 size={40} className="animate-spin mx-auto mb-5" style={{ color: SKY }} />
+                <h3 className="text-2xl font-black text-slate-900 mb-2">Building your trip...</h3>
+                <p className="text-slate-500">Finding tickets, flights and hotels simultaneously</p>
               </div>
             )}
-            {!loading && agentResponse && (
+            {!loading && response && (
               <>
-                {agentResponse.intent === 'city_selection_required' && agentResponse.cities ? (
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="py-8">
-                    <CityPicker eventId={agentResponse.event_id!} eventName={agentResponse.event_name || agentResponse.event?.name || 'Event'} cities={agentResponse.cities} onSelect={handleCitySelect} />
-                  </motion.div>
-                ) : (
-                  <>
-                    {/* ✅ Real event hero — shows image, name, venue, ticket link, price */}
-                    <EventHeroCard event={agentResponse.event} budget={agentResponse.budget} ticketsUrl={agentResponse.affiliate_links?.tickets} />
-
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-                      <div className="flex items-start justify-between mb-4">
-                        <p className="text-gray-500 text-lg">{destination}{startDate && endDate && ` · ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`}</p>
-                        <div className="flex gap-3">
-                          {currentWeather && <Button onClick={() => setShowWeather(true)} variant="outline" size="sm"><CloudRain size={16} className="mr-2" />{currentWeather.temp}°</Button>}
-                          <Button onClick={() => setShowMaps(true)} variant="outline" size="sm"><MapPin size={16} className="mr-2" />Map</Button>
-                          {totalSavedItems > 0 && <Button onClick={() => setShowTripSummary(true)} size="sm" className="bg-blue-600 hover:bg-blue-700"><Bookmark size={16} className="mr-2" />Trip ({totalSavedItems})</Button>}
+                {response.intent === 'city_selection_required' && response.cities
+                  ? <CityPicker eventId={response.event_id!} eventName={response.event_name || response.event?.name || 'Event'} cities={response.cities} onSelect={handleCitySelect} />
+                  : (
+                    <>
+                      <EventHero event={response.event} budget={response.budget} ticketsUrl={response.affiliate_links?.tickets} />
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                        <p className="text-slate-500 text-sm">{destination}{startDate && endDate && ` · ${startDate.toLocaleDateString()} – ${endDate.toLocaleDateString()}`}</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => setShowMaps(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border-2 border-slate-200 text-slate-600 hover:border-sky-300 transition-all"><MapPin size={14} />Map</button>
+                          {totalSaved > 0 && <button onClick={() => setShowSummary(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white" style={{ background: SKY }}><Bookmark size={14} />Trip ({totalSaved})</button>}
                         </div>
                       </div>
-                      {eventType && currentEventConfig && <Badge variant="secondary" className="text-sm"><currentEventConfig.icon size={14} className="mr-1" />{currentEventConfig.label} Event</Badge>}
-                    </motion.div>
-
-                    <Tabs value={activeTab} onValueChange={setActiveTab}>
-                      <TabsList className="w-full justify-start mb-8 bg-white p-2 rounded-2xl shadow-sm">
-                        <TabsTrigger value="itinerary" className="flex items-center gap-2"><Sparkles size={16} />Itinerary</TabsTrigger>
-                        <TabsTrigger value="hotels" className="flex items-center gap-2"><Hotel size={16} />Hotels{agentResponse.hotels?.length > 0 && <Badge variant="secondary">{agentResponse.hotels.length}</Badge>}</TabsTrigger>
-                        <TabsTrigger value="flights" className="flex items-center gap-2"><Plane size={16} />Flights{agentResponse.flights?.length > 0 && <Badge variant="secondary">{agentResponse.flights.length}</Badge>}</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="itinerary">{itineraryData && <ItineraryView data={itineraryData} />}</TabsContent>
-                      <TabsContent value="hotels"><HotelResults hotels={agentResponse.hotels || []} onSaveItem={(h) => handleSaveItem(h, 'hotel')} loading={false} /></TabsContent>
-                      <TabsContent value="flights"><FlightResults flights={agentResponse.flights || []} onSaveItem={(f) => handleSaveItem(f, 'flight')} loading={false} /></TabsContent>
-                    </Tabs>
-                  </>
-                )}
+                      <Tabs value={tab} onValueChange={setTab}>
+                        <TabsList className="w-full mb-6 p-1 rounded-2xl bg-slate-200">
+                          <TabsTrigger value="itinerary" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Sparkles size={14} />Itinerary</TabsTrigger>
+                          <TabsTrigger value="hotels" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Hotel size={14} />Hotels {response.hotels?.length > 0 && <span className="text-xs opacity-60">({response.hotels.length})</span>}</TabsTrigger>
+                          <TabsTrigger value="flights" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Plane size={14} />Flights {response.flights?.length > 0 && <span className="text-xs opacity-60">({response.flights.length})</span>}</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="itinerary">{itineraryData && <ItineraryView data={itineraryData} />}</TabsContent>
+                        <TabsContent value="hotels"><HotelResults hotels={response.hotels || []} onSaveItem={h => handleSave(h, 'hotel')} loading={false} /></TabsContent>
+                        <TabsContent value="flights"><FlightResults flights={response.flights || []} onSaveItem={f => handleSave(f, 'flight')} loading={false} /></TabsContent>
+                      </Tabs>
+                    </>
+                  )
+                }
               </>
             )}
           </div>
@@ -812,29 +790,23 @@ export default function HomeClient() {
 
       <Footer />
 
-      {/* MODALS */}
-      {showRefinement && <TripRefinementModal isOpen={showRefinement} onClose={() => setShowRefinement(false)} onGenerate={handleRefinementSubmit} destination={destination} isLoading={loading} eventContext={agentResponse?.event?.name ? { name: agentResponse.event.name, date: agentResponse.event.date || '', type: agentResponse.event.type === 'festival' ? 'festivals' : agentResponse.event.type === 'conference' ? 'other' : agentResponse.event.type || 'other' } : undefined} />}
-      {showTripSummary && <TripSummary isOpen={showTripSummary} onClose={() => setShowTripSummary(false)} savedItems={savedItems} onRemoveItem={handleRemoveItem} destination={destination} />}
+      {/* ── MODALS ── */}
+      {showSummary && <TripSummary isOpen={showSummary} onClose={() => setShowSummary(false)} savedItems={savedItems} onRemoveItem={handleRemove} destination={destination} />}
       {showMaps && destination && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="p-6 border-b flex items-center justify-between"><h3 className="text-2xl font-bold">Map & Directions</h3><button onClick={() => setShowMaps(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">✕</button></div>
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)]"><MapsDirections destination={destination} defaultOrigin={origin} /></div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-xl">Map & Directions</h3>
+              <button onClick={() => setShowMaps(false)} className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors">✕</button>
+            </div>
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-80px)]"><MapsDirections destination={destination} defaultOrigin={origin} /></div>
           </div>
         </div>
       )}
-      {showWeather && destination && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl">
-            <div className="p-6 border-b flex items-center justify-between"><h3 className="text-2xl font-bold">Weather Forecast</h3><button onClick={() => setShowWeather(false)} className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">✕</button></div>
-            <div className="p-6"><WeatherWidget destination={destination} showRecommendations={true} showHourlyForecast={false} onWeatherLoad={setCurrentWeather} /></div>
-          </div>
-        </div>
-      )}
-      {showVoicePlanner && <VoiceTripPlanner />}
-      {showSavedTrips && <SavedTrips />}
+      {showVoice && <VoiceTripPlanner />}
+      {showSaved && <SavedTrips />}
       <GladysChat />
       <EventNotificationToast userLocation={origin} />
-    </main>
+    </div>
   );
 }
