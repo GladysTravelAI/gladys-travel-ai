@@ -1,9 +1,10 @@
 // lib/tools/eventIntelTool.ts
 // 🎫 EVENT INTELLIGENCE TOOL
-// Searches: UniversalEvent registry + Ticketmaster (new service)
+// Searches: UniversalEvent registry + Ticketmaster + PredictHQ
 
 import { searchEvents as registrySearch } from '@/lib/data/eventRegistry';
 import { searchTicketmasterEvents } from '@/lib/services/ticketmaster';
+import { searchPHQEvents } from '@/lib/services/predicthq';
 
 export const eventIntelToolDefinition = {
   type: 'function' as const,
@@ -54,39 +55,75 @@ export async function executeEventSearch(args: {
       source: 'registry',
     }));
 
-    // LAYER 2: Ticketmaster fallback if no registry results
+    // LAYER 2 + 3: Ticketmaster + PredictHQ in parallel — only if no registry results
     let externalEvents: any[] = [];
-    if (registryEvents.length === 0) {
-      try {
-        const tmResults = await searchTicketmasterEvents({
-          keyword: query,
-          city,
-          size: 10,
-        });
 
-        externalEvents = tmResults.map(e => ({
-          id: `tm-${e.id}`,
-          name: e.name,
-          type: e.category,
-          date: e.date,
-          time: e.time,
-          venue: e.venue,
-          city: e.city,
-          country: e.country,
+    if (registryEvents.length === 0) {
+      const [tmResult, phqResult] = await Promise.allSettled([
+        searchTicketmasterEvents({ keyword: query, city, size: 10 }),
+        searchPHQEvents({ keyword: query, city, limit: 10 }),
+      ]);
+
+      if (tmResult.status === 'fulfilled') {
+        externalEvents.push(...tmResult.value.map(e => ({
+          id:          `tm-${e.id}`,
+          name:        e.name,
+          type:        e.category,
+          date:        e.date,
+          time:        e.time,
+          venue:       e.venue,
+          city:        e.city,
+          country:     e.country,
           countryCode: e.countryCode,
-          ticketUrl: e.ticketUrl,
-          image: e.image,
-          priceMin: e.priceMin,
-          priceMax: e.priceMax,
-          currency: e.currency,
-          attraction: e.attraction,
-          status: e.status,
-          multi_city: false,
-          source: 'ticketmaster',
-        }));
-      } catch (error) {
-        console.warn('⚠️ Ticketmaster search failed:', error);
+          ticketUrl:   e.ticketUrl,   // ← real Ticketmaster URL
+          image:       e.image,
+          priceMin:    e.priceMin,
+          priceMax:    e.priceMax,
+          currency:    e.currency,
+          attraction:  e.attraction,
+          status:      e.status,
+          rank:        null,
+          multi_city:  false,
+          source:      'ticketmaster',
+        })));
+      } else {
+        console.warn('⚠️ Ticketmaster search failed:', tmResult.reason);
       }
+
+      if (phqResult.status === 'fulfilled') {
+        externalEvents.push(...phqResult.value.map(e => ({
+          id:          e.id,
+          name:        e.name,
+          type:        e.category,
+          date:        e.date,
+          time:        undefined,
+          venue:       e.venue       || null,
+          city:        e.city        || null,
+          country:     e.country     || null,
+          countryCode: e.countryCode || null,
+          ticketUrl:   null,          // PredictHQ doesn't provide ticket URLs
+          image:       null,
+          priceMin:    null,
+          priceMax:    null,
+          currency:    null,
+          attraction:  null,
+          status:      'onsale',
+          rank:        e.rank,        // phq_rank 0–100 → drives "Hot" badge
+          multi_city:  false,
+          source:      'predicthq',
+        })));
+      } else {
+        console.warn('⚠️ PredictHQ search failed:', phqResult.reason);
+      }
+
+      // Deduplicate by name — keep Ticketmaster entry if same event appears in both
+      const seen = new Set<string>();
+      externalEvents = externalEvents.filter(e => {
+        const key = e.name.toLowerCase().trim();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     }
 
     const allEvents = [...registryEvents, ...externalEvents];
