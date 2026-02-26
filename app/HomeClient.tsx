@@ -154,7 +154,6 @@ function EventCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => v
       onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-4px)')}
       onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
     >
-      {/* image */}
       <div className="relative h-44 overflow-hidden bg-slate-100">
         {ev.image
           ? <img src={ev.image} alt={ev.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -162,7 +161,6 @@ function EventCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => v
               <CatIcon size={40} style={{ color, opacity: 0.4 }} />
             </div>
         }
-        {/* category pill */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-white shadow-sm" style={{ color }}>
           <CatIcon size={11} />{ev.category === 'festival' ? 'Festival' : ev.category.charAt(0).toUpperCase() + ev.category.slice(1)}
         </div>
@@ -172,7 +170,6 @@ function EventCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => v
           </div>
         )}
       </div>
-
       <div className="p-4">
         <h3 className="font-bold text-slate-900 text-sm leading-tight mb-1 line-clamp-2">{ev.name}</h3>
         {ev.attraction && <p className="text-xs mb-2 font-medium line-clamp-1" style={{ color }}>{ev.attraction}</p>}
@@ -379,6 +376,19 @@ export default function HomeClient() {
   const filtered = activeFilter === 'all' ? events : events.filter(e => e.category === activeFilter || (activeFilter === 'festival' && e.category === 'festival'));
   const itineraryData = response && response.intent !== 'city_selection_required' ? buildItinerary(response, startDate, endDate) : null;
 
+  // ── CHANGE 1: Save itinerary to localStorage whenever it updates ──────────
+  // Allows the standalone /itinerary page to read and display it for download.
+  useEffect(() => {
+    if (itineraryData) {
+      try {
+        localStorage.setItem('gladys-itinerary-current', JSON.stringify(itineraryData));
+      } catch {
+        // Fail silently — private browsing or storage quota exceeded
+      }
+    }
+  }, [itineraryData]);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleSave = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
     const si: SavedItem = { id: item.id?.toString() || Math.random().toString(), type, name: item.name || 'Unnamed', price: item.price?.toString() || '$0', location: item.location || '', date: item.date || '', image: item.image || '', affiliateUrl: item.bookingUrl || '#', partner: item.partner || 'TravelPayouts', description: item.description || '' };
     setSavedItems(prev => {
@@ -436,7 +446,6 @@ export default function HomeClient() {
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
-      {/* Google Font */}
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
 
       <Navbar />
@@ -447,7 +456,6 @@ export default function HomeClient() {
       <section className="min-h-[100svh] flex flex-col justify-center px-5 pt-24 pb-16 bg-white">
         <div className="max-w-2xl mx-auto w-full space-y-10">
 
-          {/* Badge */}
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
               <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: SKY }} />
@@ -455,7 +463,6 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* Headline */}
           <div className="text-center">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.0] text-slate-900 mb-5">
               You pick the event.<br />
@@ -466,7 +473,6 @@ export default function HomeClient() {
             </p>
           </div>
 
-          {/* Event type selector */}
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 text-center mb-4">What are you going to?</p>
             <div className="grid grid-cols-3 gap-3">
@@ -477,10 +483,7 @@ export default function HomeClient() {
                   <button key={key}
                     onClick={() => { setEventType(key); setQuery(''); setResponse(null); }}
                     className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border-2 transition-all duration-200"
-                    style={{
-                      borderColor: selected ? c.accent : '#E2E8F0',
-                      background: selected ? c.bg : 'white',
-                    }}>
+                    style={{ borderColor: selected ? c.accent : '#E2E8F0', background: selected ? c.bg : 'white' }}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all" style={{ background: selected ? c.accent : '#F1F5F9' }}>
                       <Icon size={22} style={{ color: selected ? 'white' : '#94A3B8' }} />
                     </div>
@@ -491,7 +494,6 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* Search */}
           <div className="space-y-3">
             <div className="relative">
               <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -501,14 +503,10 @@ export default function HomeClient() {
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
                 placeholder={cfg?.placeholder || 'Search any event worldwide...'}
                 className="w-full h-14 pl-12 pr-5 text-base rounded-2xl border-2 outline-none transition-all"
-                style={{
-                  borderColor: cfg ? cfg.border : '#E2E8F0',
-                  background: cfg ? cfg.bg : 'white',
-                }}
+                style={{ borderColor: cfg ? cfg.border : '#E2E8F0', background: cfg ? cfg.bg : 'white' }}
               />
             </div>
 
-            {/* Date pickers — appear when typing */}
             {showDates && (
               <div className="flex gap-2 items-center">
                 <input type="date" value={startDate?.toISOString().split('T')[0] || ''} onChange={e => setStartDate(e.target.value ? new Date(e.target.value) : null)}
@@ -528,7 +526,6 @@ export default function HomeClient() {
               {loading ? <><Loader2 size={18} className="animate-spin" />Searching...</> : <><Sparkles size={18} />Find {cfg?.label || 'Event'} Travel</>}
             </button>
 
-            {/* Quick actions */}
             <div className="flex gap-2">
               <button onClick={() => setShowVoice(true)} className="flex-1 h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all">
                 <Mic size={14} />Voice Search
@@ -539,7 +536,6 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* Scroll indicator */}
           <div className="flex justify-center">
             <div className="flex flex-col items-center gap-1 text-slate-300">
               <p className="text-xs font-medium">Scroll to explore</p>
@@ -550,7 +546,7 @@ export default function HomeClient() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          TRUST STATS — horizontal strip
+          TRUST STATS
       ═══════════════════════════════════════════════════════════════════════ */}
       <section className="py-10 border-y border-slate-100 bg-slate-50">
         <div className="max-w-5xl mx-auto px-5">
@@ -573,7 +569,7 @@ export default function HomeClient() {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          TRUST BADGES — clean horizontal row
+          TRUST BADGES
       ═══════════════════════════════════════════════════════════════════════ */}
       <section className="py-10 border-b border-slate-100 bg-white">
         <div className="max-w-5xl mx-auto px-5">
@@ -634,15 +630,11 @@ export default function HomeClient() {
               <h2 className="text-3xl sm:text-4xl font-black text-slate-900">Upcoming Events</h2>
               <p className="text-slate-500 mt-1">Real events worldwide. Click any to plan instantly.</p>
             </div>
-            {/* Filter pills */}
             <div className="flex gap-2 flex-wrap">
               {(['all', 'sports', 'music', 'festival'] as const).map(f => (
                 <button key={f} onClick={() => setActiveFilter(f)}
                   className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
-                  style={{
-                    background: activeFilter === f ? (f === 'all' ? SKY : catColor(f)) : '#F1F5F9',
-                    color: activeFilter === f ? 'white' : '#64748B',
-                  }}>
+                  style={{ background: activeFilter === f ? (f === 'all' ? SKY : catColor(f)) : '#F1F5F9', color: activeFilter === f ? 'white' : '#64748B' }}>
                   {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
@@ -775,7 +767,27 @@ export default function HomeClient() {
                           <TabsTrigger value="hotels" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Hotel size={14} />Hotels {response.hotels?.length > 0 && <span className="text-xs opacity-60">({response.hotels.length})</span>}</TabsTrigger>
                           <TabsTrigger value="flights" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Plane size={14} />Flights {response.flights?.length > 0 && <span className="text-xs opacity-60">({response.flights.length})</span>}</TabsTrigger>
                         </TabsList>
-                        <TabsContent value="itinerary">{itineraryData && <ItineraryView data={itineraryData} />}</TabsContent>
+
+                        {/* ── CHANGE 2: Download button added above ItineraryView ── */}
+                        <TabsContent value="itinerary">
+                          {itineraryData && (
+                            <>
+                              <div className="flex justify-end mb-4">
+                                <button
+                                  onClick={() => router.push('/itinerary')}
+                                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
+                                  style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}
+                                >
+                                  <Download size={15} />
+                                  View & Download Itinerary
+                                </button>
+                              </div>
+                              <ItineraryView data={itineraryData} />
+                            </>
+                          )}
+                        </TabsContent>
+                        {/* ──────────────────────────────────────────────────────── */}
+
                         <TabsContent value="hotels"><HotelResults hotels={response.hotels || []} onSaveItem={h => handleSave(h, 'hotel')} loading={false} /></TabsContent>
                         <TabsContent value="flights"><FlightResults flights={response.flights || []} onSaveItem={f => handleSave(f, 'flight')} loading={false} /></TabsContent>
                       </Tabs>

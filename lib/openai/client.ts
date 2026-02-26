@@ -120,6 +120,12 @@ You MUST return valid JSON matching this EXACT schema:
     "type": "sports" | "music" | "festival" | "conference" | "other" | null,
     "date": string | null,
     "venue": string | null
+    ticketUrl?: string | null;
+priceMin?: number | null;
+priceMax?: number | null;
+currency?: string | null;
+attraction?: string | null;
+time?: string | null;
   },
   "itinerary": [
     {
@@ -162,6 +168,9 @@ STRICT RULES
 - NEVER use markdown formatting
 - NEVER speak conversationally in the response
 - NEVER invent or fabricate affiliate links (use tool results only)
+- For affiliate_links.tickets: use the ticketUrl field from the search_events tool result. If ticketUrl is null or missing, set affiliate_links.tickets to "".
+- For affiliate_links.hotel: use the booking URL from search_hotels tool result.
+- For affiliate_links.flight: use the booking URL from search_flights tool result.
 - Only populate hotels and flights arrays if tools were executed successfully
 - If tool not executed, return empty arrays
 - Keep message field short, structured, and action-oriented
