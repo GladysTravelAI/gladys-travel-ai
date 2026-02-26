@@ -1,10 +1,5 @@
 // lib/services/predicthq.ts
 // 🌍 PredictHQ Event Intelligence API
-// Fills gaps Ticketmaster doesn't cover:
-// - Football/soccer matches globally
-// - Festivals in Africa, Asia, Middle East
-// - Free events, marathons, parades
-// - Demand impact scores for hotel/flight pricing
 
 const PHQ_BASE = 'https://api.predicthq.com/v1';
 const PHQ_KEY = process.env.PREDICTHQ_API_KEY!;
@@ -14,13 +9,13 @@ const PHQ_KEY = process.env.PREDICTHQ_API_KEY!;
 export interface PHQEvent {
   id: string;
   title: string;
-  category: string;        // "sports", "concerts", "festivals", "community", etc.
-  labels: string[];        // ["music", "festival", "outdoor"], etc.
-  start: string;           // ISO datetime
+  category: string;
+  labels: string[];
+  start: string;
   end: string;
   timezone: string;
-  country: string;         // "US", "ZA", "GB", etc.
-  location: [number, number]; // [longitude, latitude]
+  country: string;
+  location: [number, number];
   geo?: {
     address?: {
       city?: string;
@@ -30,13 +25,13 @@ export interface PHQEvent {
     };
     formatted_address?: string;
   };
-  rank: number;            // 0-100, higher = more impactful
+  rank: number;
   local_rank?: number;
-  phq_attendance?: number; // Predicted attendance
+  phq_attendance?: number;
   entities?: Array<{
     entity_id: string;
     name: string;
-    type: string;          // "venue", "organisation"
+    type: string;
     formatted_address?: string;
   }>;
   description?: string;
@@ -49,13 +44,13 @@ export interface NormalizedPHQEvent {
   name: string;
   category: 'sports' | 'music' | 'festival' | 'other';
   labels: string[];
-  date: string;            // YYYY-MM-DD
+  date: string;
   endDate?: string;
   city: string;
   country: string;
   countryCode: string;
   venue?: string;
-  rank: number;            // demand impact 0-100
+  rank: number;
   attendance?: number;
   description?: string;
   source: 'predicthq';
@@ -64,12 +59,12 @@ export interface NormalizedPHQEvent {
 // ==================== CATEGORY MAPPING ====================
 
 function mapPHQCategory(category: string, labels: string[]): NormalizedPHQEvent['category'] {
-  if (category === 'sports') return 'sports';
-  if (category === 'concerts') return 'music';
+  if (category === 'sports')    return 'sports';
+  if (category === 'concerts')  return 'music';
   if (category === 'festivals') return 'festival';
-  if (labels.includes('music')) return 'music';
+  if (labels.includes('music'))    return 'music';
   if (labels.includes('festival')) return 'festival';
-  if (labels.includes('sport')) return 'sports';
+  if (labels.includes('sport'))    return 'sports';
   return 'other';
 }
 
@@ -79,36 +74,33 @@ function normalize(e: PHQEvent): NormalizedPHQEvent {
   const countryCode = e.geo?.address?.country_code || e.country || '';
 
   return {
-    id: `phq-${e.id}`,
-    name: e.title,
-    category: mapPHQCategory(e.category, e.labels),
-    labels: e.labels,
-    date: e.start.split('T')[0],
-    endDate: e.end ? e.end.split('T')[0] : undefined,
+    id:          `phq-${e.id}`,
+    name:        e.title,
+    category:    mapPHQCategory(e.category, e.labels),
+    labels:      e.labels,
+    date:        e.start.split('T')[0],
+    endDate:     e.end ? e.end.split('T')[0] : undefined,
     city,
-    country: countryCode,
+    country:     countryCode,
     countryCode,
-    venue: venue?.name,
-    rank: e.rank,
-    attendance: e.phq_attendance,
+    venue:       venue?.name,
+    rank:        e.rank,
+    attendance:  e.phq_attendance,
     description: e.description,
-    source: 'predicthq',
+    source:      'predicthq',
   };
 }
 
-// ==================== API FUNCTIONS ====================
+// ==================== SEARCH ====================
 
-/**
- * Search PredictHQ events by keyword and optional location
- */
 export async function searchPHQEvents(params: {
-  keyword: string;
+  keyword?: string;         // optional — omit for broad category discovery
   countryCode?: string;
   city?: string;
-  startDate?: string;   // YYYY-MM-DD
+  startDate?: string;
   endDate?: string;
-  categories?: string;  // comma-separated: "sports,concerts,festivals"
-  minRank?: number;     // filter low-impact events
+  categories?: string;
+  minRank?: number;
   limit?: number;
 }): Promise<NormalizedPHQEvent[]> {
   if (!PHQ_KEY) {
@@ -128,25 +120,32 @@ export async function searchPHQEvents(params: {
   } = params;
 
   const url = new URL(`${PHQ_BASE}/events/`);
-  url.searchParams.set('q', keyword);
-  url.searchParams.set('limit', String(limit));
-  url.searchParams.set('sort', 'rank');
+
+  // CRITICAL: only set q when keyword is a real non-empty string.
+  // q= (empty string) returns ZERO results from PredictHQ.
+  // Omitting q entirely = broad discovery filtered by category + date.
+  if (keyword && keyword.trim().length > 0) {
+    url.searchParams.set('q', keyword.trim());
+  }
+
+  url.searchParams.set('limit',    String(limit));
+  url.searchParams.set('sort',     '-rank');
   url.searchParams.set('category', categories);
   url.searchParams.set('rank.gte', String(minRank));
-  url.searchParams.set('state', 'active');
+  url.searchParams.set('state',    'active');
 
-  if (countryCode) url.searchParams.set('country', countryCode.toUpperCase());
+  if (countryCode) url.searchParams.set('country',    countryCode.toUpperCase());
   if (city)        url.searchParams.set('place.name', city);
-  if (startDate)   url.searchParams.set('start.gte', startDate);
-  if (endDate)     url.searchParams.set('start.lte', endDate);
+  if (startDate)   url.searchParams.set('start.gte',  startDate);
+  if (endDate)     url.searchParams.set('start.lte',  endDate);
 
   try {
     const res = await fetch(url.toString(), {
       headers: {
         'Authorization': `Bearer ${PHQ_KEY}`,
-        'Accept': 'application/json',
+        'Accept':        'application/json',
       },
-      next: { revalidate: 300 }, // 5-min cache
+      next: { revalidate: 300 },
     });
 
     if (!res.ok) {
@@ -156,13 +155,13 @@ export async function searchPHQEvents(params: {
 
     const data = await res.json();
     const events: PHQEvent[] = data.results || [];
-
     const today = new Date().toISOString().split('T')[0];
+
     return events
       .filter(e => e.state !== 'cancelled' && e.state !== 'deleted' && e.state !== 'postponed')
       .map(normalize)
       .filter(e => e.date >= today)
-      .sort((a, b) => b.rank - a.rank); // highest impact first
+      .sort((a, b) => b.rank - a.rank);
 
   } catch (err) {
     console.error('❌ PredictHQ fetch failed:', err);
@@ -170,22 +169,11 @@ export async function searchPHQEvents(params: {
   }
 }
 
-/**
- * Find best single event match for a query
- */
 export async function findBestPHQMatch(query: string): Promise<NormalizedPHQEvent | null> {
-  const results = await searchPHQEvents({
-    keyword: query,
-    minRank: 40,
-    limit: 5,
-  });
+  const results = await searchPHQEvents({ keyword: query, minRank: 40, limit: 5 });
   return results[0] || null;
 }
 
-/**
- * Get demand impact score for a city on specific dates
- * Useful for showing users "prices will be higher due to X event"
- */
 export async function getDemandImpact(params: {
   city: string;
   countryCode: string;
@@ -193,12 +181,12 @@ export async function getDemandImpact(params: {
   endDate: string;
 }): Promise<{ rank: number; topEvents: NormalizedPHQEvent[] }> {
   const events = await searchPHQEvents({
-    keyword: params.city,
+    keyword:     params.city,
     countryCode: params.countryCode,
-    startDate: params.startDate,
-    endDate: params.endDate,
-    minRank: 50,
-    limit: 5,
+    startDate:   params.startDate,
+    endDate:     params.endDate,
+    minRank:     50,
+    limit:       5,
   });
 
   const avgRank = events.length > 0
