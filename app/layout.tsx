@@ -7,7 +7,6 @@ import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
-// Inter is an excellent system font that works beautifully with the opulent design
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -123,6 +122,9 @@ export default function RootLayout({
 
         <meta name="agd-partner-manual-verification" />
 
+        {/* FlexOffers Verification */}
+        <meta name="fo-verify" content="48d40b28-b7e9-4c44-ba48-1bf20f044f5a" />
+
         {/* Essential Meta Tags */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -146,12 +148,10 @@ export default function RootLayout({
       >
         <AuthProvider>
           <Providers>
-            {/* Main Content */}
             <main className="min-h-screen">
               {children}
             </main>
 
-            {/* Global Toast Notifications */}
             <Toaster 
               position="top-right"
               expand={true}
@@ -168,11 +168,9 @@ export default function RootLayout({
               }}
             />
 
-            {/* Analytics & Performance Monitoring */}
             <Analytics />
             <SpeedInsights />
 
-            {/* Accessibility: Skip to main content */}
             <a 
               href="#main-content" 
               className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-6 focus:py-3 focus:bg-amber-500 focus:text-white focus:rounded-xl focus:shadow-2xl focus:outline-none focus:ring-4 focus:ring-amber-300"

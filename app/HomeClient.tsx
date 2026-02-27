@@ -279,56 +279,6 @@ function EventHero({ event, budget, ticketsUrl }: { event: AgentResponse['event'
   );
 }
 
-// ─── ITINERARY BUILDER ────────────────────────────────────────────────────────
-
-function buildItinerary(r: AgentResponse, start?: Date | null, end?: Date | null): ItineraryData {
-  const total = r.itinerary?.length || 0;
-  if (!total) return { overview: '', tripSummary: { totalDays: 0, cities: [] }, budget: { totalBudget: '', dailyAverage: '' }, days: [] };
-
-  let dates: string[] = [];
-  const slots = r.travel_dates?.day_slots;
-  if (slots?.length) { dates = slots.map(s => s.date); }
-  else if (start) { for (let i = 0; i < total; i++) { const d = new Date(start); d.setDate(d.getDate() + i); dates.push(d.toISOString().split('T')[0]); } }
-  else {
-    const evDay = Math.ceil(total / 2);
-    const base = r.event?.date ? new Date(r.event.date) : new Date();
-    base.setDate(base.getDate() - (evDay - 1));
-    for (let i = 0; i < total; i++) { const d = new Date(base); d.setDate(d.getDate() + i); dates.push(d.toISOString().split('T')[0]); }
-  }
-
-  const evIdx = slots ? slots.findIndex(s => s.day_type === 'event_day') : Math.ceil(total / 2) - 1;
-  const evDayNum = evIdx >= 0 ? evIdx + 1 : Math.ceil(total / 2);
-  const evType: 'sports' | 'music' | 'festivals' = r.event?.type === 'festival' ? 'festivals' : r.event?.type === 'music' ? 'music' : 'sports';
-  const b = r.budget; const cur = b?.currency || 'USD';
-  const budgetData: ItineraryData['budget'] = b
-    ? { totalBudget: fmt(b.total, cur), dailyAverage: fmt(b.per_day_average, cur), eventDayCost: fmt(b.event_tickets + b.per_day_average, cur), breakdown: { accommodation: fmt(b.accommodation, cur), transport: fmt(b.transport, cur), food: fmt(b.food, cur), event: fmt(b.event_tickets, cur), activities: fmt(b.activities, cur) } }
-    : { totalBudget: 'USD 1,850', dailyAverage: 'USD 370', eventDayCost: 'USD 650', breakdown: { accommodation: 'USD 600', transport: 'USD 300', food: 'USD 250', event: 'USD 400', activities: 'USD 300' } };
-
-  const dpa = b?.per_day_average || 370;
-  const city = r.destination?.city || '';
-  const evName = r.event?.name || 'Event';
-  const evDate = r.event?.date || dates[evDayNum - 1] || '';
-  const evVenue = r.event?.venue || 'Event Venue';
-
-  return {
-    overview: `${total}-day ${evType} trip built around ${evName}.`,
-    eventAnchor: { eventName: evName, eventType: evType, eventDate: evDate, eventDay: evDayNum, venue: evVenue, city, country: r.destination?.country || '' },
-    tripSummary: { totalDays: total, cities: [city], highlights: r.itinerary.map(d => d.title), eventPhases: { preEvent: evDayNum - 1, eventDay: 1, postEvent: total - evDayNum } },
-    budget: budgetData,
-    days: r.itinerary.map((day, idx) => {
-      const isEvDay = idx + 1 === evDayNum;
-      const label = slots?.[idx]?.label || (isEvDay ? 'Event Day' : idx < evDayNum - 1 ? 'Pre-Event' : 'Post-Event');
-      const acts = day.activities || [];
-      return {
-        day: day.day, date: dates[idx] || '', city, theme: day.title, label, isEventDay: isEvDay,
-        morning: { time: '9:00 AM', activities: acts[0] || 'Morning exploration', location: city, cost: fmt(Math.round(dpa * 0.15), cur) },
-        afternoon: { time: '1:00 PM', activities: acts[1] || (isEvDay ? 'Pre-event build-up' : 'Afternoon exploration'), location: isEvDay ? evVenue : city, cost: fmt(Math.round(dpa * 0.25), cur) },
-        evening: { time: isEvDay ? '6:00 PM' : '6:00 PM', activities: acts[2] || (isEvDay ? `Attend ${evName}` : 'Evening activities'), location: isEvDay ? evVenue : city, cost: fmt(isEvDay ? (b?.event_tickets || 400) : Math.round(dpa * 0.35), cur), isEventBlock: isEvDay, ...(isEvDay && { eventDetails: { doors: '5:30 PM', startTime: '7:00 PM', duration: '2-3 hours', ticketUrl: r.affiliate_links?.tickets || r.event?.ticketUrl || '' } }) }
-      };
-    }),
-  };
-}
-
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function HomeClient() {
@@ -346,6 +296,10 @@ export default function HomeClient() {
   const [response, setResponse] = useState<AgentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('itinerary');
+
+  // ── Itinerary is now proper async state (not computed from agent response) ──
+  const [itineraryData, setItineraryData] = useState<ItineraryData | null>(null);
+  const [itineraryLoading, setItineraryLoading] = useState(false);
 
   // UI modals
   const [showSummary, setShowSummary] = useState(false);
@@ -374,20 +328,13 @@ export default function HomeClient() {
   const totalSaved = Object.values(savedItems).reduce((s, a) => s + a.length, 0);
   const destination = response?.destination?.city || '';
   const filtered = activeFilter === 'all' ? events : events.filter(e => e.category === activeFilter || (activeFilter === 'festival' && e.category === 'festival'));
-  const itineraryData = response && response.intent !== 'city_selection_required' ? buildItinerary(response, startDate, endDate) : null;
 
-  // ── CHANGE 1: Save itinerary to localStorage whenever it updates ──────────
-  // Allows the standalone /itinerary page to read and display it for download.
+  // Persist itinerary to localStorage whenever it updates (for /itinerary download page)
   useEffect(() => {
     if (itineraryData) {
-      try {
-        localStorage.setItem('gladys-itinerary-current', JSON.stringify(itineraryData));
-      } catch {
-        // Fail silently — private browsing or storage quota exceeded
-      }
+      try { localStorage.setItem('gladys-itinerary-current', JSON.stringify(itineraryData)); } catch {}
     }
   }, [itineraryData]);
-  // ──────────────────────────────────────────────────────────────────────────
 
   const handleSave = async (item: any, type: 'hotel' | 'flight' | 'restaurant' | 'activity') => {
     const si: SavedItem = { id: item.id?.toString() || Math.random().toString(), type, name: item.name || 'Unnamed', price: item.price?.toString() || '$0', location: item.location || '', date: item.date || '', image: item.image || '', affiliateUrl: item.bookingUrl || '#', partner: item.partner || 'TravelPayouts', description: item.description || '' };
@@ -404,18 +351,82 @@ export default function HomeClient() {
     setSavedItems(prev => { const k = (type + 's') as keyof typeof prev; return { ...prev, [k]: (prev[k] || []).filter((i: SavedItem) => i.id !== id) }; });
   };
 
+  // ── Helper: call /api/itinerary and set state ──────────────────────────────
+  const generateItinerary = async (agentData: AgentResponse) => {
+    if (!agentData.event?.name) return;
+    setItineraryLoading(true);
+    try {
+      const ev = agentData.event;
+      const res = await fetch('/api/itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventName:    ev.name,
+          eventDate:    ev.date,
+          eventVenue:   ev.venue || agentData.destination?.city || '',
+          eventCity:    agentData.destination?.city || '',
+          eventCountry: agentData.destination?.country || '',
+          eventType:    ev.type === 'festival' ? 'festivals' : ev.type === 'music' ? 'music' : 'sports',
+          ticketUrl:    ev.ticketUrl || agentData.affiliate_links?.tickets || null,
+          days:         5,
+          budget:       'mid',
+          groupSize:    1,
+          startDate:    agentData.travel_dates?.arrival_date,
+          endDate:      agentData.travel_dates?.departure_date,
+        })
+      });
+      const data = await res.json();
+      if (!data.days?.length) return;
+
+      // Merge real budget numbers from agent into itinerary display
+      if (agentData.budget) {
+        const b = agentData.budget;
+        const cur = b.currency || 'USD';
+        const f = (n: number) => `${cur} ${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        data.budget = {
+          totalBudget:  f(b.total),
+          dailyAverage: f(b.per_day_average),
+          eventDayCost: f(b.event_tickets + b.per_day_average),
+          breakdown: {
+            accommodation: f(b.accommodation),
+            transport:     f(b.transport),
+            food:          f(b.food),
+            event:         f(b.event_tickets),
+            activities:    f(b.activities),
+          }
+        };
+      }
+
+      setItineraryData(data as ItineraryData);
+    } catch (err) {
+      console.warn('Itinerary generation failed:', err);
+    } finally {
+      setItineraryLoading(false);
+    }
+  };
+
   const handleCitySelect = async (params: any) => {
     setLoading(true);
+    setItineraryData(null);
     const t = toast.loading('Building trip...');
     try {
-      const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: query, ...params, budget_level: 'mid', origin_country_code: 'ZA' }) });
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: query, ...params, budget_level: 'mid', origin_country_code: 'ZA' })
+      });
       const result = await res.json();
       if (!result.success) throw new Error(result.error);
       setResponse(result.data);
       toast.success('Trip ready!', { id: t });
       setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 300);
-    } catch (e: any) { toast.error('Failed', { id: t }); }
-    finally { setLoading(false); }
+      // Generate rich itinerary
+      if (result.data.event?.name) await generateItinerary(result.data);
+    } catch (e: any) {
+      toast.error('Failed', { id: t });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSearch = async (q?: string) => {
@@ -423,17 +434,40 @@ export default function HomeClient() {
     if (!loc.trim()) { toast.error('Enter an event or destination'); return; }
     if (!eventType) { toast.error('Select Sports, Music or Festivals first'); return; }
     setLoading(true);
+    setItineraryData(null);
     const t = toast.loading(`Searching "${loc}"...`);
     try {
-      const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: loc, context: { eventType, origin, days: 5, startDate: startDate?.toISOString(), endDate: endDate?.toISOString() } }) });
+      // Step 1: Agent — finds event, hotels, flights
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: loc,
+          context: { eventType, origin, days: 5, startDate: startDate?.toISOString(), endDate: endDate?.toISOString() }
+        })
+      });
       const result = await res.json();
       if (!result.success) throw new Error(result.error);
       setResponse(result.data);
       if (user) await profileManager.trackTripPlanned(user.uid, loc);
-      toast.success(result.data.intent === 'city_selection_required' ? `${result.data.event_name} — pick your city` : `Found: ${result.data.event?.name || loc}`, { id: t, description: `${result.data.hotels?.length || 0} hotels · ${result.data.flights?.length || 0} flights` });
+      toast.success(
+        result.data.intent === 'city_selection_required'
+          ? `${result.data.event_name} — pick your city`
+          : `Found: ${result.data.event?.name || loc}`,
+        { id: t, description: `${result.data.hotels?.length || 0} hotels · ${result.data.flights?.length || 0} flights` }
+      );
       setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 500);
-    } catch (e: any) { toast.error('Search failed', { id: t, description: (e as Error).message }); }
-    finally { setLoading(false); }
+
+      // Step 2: Itinerary — only for real events (not city selection prompts)
+      if (result.data.intent !== 'city_selection_required' && result.data.event?.name) {
+        await generateItinerary(result.data);
+      }
+
+    } catch (e: any) {
+      toast.error('Search failed', { id: t, description: (e as Error).message });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEventSearch = (name: string) => {
@@ -481,7 +515,7 @@ export default function HomeClient() {
                 const selected = eventType === key;
                 return (
                   <button key={key}
-                    onClick={() => { setEventType(key); setQuery(''); setResponse(null); }}
+                    onClick={() => { setEventType(key); setQuery(''); setResponse(null); setItineraryData(null); }}
                     className="flex flex-col items-center gap-2.5 p-4 rounded-2xl border-2 transition-all duration-200"
                     style={{ borderColor: selected ? c.accent : '#E2E8F0', background: selected ? c.bg : 'white' }}>
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all" style={{ background: selected ? c.accent : '#F1F5F9' }}>
@@ -768,9 +802,14 @@ export default function HomeClient() {
                           <TabsTrigger value="flights" className="flex items-center gap-2 rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm"><Plane size={14} />Flights {response.flights?.length > 0 && <span className="text-xs opacity-60">({response.flights.length})</span>}</TabsTrigger>
                         </TabsList>
 
-                        {/* ── CHANGE 2: Download button added above ItineraryView ── */}
                         <TabsContent value="itinerary">
-                          {itineraryData && (
+                          {itineraryLoading ? (
+                            <div className="flex flex-col items-center justify-center py-24 gap-4">
+                              <Loader2 size={36} className="animate-spin" style={{ color: SKY }} />
+                              <p className="text-slate-500 font-semibold">Building your day-by-day itinerary...</p>
+                              <p className="text-slate-400 text-sm">This takes ~10 seconds</p>
+                            </div>
+                          ) : itineraryData ? (
                             <>
                               <div className="flex justify-end mb-4">
                                 <button
@@ -784,9 +823,13 @@ export default function HomeClient() {
                               </div>
                               <ItineraryView data={itineraryData} />
                             </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-24 gap-3 text-slate-400">
+                              <Sparkles size={36} className="opacity-30" />
+                              <p className="font-semibold text-slate-500">Search for an event to see your itinerary</p>
+                            </div>
                           )}
                         </TabsContent>
-                        {/* ──────────────────────────────────────────────────────── */}
 
                         <TabsContent value="hotels"><HotelResults hotels={response.hotels || []} onSaveItem={h => handleSave(h, 'hotel')} loading={false} /></TabsContent>
                         <TabsContent value="flights"><FlightResults flights={response.flights || []} onSaveItem={f => handleSave(f, 'flight')} loading={false} /></TabsContent>
