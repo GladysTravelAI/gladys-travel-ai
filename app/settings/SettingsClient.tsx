@@ -4,305 +4,148 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/AuthContext";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  User, Bell, Lock, Globe, Moon, Mail, ChevronRight, LogOut, Trash2, Shield,
-  MapPin, Smartphone, Languages, HelpCircle, Sun, Sparkles, Star, TrendingUp, Award,
-  CreditCard, Camera, Download, History, Plane, CheckCircle, XCircle, Loader2,
-  AlertCircle, FileText, UserCircle, Key, Clock, Bookmark, Heart, Settings, Upload
-} from "lucide-react";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  User, Bell, Lock, Globe, Mail, ChevronRight, LogOut, Trash2, Shield,
+  MapPin, Smartphone, Languages, HelpCircle, Sun, Sparkles, Star, TrendingUp,
+  CreditCard, Camera, Download, History, Plane, CheckCircle, XCircle, Loader2,
+  AlertCircle, FileText, UserCircle, Key, Clock, Bookmark, Heart, Moon, Upload,
+} from "lucide-react";
+import Navbar  from "@/components/Navbar";
+import Footer  from "@/components/Footer";
+import { Button }    from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Input }     from "@/components/ui/input";
+import { Textarea }  from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import Image from "next/image";
 
-// Import all Settings Modals from Part 1
-import { 
-  PhotoUploadModal,
-  PasswordModal,
-  NotificationsModal,
-  LocationModal,
-  LanguageModal,
-  AppearanceModal
-} from "@/components/settings/SettingsModals-Part1";
-
-// Import all Settings Modals from Part 2
 import {
-  TravelPrefsModal,
-  TravelDocsModal,
-  PaymentMethodsModal,
-  EmergencyContactModal,
-  TwoFactorModal,
-  SavedTripsModal,
-  ActivityLogModal,
-  ExportDataModal
+  PhotoUploadModal, PasswordModal, NotificationsModal,
+  LocationModal, LanguageModal, AppearanceModal,
+} from "@/components/settings/SettingsModals-Part1";
+import {
+  TravelPrefsModal, TravelDocsModal, PaymentMethodsModal,
+  EmergencyContactModal, TwoFactorModal, SavedTripsModal,
+  ActivityLogModal, ExportDataModal,
 } from "@/components/settings/SettingsModals-Part2";
 
-// ==================== TYPES ====================
+const SKY = '#0EA5E9';
+
+// ── TYPES ──────────────────────────────────────────────────────────────────────
 
 interface UserSettings {
-  // Personal
-  displayName: string;
-  email: string;
-  phone: string;
-  bio: string;
-  photoUrl: string;
-  
-  // Location & Language
-  defaultLocation: string;
-  language: string;
-  timezone: string;
-  currency: string;
-  
-  // Notifications
-  notifications: {
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-    deals: boolean;
-    priceAlerts: boolean;
-    tripReminders: boolean;
-  };
-  
-  // Travel Preferences (Gladys Integration)
-  travelPrefs: {
-    budget: 'budget' | 'moderate' | 'luxury';
-    tripStyle: 'adventure' | 'relaxation' | 'cultural' | 'balanced';
-    seatPreference: 'window' | 'aisle' | 'no-preference';
-    mealPreference: string;
-    accessibility: string[];
-  };
-  
-  // Travel Documents
-  travelDocs: {
-    passportNumber: string;
-    passportExpiry: string;
-    tsaPrecheck: string;
-    knownTravelerNumber: string;
-    frequentFlyer: {
-      airline: string;
-      number: string;
-    }[];
-  };
-  
-  // Payment Methods
-  paymentMethods: {
-    id: string;
-    type: 'card' | 'paypal' | 'apple-pay';
-    last4: string;
-    brand: string;
-    expiryMonth: string;
-    expiryYear: string;
-    isDefault: boolean;
-  }[];
-  
-  // Emergency Contact
-  emergencyContact: {
-    name: string;
-    relationship: string;
-    phone: string;
-    email: string;
-  };
-  
-  // Security
-  security: {
-    twoFactorEnabled: boolean;
-    emailVerified: boolean;
-    phoneVerified: boolean;
-  };
-  
-  // Preferences
-  appearance: 'light' | 'dark' | 'system';
+  displayName: string; email: string; phone: string; bio: string; photoUrl: string;
+  defaultLocation: string; language: string; timezone: string; currency: string;
+  notifications: { email: boolean; push: boolean; sms: boolean; deals: boolean; priceAlerts: boolean; tripReminders: boolean };
+  travelPrefs: { budget: 'budget'|'moderate'|'luxury'; tripStyle: 'adventure'|'relaxation'|'cultural'|'balanced'; seatPreference: 'window'|'aisle'|'no-preference'; mealPreference: string; accessibility: string[] };
+  travelDocs: { passportNumber: string; passportExpiry: string; tsaPrecheck: string; knownTravelerNumber: string; frequentFlyer: { airline: string; number: string }[] };
+  paymentMethods: { id: string; type: 'card'|'paypal'|'apple-pay'; last4: string; brand: string; expiryMonth: string; expiryYear: string; isDefault: boolean }[];
+  emergencyContact: { name: string; relationship: string; phone: string; email: string };
+  security: { twoFactorEnabled: boolean; emailVerified: boolean; phoneVerified: boolean };
+  appearance: 'light'|'dark'|'system';
 }
 
+// ── MAIN ───────────────────────────────────────────────────────────────────────
+
 export default function SettingsClient() {
-  const { user, logout, loading: authLoading } = useAuth();
+  const { user, userProfile, logout, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+
+  const [loading,        setLoading]        = useState(false);
+  const [saving,         setSaving]         = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Modal states
-  const [personalInfoOpen, setPersonalInfoOpen] = useState(false);
-  const [photoUploadOpen, setPhotoUploadOpen] = useState(false);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [locationOpen, setLocationOpen] = useState(false);
-  const [languageOpen, setLanguageOpen] = useState(false);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [travelPrefsOpen, setTravelPrefsOpen] = useState(false);
-  const [travelDocsOpen, setTravelDocsOpen] = useState(false);
-  const [paymentMethodsOpen, setPaymentMethodsOpen] = useState(false);
-  const [emergencyContactOpen, setEmergencyContactOpen] = useState(false);
-  const [twoFactorOpen, setTwoFactorOpen] = useState(false);
-  const [savedTripsOpen, setSavedTripsOpen] = useState(false);
-  const [activityLogOpen, setActivityLogOpen] = useState(false);
-  const [exportDataOpen, setExportDataOpen] = useState(false);
+  // Modals
+  const [personalInfoOpen,    setPersonalInfoOpen]    = useState(false);
+  const [photoUploadOpen,     setPhotoUploadOpen]     = useState(false);
+  const [passwordOpen,        setPasswordOpen]        = useState(false);
+  const [notificationsOpen,   setNotificationsOpen]   = useState(false);
+  const [locationOpen,        setLocationOpen]        = useState(false);
+  const [languageOpen,        setLanguageOpen]        = useState(false);
+  const [appearanceOpen,      setAppearanceOpen]      = useState(false);
+  const [travelPrefsOpen,     setTravelPrefsOpen]     = useState(false);
+  const [travelDocsOpen,      setTravelDocsOpen]      = useState(false);
+  const [paymentMethodsOpen,  setPaymentMethodsOpen]  = useState(false);
+  const [emergencyOpen,       setEmergencyOpen]       = useState(false);
+  const [twoFactorOpen,       setTwoFactorOpen]       = useState(false);
+  const [savedTripsOpen,      setSavedTripsOpen]      = useState(false);
+  const [activityLogOpen,     setActivityLogOpen]     = useState(false);
+  const [exportDataOpen,      setExportDataOpen]      = useState(false);
 
-  // Settings state
   const [settings, setSettings] = useState<UserSettings>({
-    // Personal
-    displayName: user?.displayName || "",
-    email: user?.email || "",
-    phone: "",
-    bio: "",
-    photoUrl: user?.photoURL || "",
-    
-    // Location
-    defaultLocation: "Johannesburg, South Africa",
-    language: "en-US",
-    timezone: "Africa/Johannesburg",
-    currency: "ZAR",
-    
-    // Notifications
-    notifications: {
-      email: true,
-      push: false,
-      sms: false,
-      deals: true,
-      priceAlerts: true,
-      tripReminders: true
-    },
-    
-    // Travel Preferences
-    travelPrefs: {
-      budget: 'moderate',
-      tripStyle: 'balanced',
-      seatPreference: 'window',
-      mealPreference: 'No preference',
-      accessibility: []
-    },
-    
-    // Travel Documents
-    travelDocs: {
-      passportNumber: '',
-      passportExpiry: '',
-      tsaPrecheck: '',
-      knownTravelerNumber: '',
-      frequentFlyer: []
-    },
-    
-    // Payment Methods
+    displayName:   '',
+    email:         '',
+    phone:         '',
+    bio:           '',
+    photoUrl:      '',
+    defaultLocation: 'Johannesburg, South Africa',
+    language:      'en-US',
+    timezone:      'Africa/Johannesburg',
+    currency:      'ZAR',
+    notifications: { email: true, push: false, sms: false, deals: true, priceAlerts: true, tripReminders: true },
+    travelPrefs:   { budget: 'moderate', tripStyle: 'balanced', seatPreference: 'window', mealPreference: 'No preference', accessibility: [] },
+    travelDocs:    { passportNumber: '', passportExpiry: '', tsaPrecheck: '', knownTravelerNumber: '', frequentFlyer: [] },
     paymentMethods: [],
-    
-    // Emergency Contact
-    emergencyContact: {
-      name: '',
-      relationship: '',
-      phone: '',
-      email: ''
-    },
-    
-    // Security
-    security: {
-      twoFactorEnabled: false,
-      emailVerified: false,
-      phoneVerified: false
-    },
-    
-    // Appearance
-    appearance: 'system'
+    emergencyContact: { name: '', relationship: '', phone: '', email: '' },
+    security:      { twoFactorEnabled: false, emailVerified: false, phoneVerified: false },
+    appearance:    'system',
   });
 
-  // Stats (mock - should come from API)
-  const [stats, setStats] = useState({
-    tripsPlanned: 12,
-    tripsSaved: 5,
-    favoritesCount: 8,
-    averageRating: 4.9,
-    memberSince: '2024'
-  });
-
-  // Load settings from localStorage/API
+  // ── Redirect if not logged in ──
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/signin");
-      return;
-    }
-
-    if (user) {
-      loadSettings();
-    }
+    if (!authLoading && !user) router.push('/signin');
   }, [user, authLoading, router]);
 
-  const loadSettings = async () => {
+  // ── Load settings + merge real Firebase data ──
+  useEffect(() => {
+    if (!user) return;
     try {
-      // Try to load from localStorage first
       const saved = localStorage.getItem('gladys-user-settings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setSettings(prev => ({ ...prev, ...parsed }));
-      }
+      const parsed = saved ? JSON.parse(saved) : {};
+      setSettings(prev => ({
+        ...prev,
+        ...parsed,
+        // Always prefer live Firebase values over stale localStorage
+        displayName: userProfile?.name  || user.displayName || parsed.displayName || '',
+        email:       user.email         || parsed.email      || '',
+        photoUrl:    userProfile?.profileImage || user.photoURL || parsed.photoUrl || '',
+        security: {
+          ...prev.security,
+          emailVerified: user.emailVerified || false,
+        },
+      }));
+    } catch {}
+  }, [user, userProfile]);
 
-      // Also sync with Gladys context
-      const gladysContext = localStorage.getItem('gladys-context');
-      if (gladysContext) {
-        const context = JSON.parse(gladysContext);
-        setSettings(prev => ({
-          ...prev,
-          travelPrefs: {
-            ...prev.travelPrefs,
-            budget: context.budget || prev.travelPrefs.budget
-          }
-        }));
-      }
-
-      // In production, fetch from API:
-      // const response = await fetch('/api/settings');
-      // const data = await response.json();
-      // setSettings(data);
-    } catch (error) {
-      console.error('Failed to load settings:', error);
-    }
+  // ── Real stats from userProfile ──
+  const stats = {
+    tripsPlanned: userProfile?.totalTripsPlanned ?? 0,
+    savedCount:   0,
+    memberSince:  userProfile?.createdAt
+      ? new Date(userProfile.createdAt).getFullYear().toString()
+      : new Date().getFullYear().toString(),
   };
 
   const saveSettings = async (updates: Partial<UserSettings>) => {
     setSaving(true);
     try {
-      const newSettings = { ...settings, ...updates };
-      setSettings(newSettings);
-      
-      // Save to localStorage
-      localStorage.setItem('gladys-user-settings', JSON.stringify(newSettings));
-      
-      // Sync with Gladys context
-      const gladysContext = {
-        name: newSettings.displayName,
-        budget: newSettings.travelPrefs.budget,
-        preferredCities: [newSettings.defaultLocation],
-        travelStyle: newSettings.travelPrefs.tripStyle,
-        conversationCount: 0,
-        recentQueries: []
-      };
-      localStorage.setItem('gladys-context', JSON.stringify(gladysContext));
-
-      // In production, save to API:
-      // await fetch('/api/settings', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(newSettings)
-      // });
-
-      toast.success("Settings saved successfully!", {
-        icon: <CheckCircle className="text-green-500" size={20} />
-      });
-    } catch (error) {
-      console.error('Failed to save settings:', error);
-      toast.error("Failed to save settings. Please try again.", {
-        icon: <XCircle className="text-red-500" size={20} />
-      });
+      const next = { ...settings, ...updates };
+      setSettings(next);
+      localStorage.setItem('gladys-user-settings', JSON.stringify(next));
+      // Sync travel prefs into gladys-context
+      localStorage.setItem('gladys-context', JSON.stringify({
+        name: next.displayName,
+        budget: next.travelPrefs.budget,
+        preferredCities: [next.defaultLocation],
+        travelStyle: next.travelPrefs.tripStyle,
+      }));
+      toast.success('Settings saved');
+    } catch {
+      toast.error('Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -311,18 +154,11 @@ export default function SettingsClient() {
   const handlePhotoUpload = async (file: File) => {
     setUploadingPhoto(true);
     try {
-      // In production, upload to storage service
-      // For now, create local URL
       const photoUrl = URL.createObjectURL(file);
       await saveSettings({ photoUrl });
-      
-      toast.success("Profile photo updated!", {
-        icon: <CheckCircle className="text-green-500" size={20} />
-      });
-    } catch (error) {
-      toast.error("Failed to upload photo", {
-        icon: <XCircle className="text-red-500" size={20} />
-      });
+      toast.success('Profile photo updated');
+    } catch {
+      toast.error('Failed to upload photo');
     } finally {
       setUploadingPhoto(false);
       setPhotoUploadOpen(false);
@@ -330,42 +166,25 @@ export default function SettingsClient() {
   };
 
   const handleExportData = async () => {
-    try {
-      const dataToExport = {
-        profile: settings,
-        stats,
-        exportedAt: new Date().toISOString()
-      };
-      
-      const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gladys-data-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      
-      toast.success("Data exported successfully!", {
-        icon: <Download className="text-green-500" size={20} />
-      });
-    } catch (error) {
-      toast.error("Failed to export data", {
-        icon: <XCircle className="text-red-500" size={20} />
-      });
-    }
+    const blob = new Blob([JSON.stringify({ profile: settings, stats, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `gladys-data-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    toast.success('Data exported');
   };
 
   const handleSignOut = async () => {
     setLoading(true);
     await logout();
-    router.push("/");
+    router.push('/');
   };
 
   const toggleDarkMode = (mode: 'light' | 'dark' | 'system') => {
     saveSettings({ appearance: mode });
-    
     if (mode === 'system') {
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.classList.toggle('dark', isDark);
+      document.documentElement.classList.toggle('dark', window.matchMedia('(prefers-color-scheme: dark)').matches);
     } else {
       document.documentElement.classList.toggle('dark', mode === 'dark');
     }
@@ -373,517 +192,251 @@ export default function SettingsClient() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-opulent-subtle">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg font-semibold text-gray-900 dark:text-white">Loading your settings...</p>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-slate-200 border-t-sky-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-slate-500 text-sm font-semibold">Loading settings...</p>
+        </div>
       </div>
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-amber-50/30 to-white dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
+    <div className="min-h-screen bg-white"
+      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
       <Navbar />
-      
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        {/* Header with Profile */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
-        >
-          <div className="bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 rounded-3xl p-8 shadow-2xl">
-            <div className="flex flex-col md:flex-row items-center gap-6">
-              {/* Profile Photo */}
-              <div className="relative">
-                <div className="w-32 h-32 rounded-full border-4 border-white dark:border-zinc-900 overflow-hidden bg-white dark:bg-zinc-800 shadow-xl">
-                  {settings.photoUrl ? (
-                    <Image 
-                      src={settings.photoUrl} 
-                      alt={settings.displayName}
-                      width={128}
-                      height={128}
-                      className="object-cover w-full h-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-amber-100 to-purple-100 dark:from-amber-900 dark:to-purple-900">
-                      <User size={48} className="text-amber-600" />
-                    </div>
-                  )}
+
+      <div className="max-w-6xl mx-auto px-4 pt-28 pb-16">
+
+        {/* ── PROFILE HEADER ── */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
+          <div className="rounded-3xl p-7 sm:p-8 shadow-xl overflow-hidden relative"
+            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7, #1E40AF)' }}>
+
+            {/* Decorative circles */}
+            <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full border-4 border-white/10" />
+            <div className="absolute -right-4 -bottom-8  w-40 h-40 rounded-full border-4 border-white/10" />
+
+            <div className="relative flex flex-col md:flex-row items-center gap-6">
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-white/30 overflow-hidden bg-white/20 shadow-xl">
+                  {settings.photoUrl
+                    ? <Image src={settings.photoUrl} alt={settings.displayName} width={112} height={112} className="object-cover w-full h-full" />
+                    : <div className="w-full h-full flex items-center justify-center">
+                        <User size={44} className="text-white/80" />
+                      </div>
+                  }
                 </div>
-                <button
-                  onClick={() => setPhotoUploadOpen(true)}
-                  className="absolute bottom-0 right-0 w-10 h-10 bg-white dark:bg-zinc-900 rounded-full border-2 border-amber-500 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-                >
-                  <Camera size={18} className="text-amber-600" />
+                <button onClick={() => setPhotoUploadOpen(true)}
+                  className="absolute bottom-0 right-0 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  style={{ color: SKY }}>
+                  <Camera size={16} />
                 </button>
               </div>
 
-              {/* Profile Info */}
-              <div className="flex-1 text-center md:text-left text-white">
-                <h1 className="text-4xl font-bold mb-2">{settings.displayName || user.email}</h1>
-                <p className="text-white/90 mb-4">{settings.email}</p>
-                
-                <div className="flex flex-wrap items-center gap-3 justify-center md:justify-start">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
-                    {settings.security.emailVerified ? (
-                      <>
-                        <CheckCircle size={16} />
-                        <span className="text-sm font-medium">Email Verified</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle size={16} />
-                        <span className="text-sm font-medium">Email Not Verified</span>
-                      </>
-                    )}
-                  </div>
-                  
+              {/* Info */}
+              <div className="flex-1 text-center md:text-left text-white min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-black mb-1 truncate">
+                  {settings.displayName || user.email}
+                </h1>
+                <p className="text-white/70 text-sm mb-3 truncate">{user.email}</p>
+                <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-bold">
+                    {user.emailVerified
+                      ? <><CheckCircle size={12} />Email Verified</>
+                      : <><AlertCircle size={12} />Email Not Verified</>
+                    }
+                  </span>
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-bold">
+                    <Clock size={12} />Member since {stats.memberSince}
+                  </span>
                   {settings.security.twoFactorEnabled && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
-                      <Shield size={16} />
-                      <span className="text-sm font-medium">2FA Enabled</span>
-                    </div>
+                    <span className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-bold">
+                      <Shield size={12} />2FA Active
+                    </span>
                   )}
-                  
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
-                    <Clock size={16} />
-                    <span className="text-sm font-medium">Member since {stats.memberSince}</span>
-                  </div>
                 </div>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
-                  <TrendingUp size={24} className="mx-auto mb-2" />
-                  <div className="text-2xl font-bold">{stats.tripsPlanned}</div>
-                  <div className="text-xs opacity-90">Trips</div>
-                </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
-                  <Heart size={24} className="mx-auto mb-2" />
-                  <div className="text-2xl font-bold">{stats.favoritesCount}</div>
-                  <div className="text-xs opacity-90">Saved</div>
-                </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
-                  <Star size={24} className="mx-auto mb-2 fill-white" />
-                  <div className="text-2xl font-bold">{stats.averageRating}</div>
-                  <div className="text-xs opacity-90">Rating</div>
-                </div>
+              <div className="flex gap-3 flex-shrink-0">
+                {[
+                  { icon: TrendingUp, value: stats.tripsPlanned, label: 'Trips'  },
+                  { icon: Bookmark,   value: stats.savedCount,   label: 'Saved'  },
+                ].map((s, i) => (
+                  <div key={i} className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 text-center min-w-[72px]">
+                    <s.icon size={20} className="mx-auto mb-1 text-white" />
+                    <div className="text-xl font-black text-white">{s.value}</div>
+                    <div className="text-[11px] text-white/70 font-semibold">{s.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Main Settings */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Personal Information */}
-            <SettingsSection title="Personal Information" icon={User}>
-              <SettingsItem
-                icon={UserCircle}
-                label="Profile Details"
-                description="Name, bio, and contact information"
-                onClick={() => setPersonalInfoOpen(true)}
-              />
-              <SettingsItem
-                icon={Camera}
-                label="Profile Photo"
-                description="Upload or change your profile picture"
-                onClick={() => setPhotoUploadOpen(true)}
-              />
-            </SettingsSection>
+        {/* ── SETTINGS GRID ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            {/* Travel Preferences (Gladys Integration) */}
-            <SettingsSection title="Travel Preferences" icon={Plane}>
-              <div className="px-6 py-4 bg-gradient-to-r from-amber-50 to-purple-50 dark:from-amber-900/10 dark:to-purple-900/10 border-b">
-                <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
-                  <Sparkles size={16} />
-                  <span className="font-semibold">Syncs with Gladys AI</span>
+          {/* ── LEFT: Main ── */}
+          <div className="lg:col-span-2 space-y-6">
+
+            <Section title="Personal Information" icon={User}>
+              <Item icon={UserCircle} label="Profile Details"    desc="Name, bio, and contact information"   onClick={() => setPersonalInfoOpen(true)} />
+              <Item icon={Camera}     label="Profile Photo"      desc="Upload or change your profile picture" onClick={() => setPhotoUploadOpen(true)}  />
+            </Section>
+
+            <Section title="Travel Preferences" icon={Plane}>
+              <div className="px-5 py-3 border-b border-slate-100" style={{ background: '#F0F9FF' }}>
+                <div className="flex items-center gap-2 text-xs font-bold" style={{ color: SKY }}>
+                  <Sparkles size={13} />Syncs with Gladys AI
                 </div>
               </div>
-              <SettingsItem
-                icon={Globe}
-                label="Trip Preferences"
-                description={`${settings.travelPrefs.budget} · ${settings.travelPrefs.tripStyle}`}
-                onClick={() => setTravelPrefsOpen(true)}
-              />
-              <SettingsItem
-                icon={FileText}
-                label="Travel Documents"
-                description="Passport, TSA PreCheck, frequent flyer"
-                onClick={() => setTravelDocsOpen(true)}
-              />
-              <SettingsItem
-                icon={User}
-                label="Emergency Contact"
-                description={settings.emergencyContact.name || "Not set"}
-                onClick={() => setEmergencyContactOpen(true)}
-              />
-            </SettingsSection>
+              <Item icon={Globe}    label="Trip Preferences"   desc={`${settings.travelPrefs.budget} · ${settings.travelPrefs.tripStyle}`} onClick={() => setTravelPrefsOpen(true)} />
+              <Item icon={FileText} label="Travel Documents"   desc="Passport, TSA PreCheck, frequent flyer"                                onClick={() => setTravelDocsOpen(true)}  />
+              <Item icon={User}     label="Emergency Contact"  desc={settings.emergencyContact.name || 'Not set'}                          onClick={() => setEmergencyOpen(true)}   />
+            </Section>
 
-            {/* Payment & Billing */}
-            <SettingsSection title="Payment & Billing" icon={CreditCard}>
-              <SettingsItem
-                icon={CreditCard}
-                label="Payment Methods"
-                description={`${settings.paymentMethods.length} saved cards`}
-                onClick={() => setPaymentMethodsOpen(true)}
-                badge={settings.paymentMethods.length > 0 ? `${settings.paymentMethods.length}` : undefined}
-              />
-            </SettingsSection>
+            <Section title="Payment & Billing" icon={CreditCard}>
+              <Item icon={CreditCard} label="Payment Methods" desc={`${settings.paymentMethods.length} saved cards`} onClick={() => setPaymentMethodsOpen(true)}
+                badge={settings.paymentMethods.length > 0 ? String(settings.paymentMethods.length) : undefined} />
+            </Section>
 
-            {/* Notifications */}
-            <SettingsSection title="Notifications" icon={Bell}>
-              <SettingsItem
-                icon={Bell}
-                label="Notification Preferences"
-                description="Email, push, SMS, and price alerts"
-                onClick={() => setNotificationsOpen(true)}
-              />
-            </SettingsSection>
+            <Section title="Notifications" icon={Bell}>
+              <Item icon={Bell} label="Notification Preferences" desc="Email, push, SMS, and price alerts" onClick={() => setNotificationsOpen(true)} />
+            </Section>
 
-            {/* Location & Language */}
-            <SettingsSection title="Location & Language" icon={Globe}>
-              <SettingsItem
-                icon={MapPin}
-                label="Default Location"
-                description={settings.defaultLocation}
-                onClick={() => setLocationOpen(true)}
-              />
-              <SettingsItem
-                icon={Languages}
-                label="Language & Region"
-                description={`${settings.language} · ${settings.currency}`}
-                onClick={() => setLanguageOpen(true)}
-              />
-              <SettingsItem
-                icon={settings.appearance === 'dark' ? Moon : Sun}
-                label="Appearance"
-                description={settings.appearance === 'system' ? 'System default' : settings.appearance}
-                onClick={() => setAppearanceOpen(true)}
-              />
-            </SettingsSection>
+            <Section title="Location & Language" icon={Globe}>
+              <Item icon={MapPin}    label="Default Location"  desc={settings.defaultLocation}                                                    onClick={() => setLocationOpen(true)}  />
+              <Item icon={Languages} label="Language & Region" desc={`${settings.language} · ${settings.currency}`}                               onClick={() => setLanguageOpen(true)}  />
+              <Item icon={settings.appearance === 'dark' ? Moon : Sun}
+                                     label="Appearance"        desc={settings.appearance === 'system' ? 'System default' : settings.appearance}    onClick={() => setAppearanceOpen(true)} />
+            </Section>
           </div>
 
-          {/* Right Column - Quick Actions & Security */}
-          <div className="space-y-8">
-            {/* Quick Actions */}
-            <SettingsSection title="Quick Actions" icon={Sparkles}>
-              <SettingsItem
-                icon={Bookmark}
-                label="Saved Trips"
-                description={`${stats.tripsSaved} saved itineraries`}
-                onClick={() => setSavedTripsOpen(true)}
-                compact
-              />
-              <SettingsItem
-                icon={History}
-                label="Activity Log"
-                description="View your account activity"
-                onClick={() => setActivityLogOpen(true)}
-                compact
-              />
-              <SettingsItem
-                icon={Download}
-                label="Export Data"
-                description="Download your data"
-                onClick={() => setExportDataOpen(true)}
-                compact
-              />
-            </SettingsSection>
+          {/* ── RIGHT: Quick actions + Security + Support + Account ── */}
+          <div className="space-y-6">
 
-            {/* Security */}
-            <SettingsSection title="Security & Privacy" icon={Shield}>
-              <SettingsItem
-                icon={Lock}
-                label="Change Password"
-                description="Update your password"
-                onClick={() => setPasswordOpen(true)}
-                compact
-              />
-              <SettingsItem
-                icon={Key}
-                label="Two-Factor Auth"
-                description={settings.security.twoFactorEnabled ? "Enabled" : "Disabled"}
-                onClick={() => setTwoFactorOpen(true)}
-                compact
-                badge={settings.security.twoFactorEnabled ? undefined : "!"}
-              />
-            </SettingsSection>
+            <Section title="Quick Actions" icon={Sparkles}>
+              <Item icon={Bookmark} label="Saved Trips"   desc={`${stats.savedCount} saved itineraries`}  onClick={() => setSavedTripsOpen(true)}   compact />
+              <Item icon={History}  label="Activity Log"  desc="View your account activity"                onClick={() => setActivityLogOpen(true)}  compact />
+              <Item icon={Download} label="Export Data"   desc="Download your data"                        onClick={() => setExportDataOpen(true)}   compact />
+            </Section>
 
-            {/* Support */}
-            <SettingsSection title="Support" icon={HelpCircle}>
-              <SettingsItem
-                icon={HelpCircle}
-                label="Help Center"
-                description="Get help and support"
-                onClick={() => window.open('mailto:support@gladystravel.ai', '_blank')}
-                compact
-              />
-              <SettingsItem
-                icon={Smartphone}
-                label="Contact Us"
-                description="support@gladystravel.ai"
-                onClick={() => window.open('mailto:support@gladystravel.ai', '_blank')}
-                compact
-              />
-            </SettingsSection>
+            <Section title="Security & Privacy" icon={Shield}>
+              <Item icon={Lock} label="Change Password"   desc="Update your password"                                             onClick={() => setPasswordOpen(true)}   compact />
+              <Item icon={Key}  label="Two-Factor Auth"   desc={settings.security.twoFactorEnabled ? 'Enabled' : 'Disabled'}     onClick={() => setTwoFactorOpen(true)}  compact
+                badge={settings.security.twoFactorEnabled ? undefined : '!'} />
+            </Section>
 
-            {/* Danger Zone */}
-            <SettingsSection title="Account Actions" icon={AlertCircle}>
-              <SettingsItem
-                icon={LogOut}
-                label="Sign Out"
-                description="Sign out of your account"
-                onClick={handleSignOut}
-                danger
-                compact
-              />
-              <SettingsItem
-                icon={Trash2}
-                label="Delete Account"
-                description="Permanently delete"
-                onClick={() => {}}
-                danger
-                compact
-              />
-            </SettingsSection>
+            <Section title="Support" icon={HelpCircle}>
+              <Item icon={HelpCircle} label="Help Center" desc="Get help and support"       onClick={() => window.open('mailto:contact@gladystravel.com', '_blank')} compact />
+              <Item icon={Smartphone} label="Contact Us"  desc="contact@gladystravel.com"  onClick={() => window.open('mailto:contact@gladystravel.com', '_blank')} compact />
+            </Section>
+
+            <Section title="Account Actions" icon={AlertCircle}>
+              <Item icon={LogOut} label="Sign Out"       desc="Sign out of your account" onClick={handleSignOut}   danger compact />
+              <Item icon={Trash2} label="Delete Account" desc="Permanently delete"       onClick={() => {}}        danger compact />
+            </Section>
           </div>
         </div>
 
-        {/* Version Info */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-16 text-center"
-        >
-          <div className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-            <Sparkles size={14} className="text-amber-500" />
-            <span>Gladys Travel AI • Version 3.0 Opulent</span>
+        {/* ── VERSION ── */}
+        <div className="mt-14 text-center">
+          <div className="inline-flex items-center gap-2 text-xs text-slate-400">
+            <Sparkles size={12} style={{ color: SKY }} />
+            GladysTravel.com · © 2026
           </div>
-          <p className="mt-2 text-sm text-gray-400 dark:text-gray-500">
-            © 2025 Gladys. Crafted with excellence.
-          </p>
-        </motion.div>
+        </div>
       </div>
 
       <Footer />
 
-      {/* Global Saving Indicator */}
+      {/* Saving indicator */}
       <AnimatePresence>
         {saving && (
           <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-8 right-8 bg-white dark:bg-zinc-900 border-2 border-amber-500 rounded-2xl px-6 py-4 shadow-2xl flex items-center gap-3 z-50"
-          >
-            <Loader2 className="animate-spin text-amber-600" size={20} />
-            <span className="font-semibold text-gray-900 dark:text-white">Saving changes...</span>
+            initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 right-8 bg-white border-2 rounded-2xl px-5 py-3.5 shadow-2xl flex items-center gap-3 z-50"
+            style={{ borderColor: SKY }}>
+            <Loader2 className="animate-spin" size={18} style={{ color: SKY }} />
+            <span className="font-bold text-slate-900 text-sm">Saving...</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ==================== ALL MODALS FROM PART 1 & PART 2 ==================== */}
-      
-      {/* Personal Info Modal (inline - not in Part1/Part2) */}
-      <PersonalInfoModal
-        open={personalInfoOpen}
-        onClose={() => setPersonalInfoOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Photo Upload Modal - From Part 1 */}
-      <PhotoUploadModal
-        open={photoUploadOpen}
-        onClose={() => setPhotoUploadOpen(false)}
-        onUpload={handlePhotoUpload}
-        uploading={uploadingPhoto}
-      />
-
-      {/* Password Modal - From Part 1 */}
-      <PasswordModal
-        open={passwordOpen}
-        onClose={() => setPasswordOpen(false)}
-      />
-
-      {/* Notifications Modal - From Part 1 */}
-      <NotificationsModal
-        open={notificationsOpen}
-        onClose={() => setNotificationsOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Location Modal - From Part 1 */}
-      <LocationModal
-        open={locationOpen}
-        onClose={() => setLocationOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Language Modal - From Part 1 */}
-      <LanguageModal
-        open={languageOpen}
-        onClose={() => setLanguageOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Appearance Modal - From Part 1 */}
-      <AppearanceModal
-        open={appearanceOpen}
-        onClose={() => setAppearanceOpen(false)}
-        appearance={settings.appearance}
-        onSave={toggleDarkMode}
-      />
-
-      {/* Travel Prefs Modal - From Part 2 */}
-      <TravelPrefsModal
-        open={travelPrefsOpen}
-        onClose={() => setTravelPrefsOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Travel Docs Modal - From Part 2 */}
-      <TravelDocsModal
-        open={travelDocsOpen}
-        onClose={() => setTravelDocsOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Payment Methods Modal - From Part 2 */}
-      <PaymentMethodsModal
-        open={paymentMethodsOpen}
-        onClose={() => setPaymentMethodsOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Emergency Contact Modal - From Part 2 */}
-      <EmergencyContactModal
-        open={emergencyContactOpen}
-        onClose={() => setEmergencyContactOpen(false)}
-        settings={settings}
-        onSave={saveSettings}
-      />
-
-      {/* Two Factor Modal - From Part 2 */}
-      <TwoFactorModal
-        open={twoFactorOpen}
-        onClose={() => setTwoFactorOpen(false)}
-        enabled={settings.security.twoFactorEnabled}
-        onToggle={(enabled: any) => saveSettings({ 
-          security: { ...settings.security, twoFactorEnabled: enabled }
-        })}
-      />
-
-      {/* Saved Trips Modal - From Part 2 */}
-      <SavedTripsModal
-        open={savedTripsOpen}
-        onClose={() => setSavedTripsOpen(false)}
-      />
-
-      {/* Activity Log Modal - From Part 2 */}
-      <ActivityLogModal
-        open={activityLogOpen}
-        onClose={() => setActivityLogOpen(false)}
-      />
-
-      {/* Export Data Modal - From Part 2 */}
-      <ExportDataModal
-        open={exportDataOpen}
-        onClose={() => setExportDataOpen(false)}
-        onExport={handleExportData}
-      />
+      {/* ── MODALS ── */}
+      <PersonalInfoModal open={personalInfoOpen} onClose={() => setPersonalInfoOpen(false)} settings={settings} onSave={saveSettings} />
+      <PhotoUploadModal  open={photoUploadOpen}  onClose={() => setPhotoUploadOpen(false)}  onUpload={handlePhotoUpload} uploading={uploadingPhoto} />
+      <PasswordModal     open={passwordOpen}     onClose={() => setPasswordOpen(false)} />
+      <NotificationsModal open={notificationsOpen} onClose={() => setNotificationsOpen(false)} settings={settings} onSave={saveSettings} />
+      <LocationModal     open={locationOpen}     onClose={() => setLocationOpen(false)}     settings={settings} onSave={saveSettings} />
+      <LanguageModal     open={languageOpen}     onClose={() => setLanguageOpen(false)}     settings={settings} onSave={saveSettings} />
+      <AppearanceModal   open={appearanceOpen}   onClose={() => setAppearanceOpen(false)}   appearance={settings.appearance} onSave={toggleDarkMode} />
+      <TravelPrefsModal  open={travelPrefsOpen}  onClose={() => setTravelPrefsOpen(false)}  settings={settings} onSave={saveSettings} />
+      <TravelDocsModal   open={travelDocsOpen}   onClose={() => setTravelDocsOpen(false)}   settings={settings} onSave={saveSettings} />
+      <PaymentMethodsModal open={paymentMethodsOpen} onClose={() => setPaymentMethodsOpen(false)} settings={settings} onSave={saveSettings} />
+      <EmergencyContactModal open={emergencyOpen} onClose={() => setEmergencyOpen(false)}  settings={settings} onSave={saveSettings} />
+      <TwoFactorModal    open={twoFactorOpen}    onClose={() => setTwoFactorOpen(false)}    enabled={settings.security.twoFactorEnabled}
+        onToggle={(v: boolean) => saveSettings({ security: { ...settings.security, twoFactorEnabled: v } })} />
+      <SavedTripsModal   open={savedTripsOpen}   onClose={() => setSavedTripsOpen(false)} />
+      <ActivityLogModal  open={activityLogOpen}  onClose={() => setActivityLogOpen(false)} />
+      <ExportDataModal   open={exportDataOpen}   onClose={() => setExportDataOpen(false)} onExport={handleExportData} />
     </div>
   );
 }
 
-// ==================== HELPER COMPONENTS ====================
+// ── SECTION ────────────────────────────────────────────────────────────────────
 
-function SettingsSection({ title, icon: Icon, children }: { 
-  title: string; 
-  icon?: any; 
-  children: React.ReactNode 
-}) {
+function Section({ title, icon: Icon, children }: { title: string; icon?: any; children: React.ReactNode }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-    >
-      <div className="flex items-center gap-2 mb-4 px-2">
-        {Icon && <Icon className="text-amber-600" size={18} />}
-        <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-          {title}
-        </h2>
+    <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+      <div className="flex items-center gap-2 mb-3 px-1">
+        {Icon && <Icon size={15} style={{ color: '#0EA5E9' }} />}
+        <h2 className="text-xs font-black text-slate-900 uppercase tracking-[0.15em]">{title}</h2>
       </div>
-      <div className="bg-white dark:bg-zinc-900 rounded-2xl border-2 border-amber-100 dark:border-amber-900/30 overflow-hidden shadow-apple-lg">
+      <div className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden">
         {children}
       </div>
     </motion.div>
   );
 }
 
-function SettingsItem({ 
-  icon: Icon, 
-  label, 
-  description, 
-  onClick, 
-  danger = false,
-  compact = false,
-  badge
-}: any) {
+// ── ITEM ───────────────────────────────────────────────────────────────────────
+
+function Item({ icon: Icon, label, desc, onClick, danger = false, compact = false, badge }: any) {
   return (
     <>
       <motion.button
         onClick={onClick}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        className={`w-full ${compact ? 'px-4 py-3' : 'px-6 py-5'} flex items-center justify-between hover:bg-gradient-to-r transition-all ${
-          danger 
-            ? 'hover:from-red-50 hover:to-rose-50 dark:hover:from-red-900/10 dark:hover:to-rose-900/10' 
-            : 'hover:from-amber-50 hover:to-purple-50 dark:hover:from-amber-900/10 dark:hover:to-purple-900/10'
-        }`}
+        whileHover={{ scale: 1.005 }} whileTap={{ scale: 0.995 }}
+        className={`w-full ${compact ? 'px-4 py-3' : 'px-5 py-4'} flex items-center justify-between hover:bg-slate-50 transition-colors text-left`}
       >
-        <div className="flex items-center gap-3 flex-1">
-          <div className={`${compact ? 'w-10 h-10' : 'w-12 h-12'} rounded-2xl flex items-center justify-center ${
-            danger 
-              ? 'bg-gradient-to-br from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30' 
-              : 'bg-gradient-to-br from-amber-100 to-purple-100 dark:from-amber-900/30 dark:to-purple-900/30'
-          }`}>
-            <Icon className={danger ? 'text-red-600' : 'text-amber-600'} size={compact ? 18 : 20} />
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className={`${compact ? 'w-9 h-9' : 'w-10 h-10'} rounded-xl flex items-center justify-center flex-shrink-0`}
+            style={{ background: danger ? '#FEF2F2' : '#F0F9FF' }}>
+            <Icon size={compact ? 16 : 18} style={{ color: danger ? '#EF4444' : '#0EA5E9' }} />
           </div>
-          <div className="text-left flex-1">
-            <p className={`${compact ? 'text-sm' : 'text-base'} font-semibold ${danger ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
+          <div className="min-w-0">
+            <p className={`${compact ? 'text-sm' : 'text-sm'} font-bold truncate`}
+              style={{ color: danger ? '#EF4444' : '#0F172A' }}>
               {label}
             </p>
-            <p className={`${compact ? 'text-xs' : 'text-sm'} text-gray-500 dark:text-gray-400`}>{description}</p>
+            <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           {badge && (
-            <span className="px-2 py-1 bg-amber-500 text-white text-xs font-bold rounded-full">
+            <span className="px-2 py-0.5 text-white text-xs font-black rounded-full"
+              style={{ background: '#0EA5E9' }}>
               {badge}
             </span>
           )}
-          <ChevronRight className="text-gray-400 dark:text-gray-600" size={20} />
+          <ChevronRight size={16} className="text-slate-300" />
         </div>
       </motion.button>
       <Separator className="last:hidden" />
@@ -891,59 +444,42 @@ function SettingsItem({
   );
 }
 
-// Personal Info Modal (inline - kept as is since it's not in Part1/Part2)
+// ── PERSONAL INFO MODAL (inline) ───────────────────────────────────────────────
+
 function PersonalInfoModal({ open, onClose, settings, onSave }: any) {
-  const [formData, setFormData] = useState({
-    displayName: settings.displayName,
-    phone: settings.phone,
-    bio: settings.bio
-  });
-
-  const handleSave = () => {
-    onSave(formData);
-    onClose();
-  };
-
+  const [form, setForm] = useState({ displayName: settings.displayName, phone: settings.phone, bio: settings.bio });
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Personal Information</DialogTitle>
+          <DialogTitle className="text-xl font-black">Personal Information</DialogTitle>
           <DialogDescription>Update your name and profile details</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {[
+            { label: 'Display Name',  key: 'displayName', type: 'text',  ph: 'Your name'         },
+            { label: 'Phone Number',  key: 'phone',       type: 'tel',   ph: '+27 64 000 0000'   },
+          ].map(f => (
+            <div key={f.key}>
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">{f.label}</label>
+              <Input type={f.type} value={form[f.key as keyof typeof form]}
+                onChange={e => setForm({ ...form, [f.key]: e.target.value })}
+                className="h-11 rounded-xl border-2" placeholder={f.ph} />
+            </div>
+          ))}
           <div>
-            <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">Display Name</label>
-            <Input 
-              value={formData.displayName} 
-              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-              className="h-12 rounded-xl border-2"
-              placeholder="Your name"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">Phone Number</label>
-            <Input 
-              value={formData.phone} 
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="h-12 rounded-xl border-2"
-              placeholder="+27 123 456 789"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">Bio</label>
-            <Textarea 
-              value={formData.bio} 
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              className="rounded-xl border-2"
-              placeholder="Tell us about yourself..."
-              rows={3}
-            />
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">Bio</label>
+            <Textarea value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })}
+              className="rounded-xl border-2" placeholder="Tell us about yourself..." rows={3} />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} className="rounded-xl">Cancel</Button>
-          <Button onClick={handleSave} className="btn-premium">Save Changes</Button>
+          <Button onClick={() => { onSave(form); onClose(); }}
+            className="rounded-xl text-white font-bold"
+            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+            Save Changes
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

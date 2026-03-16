@@ -1,394 +1,313 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Camera, Edit, Settings, MapPin, Calendar, DollarSign, TrendingUp, ChevronRight, Star, User } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  Camera, Edit, Settings, MapPin, Calendar, TrendingUp,
+  ChevronRight, Star, User, Sparkles, Bookmark, Trophy,
+  Plane, Clock, CheckCircle, AlertCircle,
+} from 'lucide-react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { toast } from 'sonner';
 
-// Simulated user profile manager (replace with your actual implementation)
-interface UserProfile {
-  userId: string;
-  name: string;
-  email: string;
-  profileImage?: string;
-  status: string;
-  starRating: number;
-  destinations: number;
-  tripsPlanned: number;
-  totalSpent: number;
-  upcomingTrips: number;
-}
+const SKY = '#0EA5E9';
 
-const ProfileScreen = () => {
-  const [profile, setProfile] = useState<UserProfile>({
-    userId: 'user123',
-    name: 'Traveler',
-    email: 'maxnekhavhambe@gmail.com',
-    status: 'Explorer',
-    starRating: 3,
-    destinations: 8,
-    tripsPlanned: 12,
-    totalSpent: 24500,
-    upcomingTrips: 2
-  });
-  
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: profile.name,
-    email: profile.email
-  });
+export default function ProfileScreen() {
+  const { user, userProfile, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
+  const [editOpen,     setEditOpen]     = useState(false);
+  const [editForm,     setEditForm]     = useState({ name: '', email: '' });
 
-  // Load profile data on mount
+  // Redirect if not logged in
   useEffect(() => {
-    loadProfileData();
-  }, []);
+    if (!authLoading && !user) router.push('/signin');
+  }, [user, authLoading, router]);
 
-  const loadProfileData = async () => {
-    try {
-      // Load from localStorage (replace with actual API call)
-      const savedProfile = localStorage.getItem('userProfile');
-      const savedImage = localStorage.getItem('profileImage');
-      
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile);
-        setProfile(parsed);
-        setEditForm({ name: parsed.name, email: parsed.email });
-      }
-      
-      if (savedImage) {
-        setProfileImage(savedImage);
-      }
-    } catch (error) {
-      console.error('Failed to load profile:', error);
-    }
-  };
+  // Populate from Firebase
+  useEffect(() => {
+    if (!user) return;
+    setEditForm({
+      name:  userProfile?.name  || user.displayName || '',
+      email: user.email || '',
+    });
+    // Prefer Firebase photo, fall back to localStorage
+    const savedImg = localStorage.getItem('gladys-profile-image');
+    setProfileImage(userProfile?.profileImage || savedImg || user.photoURL || null);
+  }, [user, userProfile]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setProfileImage(base64String);
-        localStorage.setItem('profileImage', base64String);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveProfile = () => {
-    const updatedProfile = {
-      ...profile,
-      name: editForm.name,
-      email: editForm.email
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const b64 = reader.result as string;
+      setProfileImage(b64);
+      localStorage.setItem('gladys-profile-image', b64);
+      toast.success('Profile photo updated');
     };
-    
-    setProfile(updatedProfile);
-    localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-    setIsEditingProfile(false);
+    reader.readAsDataURL(file);
   };
 
-  const renderStars = (rating: number) => {
-    return [...Array(5)].map((_, i) => (
-      <Star
-        key={i}
-        className={`w-6 h-6 ${i < rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
-      />
-    ));
+  const handleSaveEdit = () => {
+    // Persist name to localStorage until Firebase profile update is wired
+    try {
+      const saved = JSON.parse(localStorage.getItem('gladys-user-settings') || '{}');
+      localStorage.setItem('gladys-user-settings', JSON.stringify({ ...saved, displayName: editForm.name }));
+    } catch {}
+    toast.success('Profile updated');
+    setEditOpen(false);
   };
 
-  if (showSettings) {
+  if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Settings</h2>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <h3 className="font-semibold mb-2">Notifications</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" defaultChecked />
-                    <span>Trip reminders</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" defaultChecked />
-                    <span>Price alerts</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span>Marketing emails</span>
-                  </label>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <h3 className="font-semibold mb-2">Privacy</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" defaultChecked />
-                    <span>Share travel stats</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" defaultChecked />
-                    <span>Allow profile discovery</span>
-                  </label>
-                </div>
-              </div>
-              
-              <button className="w-full py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition">
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-2 border-slate-200 border-t-sky-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  if (isEditingProfile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 p-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Edit Profile</h2>
-              <button
-                onClick={() => setIsEditingProfile(false)}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative">
-                  {profileImage ? (
-                    <img
-                      src={profileImage}
-                      alt="Profile"
-                      className="w-32 h-32 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold">
-                      {editForm.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <label className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-100 transition">
-                    <Camera className="w-5 h-5 text-gray-700" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
-                  placeholder="Enter your name"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={editForm.email}
-                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
-                  placeholder="Enter your email"
-                />
-              </div>
-              
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setIsEditingProfile(false)}
-                  className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold hover:shadow-lg transition"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const name          = userProfile?.name || user.displayName || 'Traveler';
+  const email         = user.email || '';
+  const status        = userProfile?.status || 'Explorer';
+  const tripsPlanned  = userProfile?.totalTripsPlanned ?? 0;
+  const memberSince   = userProfile?.createdAt
+    ? new Date(userProfile.createdAt).getFullYear()
+    : new Date().getFullYear();
+
+  // Star rating based on trips
+  const starRating = tripsPlanned >= 20 ? 5 : tripsPlanned >= 10 ? 4 : tripsPlanned >= 5 ? 3 : tripsPlanned >= 2 ? 2 : 1;
+
+  const STATS = [
+    { icon: TrendingUp, value: tripsPlanned, label: 'Trips Planned', color: SKY       },
+    { icon: Calendar,   value: 0,            label: 'Upcoming',      color: '#8B5CF6' },
+    { icon: Bookmark,   value: 0,            label: 'Saved',         color: '#F97316' },
+    { icon: Trophy,     value: status,       label: 'Status',        color: '#10B981' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 p-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                  <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="currentColor" strokeWidth="2"/>
-                </svg>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Gladys</h1>
-              <p className="text-amber-300 text-sm font-semibold">Travel AI</p>
-            </div>
-          </div>
-          <button className="text-white">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
+    <div className="min-h-screen bg-slate-50"
+      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
 
-        {/* Profile Card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-6 mb-6">
-          <div className="flex flex-col items-center">
-            {/* Profile Image */}
-            <div className="relative mb-4">
-              {profileImage ? (
-                <img
-                  src={profileImage}
-                  alt="Profile"
-                  className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
-                />
-              ) : (
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-5xl font-bold border-4 border-white shadow-lg">
-                  {profile.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <label className="absolute bottom-0 right-0 bg-white rounded-full p-3 shadow-lg cursor-pointer hover:bg-gray-100 transition">
-                <Camera className="w-5 h-5 text-gray-700" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
+      {/* ── HEADER ── */}
+      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl border-b border-slate-100 px-4 py-3 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+            <Sparkles size={14} className="text-white" />
+          </div>
+          <span className="font-black text-slate-900 text-base">Gladys</span>
+        </Link>
+        <Link href="/settings"
+          className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+          <Settings size={16} className="text-slate-600" />
+        </Link>
+      </div>
+
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+
+        {/* ── PROFILE CARD ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl overflow-hidden shadow-xl"
+          style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7, #1E40AF)' }}>
+
+          {/* Decorative rings */}
+          <div className="absolute -right-12 -top-12 w-48 h-48 rounded-full border-4 border-white/10 pointer-events-none" />
+          <div className="absolute right-8 bottom-0 w-24 h-24 rounded-full border-4 border-white/10 pointer-events-none" />
+
+          <div className="relative p-6 pb-8 text-center">
+            {/* Avatar */}
+            <div className="relative inline-block mb-4">
+              <div className="w-28 h-28 rounded-full border-4 border-white/30 overflow-hidden bg-white/20 shadow-xl mx-auto">
+                {profileImage
+                  ? <img src={profileImage} alt={name} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center">
+                      <User size={44} className="text-white/80" />
+                    </div>
+                }
+              </div>
+              <label className="absolute bottom-0 right-0 w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform"
+                style={{ color: SKY }}>
+                <Camera size={15} />
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
               </label>
             </div>
 
-            {/* Profile Info */}
-            <h2 className="text-3xl font-bold text-gray-900 mb-1">{profile.name}</h2>
-            <p className="text-gray-600 mb-6">{profile.email}</p>
+            {/* Name & email */}
+            <h1 className="text-2xl font-black text-white mb-1">{name}</h1>
+            <p className="text-white/60 text-sm mb-4">{email}</p>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3 w-full mb-6">
-              <button
-                onClick={() => setIsEditingProfile(true)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
-              >
-                <Edit className="w-4 h-4" />
-                Edit Profile
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
-              >
-                <Settings className="w-4 h-4" />
-                Settings
-              </button>
+            {/* Badges */}
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-5">
+              <span className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-bold text-white">
+                {user.emailVerified
+                  ? <><CheckCircle size={11} />Verified</>
+                  : <><AlertCircle size={11} />Not Verified</>
+                }
+              </span>
+              <span className="flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-xs font-bold text-white">
+                <Clock size={11} />Since {memberSince}
+              </span>
             </div>
 
-            {/* Status Badge */}
-            <div className="bg-gradient-to-r from-amber-50 to-amber-100 border-2 border-amber-200 rounded-2xl p-6 w-full">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-amber-400 rounded-full p-2">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-amber-900">Status</p>
-                  <p className="text-2xl font-bold text-amber-900">{profile.status}</p>
-                </div>
-              </div>
-              <div className="flex gap-1 justify-center">
-                {renderStars(profile.starRating)}
-              </div>
+            {/* Stars */}
+            <div className="flex items-center justify-center gap-1 mb-5">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={18}
+                  className={i < starRating ? 'fill-amber-400 text-amber-400' : 'text-white/20'} />
+              ))}
+            </div>
+
+            {/* Status pill */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-sm rounded-2xl">
+              <Trophy size={14} className="text-amber-300" />
+              <span className="text-white font-black text-sm">{status}</span>
             </div>
           </div>
+
+          {/* Action buttons */}
+          <div className="bg-white/10 backdrop-blur-sm border-t border-white/10 grid grid-cols-2 divide-x divide-white/10">
+            <button onClick={() => setEditOpen(true)}
+              className="flex items-center justify-center gap-2 py-3.5 text-white text-sm font-bold hover:bg-white/10 transition-colors">
+              <Edit size={15} />Edit Profile
+            </button>
+            <Link href="/settings"
+              className="flex items-center justify-center gap-2 py-3.5 text-white text-sm font-bold hover:bg-white/10 transition-colors">
+              <Settings size={15} />Settings
+            </Link>
+          </div>
+        </motion.div>
+
+        {/* ── STATS GRID ── */}
+        <div className="grid grid-cols-2 gap-3">
+          {STATS.map((s, i) => (
+            <motion.div key={i}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i }}
+              className="bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: s.color + '15' }}>
+                <s.icon size={20} style={{ color: s.color }} />
+              </div>
+              <p className="text-2xl font-black text-slate-900 mb-0.5">{s.value}</p>
+              <p className="text-xs text-slate-400 font-semibold">{s.label}</p>
+            </motion.div>
+          ))}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="bg-blue-500 rounded-full w-14 h-14 flex items-center justify-center mb-4">
-              <MapPin className="w-7 h-7 text-white" />
+        {/* ── UPCOMING TRIPS ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Link href="/trips"
+            className="flex items-center gap-4 bg-white rounded-2xl p-5 border-2 border-slate-100 shadow-sm hover:border-sky-200 hover:shadow-md transition-all">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: `${SKY}15` }}>
+              <Plane size={20} style={{ color: SKY }} />
             </div>
-            <p className="text-4xl font-bold text-gray-900 mb-1">{profile.destinations}</p>
-            <p className="text-gray-600 font-medium">Destinations</p>
-          </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-slate-900 text-sm">My Trips</p>
+              <p className="text-xs text-slate-400 mt-0.5">View and manage your trips</p>
+            </div>
+            <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+          </Link>
+        </motion.div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="bg-purple-500 rounded-full w-14 h-14 flex items-center justify-center mb-4">
-              <Calendar className="w-7 h-7 text-white" />
-            </div>
-            <p className="text-4xl font-bold text-gray-900 mb-1">{profile.tripsPlanned}</p>
-            <p className="text-gray-600 font-medium">Trips Planned</p>
-          </div>
+        {/* ── QUICK LINKS ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          className="bg-white rounded-2xl border-2 border-slate-100 overflow-hidden shadow-sm">
+          {[
+            { icon: Sparkles, label: 'Explore Events',  sub: 'Concerts, sports, festivals', href: '/events'     },
+            { icon: Settings, label: 'Account Settings',sub: 'Privacy, security, preferences', href: '/settings' },
+          ].map((item, i) => (
+            <Link key={i} href={item.href}
+              className="flex items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: `${SKY}15` }}>
+                <item.icon size={17} style={{ color: SKY }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-900 text-sm">{item.label}</p>
+                <p className="text-xs text-slate-400 truncate">{item.sub}</p>
+              </div>
+              <ChevronRight size={15} className="text-slate-300 flex-shrink-0" />
+            </Link>
+          ))}
+        </motion.div>
 
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="bg-green-500 rounded-full w-14 h-14 flex items-center justify-center mb-4">
-              <DollarSign className="w-7 h-7 text-white" />
-            </div>
-            <p className="text-4xl font-bold text-gray-900 mb-1">
-              ${(profile.totalSpent / 1000).toFixed(1)}k
-            </p>
-            <p className="text-gray-600 font-medium">Total Spent</p>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="bg-orange-500 rounded-full w-14 h-14 flex items-center justify-center mb-4">
-              <TrendingUp className="w-7 h-7 text-white" />
-            </div>
-            <p className="text-4xl font-bold text-gray-900 mb-1">{profile.upcomingTrips}</p>
-            <p className="text-gray-600 font-medium">Upcoming</p>
-          </div>
-        </div>
-
-        {/* Upcoming Trips Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-500 rounded-2xl w-16 h-16 flex items-center justify-center">
-              <Calendar className="w-8 h-8 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900">Upcoming Trips</h3>
-              <p className="text-gray-600">You have {profile.upcomingTrips} trips planned</p>
-            </div>
-            <ChevronRight className="w-6 h-6 text-gray-400" />
-          </div>
+        {/* ── VERSION ── */}
+        <div className="text-center pb-2">
+          <p className="text-xs text-slate-300 flex items-center justify-center gap-1">
+            <Sparkles size={10} style={{ color: SKY }} />
+            GladysTravel.com · © 2026
+          </p>
         </div>
       </div>
+
+      {/* ── EDIT PROFILE MODAL ── */}
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => setEditOpen(false)}>
+          <motion.div
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }}
+            onClick={e => e.stopPropagation()}
+            className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-black text-slate-900 mb-5">Edit Profile</h2>
+
+            {/* Avatar in modal */}
+            <div className="flex justify-center mb-5">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-100">
+                  {profileImage
+                    ? <img src={profileImage} alt={name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center bg-sky-50">
+                        <User size={36} style={{ color: SKY }} />
+                      </div>
+                  }
+                </div>
+                <label className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-md cursor-pointer hover:scale-110 transition-transform"
+                  style={{ color: SKY }}>
+                  <Camera size={14} />
+                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              {[
+                { label: 'Full Name',      key: 'name',  type: 'text',  ph: 'Your name'    },
+                { label: 'Email Address',  key: 'email', type: 'email', ph: 'your@email.com' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5 block">{f.label}</label>
+                  <input
+                    type={f.type}
+                    value={editForm[f.key as keyof typeof editForm]}
+                    onChange={e => setEditForm({ ...editForm, [f.key]: e.target.value })}
+                    placeholder={f.ph}
+                    className="w-full h-11 px-4 border-2 border-slate-200 rounded-xl text-sm text-slate-900 outline-none focus:border-sky-400 transition-all"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setEditOpen(false)}
+                className="flex-1 h-11 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSaveEdit}
+                className="flex-1 h-11 rounded-xl text-sm font-black text-white transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+                Save Changes
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default ProfileScreen;
+}

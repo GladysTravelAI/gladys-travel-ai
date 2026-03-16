@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, Sparkles, Trophy, Music, PartyPopper,
   Loader2, ExternalLink, TrendingUp, Calendar, MapPin,
-  Plane, Hotel, Bookmark, Mic, ArrowRight, ChevronDown,
+  Plane, Hotel, Bookmark, Mic, ChevronDown,
   Ticket, Shield, CheckCircle, Globe, Users, Download,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import SavedTrips         from "@/components/SavedTrips";
 import CityPicker         from "@/components/CityPicker";
 import GladysCompanion    from "@/components/GladysCompanion";
 import FeaturedEvents     from "@/components/FeaturedEvents";
+import DateRangePicker   from "@/components/DateRangePicker";
 
 import { ItineraryData }  from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
@@ -444,15 +445,15 @@ export default function HomeClient() {
             </div>
 
             {showDates && (
-              <div className="flex gap-2 items-center">
-                <input type="date" value={startDate?.toISOString().split('T')[0] || ''}
-                  onChange={e => setStartDate(e.target.value ? new Date(e.target.value) : null)}
-                  className="flex-1 h-11 sm:h-12 px-3 sm:px-4 rounded-xl border-2 border-slate-200 text-xs sm:text-sm text-slate-600 outline-none focus:border-sky-300" />
-                <ArrowRight size={14} className="text-slate-300 flex-shrink-0" />
-                <input type="date" value={endDate?.toISOString().split('T')[0] || ''}
-                  onChange={e => setEndDate(e.target.value ? new Date(e.target.value) : null)}
-                  className="flex-1 h-11 sm:h-12 px-3 sm:px-4 rounded-xl border-2 border-slate-200 text-xs sm:text-sm text-slate-600 outline-none focus:border-sky-300" />
-              </div>
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                destination={query}
+                showCalendar={false}
+                minNights={1}
+                maxNights={30}
+              />
             )}
 
             <button
@@ -672,7 +673,7 @@ export default function HomeClient() {
                                   <Download size={15} />View & Download Itinerary
                                 </button>
                               </div>
-                              <ItineraryView data={itineraryData} />
+                              <ItineraryView data={itineraryData} startDate={startDate} endDate={endDate} />
                             </>
                           ) : (
                             <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-3 text-slate-400">

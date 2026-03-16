@@ -2,543 +2,307 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Calendar,
-  Info,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  Sparkles,
-  Clock,
-  Sun,
-  Cloud,
-  Snowflake,
-  Umbrella,
-  Check,
-  X,
-  AlertCircle,
+  Calendar, Info, ChevronLeft, ChevronRight,
+  TrendingUp, TrendingDown, Sparkles, Clock,
+  Sun, Cloud, Snowflake, Umbrella, Check, X, AlertCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
-// ==================== TYPES ====================
+const SKY = '#0EA5E9';
+
+// ── TYPES ──────────────────────────────────────────────────────────────────────
 
 interface DateRangePickerProps {
-  startDate: Date | null;
-  endDate: Date | null;
-  onDateChange: (start: Date | null, end: Date | null) => void;
-  destination?: string;
-  showCalendar?: boolean;
+  startDate:       Date | null;
+  endDate:         Date | null;
+  onDateChange:    (start: Date | null, end: Date | null) => void;
+  destination?:    string;
+  showCalendar?:   boolean;
   showPriceTrends?: boolean;
-  minNights?: number;
-  maxNights?: number;
+  minNights?:      number;
+  maxNights?:      number;
 }
 
 interface DateInfo {
-  date: Date;
-  isToday: boolean;
-  isSelected: boolean;
-  isInRange: boolean;
+  date:        Date;
+  isToday:     boolean;
+  isSelected:  boolean;
+  isInRange:   boolean;
   isStartDate: boolean;
-  isEndDate: boolean;
-  isDisabled: boolean;
-  isWeekend: boolean;
-  isHoliday: boolean;
+  isEndDate:   boolean;
+  isDisabled:  boolean;
+  isWeekend:   boolean;
   priceTrend?: 'low' | 'medium' | 'high';
 }
 
-// ==================== MAIN COMPONENT ====================
+// ── SEASONAL DATA ──────────────────────────────────────────────────────────────
+
+const SEASONAL: Record<string, { bestMonths: string; reason: string; avoid: string; icon: any; color: string }> = {
+  dubai:      { bestMonths: 'November – March', reason: 'Cooler weather (20–30°C)',          avoid: 'June–August (40°C+)',              icon: Sun,       color: '#F97316' },
+  paris:      { bestMonths: 'April – June, Sep – Oct', reason: 'Mild weather, fewer crowds', avoid: 'July–August (peak tourist season)', icon: Cloud,     color: SKY       },
+  tokyo:      { bestMonths: 'March – May, Sep – Nov', reason: 'Cherry blossoms or fall colours', avoid: 'July–August (hot & humid)',   icon: Sparkles,  color: '#EC4899' },
+  'new york': { bestMonths: 'April – June, Sep – Nov', reason: 'Pleasant weather, festivals', avoid: 'January–February (very cold)',   icon: Cloud,     color: SKY       },
+  'cape town':{ bestMonths: 'November – March', reason: 'Summer season, beaches',            avoid: 'June–August (rainy & cold)',      icon: Sun,       color: '#F59E0B' },
+  london:     { bestMonths: 'May – September', reason: 'Warmer weather, longer days',        avoid: 'November–February (cold & rainy)',icon: Umbrella,  color: '#64748B' },
+  iceland:    { bestMonths: 'June – August', reason: 'Midnight sun, accessible roads',       avoid: 'November–March (limited daylight)',icon: Snowflake, color: '#06B6D4' },
+};
+
+// ── QUICK PRESETS ──────────────────────────────────────────────────────────────
+
+const QUICK = [
+  { label: 'Weekend', days: 2,  offset: () => { const d = new Date().getDay(); return d === 6 ? 0 : d === 0 ? 6 : 6 - d; } },
+  { label: '3 Days',  days: 3,  offset: () => 7  },
+  { label: '1 Week',  days: 7,  offset: () => 7  },
+  { label: '10 Days', days: 10, offset: () => 14 },
+  { label: '2 Weeks', days: 14, offset: () => 14 },
+  { label: '3 Weeks', days: 21, offset: () => 21 },
+  { label: '1 Month', days: 30, offset: () => 30 },
+  { label: '6 Weeks', days: 42, offset: () => 30 },
+];
+
+// ── MAIN ───────────────────────────────────────────────────────────────────────
 
 export default function DateRangePicker({
-  startDate,
-  endDate,
-  onDateChange,
-  destination,
-  showCalendar = true,
-  showPriceTrends = true,
-  minNights = 1,
-  maxNights = 90,
+  startDate, endDate, onDateChange, destination,
+  showCalendar = true, showPriceTrends = true,
+  minNights = 1, maxNights = 90,
 }: DateRangePickerProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth,     setCurrentMonth]     = useState(new Date());
   const [showSeasonalInfo, setShowSeasonalInfo] = useState(false);
-  const [selectingStart, setSelectingStart] = useState(true);
-  const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
+  const [selectingStart,   setSelectingStart]   = useState(true);
+  const [hoveredDate,      setHoveredDate]      = useState<Date | null>(null);
 
-  // ==================== SEASONAL INFO ====================
+  const seasonal = destination
+    ? Object.entries(SEASONAL).find(([k]) => destination.toLowerCase().includes(k))?.[1] ?? null
+    : null;
+  const SeasonIcon = seasonal?.icon ?? Sun;
 
-  const getSeasonalInfo = (dest: string) => {
-    const seasonalData: Record<string, any> = {
-      dubai: {
-        bestMonths: 'November–March',
-        reason: 'Cooler weather (20-30°C)',
-        avoid: 'June-August (40°C+)',
-        icon: Sun,
-        color: 'text-orange-600',
-      },
-      paris: {
-        bestMonths: 'April–June, September–October',
-        reason: 'Mild weather, fewer crowds',
-        avoid: 'July-August (peak tourist season)',
-        icon: Cloud,
-        color: 'text-blue-600',
-      },
-      tokyo: {
-        bestMonths: 'March–May, September–November',
-        reason: 'Cherry blossoms or fall colors',
-        avoid: 'July-August (hot & humid)',
-        icon: Sparkles,
-        color: 'text-pink-600',
-      },
-      'new york': {
-        bestMonths: 'April–June, September–November',
-        reason: 'Pleasant weather, festivals',
-        avoid: 'January-February (very cold)',
-        icon: Cloud,
-        color: 'text-blue-600',
-      },
-      'cape town': {
-        bestMonths: 'November–March',
-        reason: 'Summer season, beaches',
-        avoid: 'June-August (rainy & cold)',
-        icon: Sun,
-        color: 'text-yellow-600',
-      },
-      london: {
-        bestMonths: 'May–September',
-        reason: 'Warmer weather, longer days',
-        avoid: 'November-February (cold & rainy)',
-        icon: Umbrella,
-        color: 'text-gray-600',
-      },
-      iceland: {
-        bestMonths: 'June–August',
-        reason: 'Midnight sun, accessible roads',
-        avoid: 'November-March (limited daylight)',
-        icon: Snowflake,
-        color: 'text-cyan-600',
-      },
-    };
+  // ── Helpers ──
 
-    const normalizedDest = dest.toLowerCase();
-    for (const [key, info] of Object.entries(seasonalData)) {
-      if (normalizedDest.includes(key)) return info;
-    }
-    return null;
+  const getDuration = (s?: Date | null, e?: Date | null) => {
+    const a = s ?? startDate; const b = e ?? endDate;
+    if (!a || !b) return null;
+    return Math.ceil((b.getTime() - a.getTime()) / 86_400_000);
   };
+  const duration = getDuration();
 
-  const seasonalInfo = destination ? getSeasonalInfo(destination) : null;
-  const SeasonIcon = seasonalInfo?.icon || Sun;
+  const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-  // ==================== QUICK SELECTIONS ====================
+  // ── Handlers ──
 
-  const quickSelections = [
-    { label: 'Weekend', days: 2, offset: getDaysUntilWeekend() },
-    { label: '3 Days', days: 3, offset: 7 },
-    { label: '1 Week', days: 7, offset: 7 },
-    { label: '10 Days', days: 10, offset: 14 },
-    { label: '2 Weeks', days: 14, offset: 14 },
-    { label: '3 Weeks', days: 21, offset: 21 },
-    { label: '1 Month', days: 30, offset: 30 },
-    { label: '6 Weeks', days: 42, offset: 30 },
-  ];
-
-  function getDaysUntilWeekend() {
-    const today = new Date();
-    const dayOfWeek = today.getDay();
-    return dayOfWeek === 6 ? 0 : dayOfWeek === 0 ? 6 : 6 - dayOfWeek;
-  }
-
-  // ==================== HANDLERS ====================
-
-  const handleQuickSelect = (days: number, offset: number) => {
-    const start = new Date();
-    start.setDate(start.getDate() + offset);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(start);
-    end.setDate(end.getDate() + days);
-
+  const handleQuickSelect = (days: number, offsetFn: () => number) => {
+    const start = new Date(); start.setDate(start.getDate() + offsetFn()); start.setHours(0,0,0,0);
+    const end   = new Date(start); end.setDate(end.getDate() + days);
     onDateChange(start, end);
-    toast.success('Dates selected', {
-      description: `${days} ${days === 1 ? 'day' : 'days'} starting ${start.toLocaleDateString()}`,
-    });
+    toast.success(`${days} days selected`, { description: `${fmtShort(start)} – ${fmtShort(end)}` });
   };
 
   const handleDateClick = (date: Date) => {
     if (selectingStart || !startDate) {
-      // Selecting start date
-      onDateChange(date, null);
-      setSelectingStart(false);
-      toast.success('Start date selected', {
-        description: date.toLocaleDateString('en-US', {
-          weekday: 'long',
-          month: 'long',
-          day: 'numeric',
-        }),
-      });
+      onDateChange(date, null); setSelectingStart(false);
+      toast.success('Start date set', { description: date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) });
     } else {
-      // Selecting end date
-      if (date < startDate) {
-        // If selected date is before start, swap them
-        onDateChange(date, startDate);
-        toast.success('Dates selected', {
-          description: `${getDuration(date, startDate)} ${getDuration(date, startDate) === 1 ? 'day' : 'days'}`,
-        });
-      } else {
-        onDateChange(startDate, date);
-        const duration = getDuration(startDate, date);
-
-        if (duration !== null && duration < minNights) {
-          toast.error('Trip too short', {
-            description: `Minimum ${minNights} ${minNights === 1 ? 'night' : 'nights'} required`,
-          });
-          return;
-        }
-
-        if (duration !== null && duration > maxNights) {
-          toast.error('Trip too long', {
-            description: `Maximum ${maxNights} nights allowed`,
-          });
-          return;
-        }
-
-        if (duration !== null) {
-          toast.success('Dates selected!', {
-            description: `${duration} ${duration === 1 ? 'day' : 'days'} trip`,
-          });
-        }
-      }
+      const [s, e] = date < startDate ? [date, startDate] : [startDate, date];
+      const d = getDuration(s, e);
+      if (d !== null && d < minNights) { toast.error(`Minimum ${minNights} night${minNights === 1 ? '' : 's'} required`); return; }
+      if (d !== null && d > maxNights) { toast.error(`Maximum ${maxNights} nights allowed`); return; }
+      onDateChange(s, e);
+      if (d !== null) toast.success('Dates confirmed', { description: `${d} day${d === 1 ? '' : 's'} · ${fmtShort(s)} – ${fmtShort(e)}` });
       setSelectingStart(true);
     }
   };
 
-  const handleClearDates = () => {
-    onDateChange(null, null);
-    setSelectingStart(true);
-    toast.success('Dates cleared');
-  };
+  const handleClear = () => { onDateChange(null, null); setSelectingStart(true); };
 
-  const handleMonthChange = (direction: 'prev' | 'next') => {
-    const newMonth = new Date(currentMonth);
-    newMonth.setMonth(newMonth.getMonth() + (direction === 'next' ? 1 : -1));
-    setCurrentMonth(newMonth);
-  };
-
-  // ==================== CALCULATIONS ====================
-
-  const getDuration = (start?: Date | null, end?: Date | null) => {
-    const s = start || startDate;
-    const e = end || endDate;
-    if (!s || !e) return null;
-    return Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-  };
-
-  const duration = getDuration();
-
-  // ==================== CALENDAR GENERATION ====================
+  // ── Calendar generation ──
 
   const calendarDays = useMemo(() => {
-    const year = currentMonth.getFullYear();
-    const month = currentMonth.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDay = firstDay.getDay();
-    const daysInMonth = lastDay.getDate();
-
+    const yr = currentMonth.getFullYear(); const mo = currentMonth.getMonth();
+    const firstDay = new Date(yr, mo, 1); const startDow = firstDay.getDay();
+    const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+    const prevLast    = new Date(yr, mo, 0).getDate();
+    const today = new Date(); today.setHours(0,0,0,0);
     const days: DateInfo[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    // Previous month days
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = startDay - 1; i >= 0; i--) {
-      const date = new Date(year, month - 1, prevMonthLastDay - i);
-      days.push(createDateInfo(date, true, today));
-    }
+    const make = (date: Date, disabled: boolean): DateInfo => {
+      const dt = date.getTime(); const st = startDate?.getTime() ?? 0; const et = endDate?.getTime() ?? 0; const ht = hoveredDate?.getTime() ?? 0;
+      const inRange = startDate && endDate
+        ? dt >= st && dt <= et
+        : startDate && hoveredDate && !selectingStart
+          ? (dt >= st && dt <= ht) || (dt <= st && dt >= ht)
+          : false;
+      return {
+        date, isToday: dt === today.getTime(),
+        isSelected: (!!startDate && dt === st) || (!!endDate && dt === et),
+        isInRange: !!inRange,
+        isStartDate: !!startDate && dt === st,
+        isEndDate:   !!endDate   && dt === et,
+        isDisabled:  disabled || dt < today.getTime(),
+        isWeekend:   date.getDay() === 0 || date.getDay() === 6,
+        priceTrend:  showPriceTrends ? getPriceTrend(date) : undefined,
+      };
+    };
 
-    // Current month days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      days.push(createDateInfo(date, false, today));
-    }
-
-    // Next month days
-    const remainingDays = 42 - days.length;
-    for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(year, month + 1, day);
-      days.push(createDateInfo(date, true, today));
-    }
-
+    for (let i = startDow - 1; i >= 0; i--)
+      days.push(make(new Date(yr, mo - 1, prevLast - i), true));
+    for (let d = 1; d <= daysInMonth; d++)
+      days.push(make(new Date(yr, mo, d), false));
+    const rem = 42 - days.length;
+    for (let d = 1; d <= rem; d++)
+      days.push(make(new Date(yr, mo + 1, d), true));
     return days;
   }, [currentMonth, startDate, endDate, hoveredDate]);
 
-  function createDateInfo(date: Date, isDisabled: boolean, today: Date): DateInfo {
-    const dateTime = date.getTime();
-    const todayTime = today.getTime();
-    const startTime = startDate?.getTime() ?? 0;
-    const endTime = endDate?.getTime() ?? 0;
-    const hoverTime = hoveredDate?.getTime() ?? 0;
-
-    const isBeforeToday = dateTime < todayTime;
-    const isSelected =
-      (startDate && dateTime === startTime) || (endDate && dateTime === endTime) || false;
-    const isInRange =
-      startDate && endDate
-        ? dateTime >= startTime && dateTime <= endTime
-        : startDate && hoveredDate && !selectingStart
-        ? (dateTime >= startTime && dateTime <= hoverTime) ||
-          (dateTime <= startTime && dateTime >= hoverTime)
-        : false;
-
-    return {
-      date,
-      isToday: dateTime === todayTime,
-      isSelected,
-      isInRange,
-      isStartDate: startDate ? dateTime === startTime : false,
-      isEndDate: endDate ? dateTime === endTime : false,
-      isDisabled: isDisabled || isBeforeToday,
-      isWeekend: date.getDay() === 0 || date.getDay() === 6,
-      isHoliday: false, // Could add holiday detection
-      priceTrend: showPriceTrends ? getPriceTrend(date) : undefined,
-    };
-  }
-
-  function getPriceTrend(date: Date): 'low' | 'medium' | 'high' {
-    // Simple algorithm - weekends and holidays are high, weekdays are low
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    const month = date.getMonth();
-    const isHighSeason = month === 11 || month === 0 || month === 6 || month === 7; // Dec, Jan, Jul, Aug
-
-    if (isWeekend || isHighSeason) return 'high';
-    if (month === 9 || month === 10 || month === 2 || month === 3) return 'medium'; // Oct, Nov, Mar, Apr
+  function getPriceTrend(d: Date): 'low' | 'medium' | 'high' {
+    const dow = d.getDay(); const mo = d.getMonth();
+    if (dow === 0 || dow === 6 || mo === 11 || mo === 0 || mo === 6 || mo === 7) return 'high';
+    if (mo === 9 || mo === 10 || mo === 2 || mo === 3) return 'medium';
     return 'low';
   }
 
-  // ==================== RENDER ====================
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      {/* Date Input Fields */}
-      <div className="grid grid-cols-2 gap-3">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="space-y-2"
-        >
-          <label className="block text-sm font-semibold text-gray-900">Start Date</label>
-          <div className="relative">
-            <Calendar
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              size={16}
-            />
-            <input
-              type="date"
-              value={startDate ? startDate.toISOString().split('T')[0] : ''}
-              onChange={e =>
-                onDateChange(e.target.value ? new Date(e.target.value) : null, endDate)
-              }
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full pl-10 pr-3 py-3 text-sm border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-            />
-          </div>
-        </motion.div>
+    <div className="space-y-4"
+      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}>
 
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="space-y-2"
-        >
-          <label className="block text-sm font-semibold text-gray-900">End Date</label>
-          <div className="relative">
-            <Calendar
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-              size={16}
-            />
-            <input
-              type="date"
-              value={endDate ? endDate.toISOString().split('T')[0] : ''}
-              onChange={e =>
-                onDateChange(startDate, e.target.value ? new Date(e.target.value) : null)
-              }
-              min={
-                startDate
-                  ? startDate.toISOString().split('T')[0]
-                  : new Date().toISOString().split('T')[0]
-              }
-              className="w-full pl-10 pr-3 py-3 text-sm border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-            />
+      {/* ── Date inputs ── */}
+      <div className="grid grid-cols-2 gap-3">
+        {([
+          { label: 'Start Date', val: startDate,  onChange: (v: Date | null) => onDateChange(v, endDate),   min: new Date() },
+          { label: 'End Date',   val: endDate,    onChange: (v: Date | null) => onDateChange(startDate, v), min: startDate ?? new Date() },
+        ] as const).map((f, i) => (
+          <div key={i} className="space-y-1.5">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-500">{f.label}</label>
+            <div className="relative">
+              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input type="date"
+                value={f.val ? f.val.toISOString().split('T')[0] : ''}
+                onChange={e => f.onChange(e.target.value ? new Date(e.target.value) : null)}
+                min={f.min.toISOString().split('T')[0]}
+                className="w-full pl-9 pr-3 py-2.5 text-sm border-2 border-slate-200 rounded-xl outline-none focus:border-sky-400 transition-all text-slate-900"
+              />
+            </div>
           </div>
-        </motion.div>
+        ))}
       </div>
 
-      {/* Duration Display */}
+      {/* ── Duration pill ── */}
       <AnimatePresence>
         {duration && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden">
+            <div className="flex items-center justify-between p-3.5 rounded-2xl border-2 border-sky-200" style={{ background: '#F0F9FF' }}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
-                  <Clock className="text-white" size={20} />
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: SKY }}>
+                  <Clock size={16} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {duration} {duration === 1 ? 'day' : 'days'} trip
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {startDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
-                    {endDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
+                  <p className="text-sm font-black text-slate-900">{duration} {duration === 1 ? 'day' : 'days'}</p>
+                  <p className="text-xs text-slate-400">{startDate && fmtShort(startDate)} – {endDate && fmtShort(endDate)}</p>
                 </div>
               </div>
-              <Button onClick={handleClearDates} variant="ghost" size="sm">
-                <X size={16} className="mr-1" />
-                Clear
-              </Button>
+              <button onClick={handleClear}
+                className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-white transition-all">
+                <X size={13} />Clear
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Quick Selections */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-        <p className="text-sm font-semibold text-gray-900 mb-2">Quick select</p>
-        <div className="grid grid-cols-4 gap-2">
-          {quickSelections.map((preset, idx) => (
-            <motion.div
-              key={preset.label}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 + idx * 0.05 }}
-            >
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleQuickSelect(preset.days, preset.offset)}
-                className="w-full text-xs h-9 hover:bg-purple-50 hover:border-purple-300 transition-all"
-              >
-                {preset.label}
-              </Button>
-            </motion.div>
+      {/* ── Quick select ── */}
+      <div>
+        <p className="text-xs font-black uppercase tracking-wider text-slate-500 mb-2">Quick select</p>
+        <div className="grid grid-cols-4 gap-1.5">
+          {QUICK.map((q, i) => (
+            <motion.button key={q.label}
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }}
+              onClick={() => handleQuickSelect(q.days, q.offset)}
+              className="py-2 text-xs font-bold rounded-xl border-2 border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-600 hover:bg-sky-50 transition-all active:scale-[0.97]">
+              {q.label}
+            </motion.button>
           ))}
         </div>
-      </motion.div>
+      </div>
 
-      {/* Calendar View */}
+      {/* ── Calendar ── */}
       {showCalendar && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-2xl border-2 border-gray-200 p-4"
-        >
-          {/* Calendar Header */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => handleMonthChange('prev')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronLeft size={20} />
-            </button>
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white rounded-2xl border-2 border-slate-100 p-4">
 
-            <h3 className="text-lg font-bold text-gray-900">
+          {/* Month nav */}
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => { const m = new Date(currentMonth); m.setMonth(m.getMonth() - 1); setCurrentMonth(m); }}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+              <ChevronLeft size={16} className="text-slate-600" />
+            </button>
+            <h3 className="text-sm font-black text-slate-900">
               {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </h3>
-
-            <button
-              onClick={() => handleMonthChange('next')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ChevronRight size={20} />
+            <button onClick={() => { const m = new Date(currentMonth); m.setMonth(m.getMonth() + 1); setCurrentMonth(m); }}
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+              <ChevronRight size={16} className="text-slate-600" />
             </button>
           </div>
 
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-              <div key={day} className="text-center text-xs font-semibold text-gray-600 py-2">
-                {day}
-              </div>
+          {/* Weekday headers */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+              <div key={d} className="text-center text-[10px] font-black text-slate-400 py-1">{d}</div>
             ))}
           </div>
 
-          {/* Calendar Days */}
+          {/* Days grid */}
           <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((dayInfo, idx) => (
-              <CalendarDay
-                key={idx}
-                dayInfo={dayInfo}
-                onClick={() => !dayInfo.isDisabled && handleDateClick(dayInfo.date)}
-                onHover={() => setHoveredDate(dayInfo.date)}
-              />
+            {calendarDays.map((di, i) => (
+              <DayCell key={i} di={di}
+                onClick={() => !di.isDisabled && handleDateClick(di.date)}
+                onHover={() => setHoveredDate(di.date)} />
             ))}
           </div>
 
-          {/* Calendar Legend */}
+          {/* Legend */}
           {showPriceTrends && (
-            <div className="mt-4 pt-4 border-t flex items-center justify-center gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <TrendingDown size={12} className="text-green-600" />
-                <span className="text-gray-600">Lower prices</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <TrendingUp size={12} className="text-orange-600" />
-                <span className="text-gray-600">Higher prices</span>
-              </div>
+            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-center gap-5 text-xs text-slate-400">
+              <span className="flex items-center gap-1"><TrendingDown size={10} className="text-emerald-500" />Lower prices</span>
+              <span className="flex items-center gap-1"><TrendingUp   size={10} className="text-red-400"     />Higher prices</span>
             </div>
           )}
         </motion.div>
       )}
 
-      {/* Seasonal Information */}
-      {seasonalInfo && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-4"
-        >
-          <button
-            onClick={() => setShowSeasonalInfo(!showSeasonalInfo)}
-            className="flex items-start gap-3 w-full text-left"
-          >
-            <div className={`w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 ${seasonalInfo.color}`}>
-              <SeasonIcon size={20} />
+      {/* ── Seasonal info ── */}
+      {seasonal && (
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-4">
+          <button onClick={() => setShowSeasonalInfo(!showSeasonalInfo)}
+            className="flex items-start gap-3 w-full text-left">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <SeasonIcon size={17} style={{ color: seasonal.color }} />
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-amber-900">Best Time to Visit</p>
-                <Info size={14} className="text-amber-600" />
+                <p className="text-sm font-black text-amber-900">Best Time to Visit</p>
+                <Info size={13} className="text-amber-500" />
               </div>
               <AnimatePresence>
                 {showSeasonalInfo && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 space-y-2"
-                  >
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                    className="mt-2 space-y-2 overflow-hidden">
                     <div className="flex items-start gap-2">
-                      <Check size={14} className="text-green-600 mt-0.5 flex-shrink-0" />
+                      <Check size={12} className="text-emerald-600 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-semibold text-amber-900">
-                          {seasonalInfo.bestMonths}
-                        </p>
-                        <p className="text-xs text-amber-700">{seasonalInfo.reason}</p>
+                        <p className="text-xs font-bold text-amber-900">{seasonal.bestMonths}</p>
+                        <p className="text-xs text-amber-700">{seasonal.reason}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
-                      <AlertCircle size={14} className="text-red-600 mt-0.5 flex-shrink-0" />
+                      <AlertCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-semibold text-amber-900">Avoid:</p>
-                        <p className="text-xs text-amber-700">{seasonalInfo.avoid}</p>
+                        <p className="text-xs font-bold text-amber-900">Avoid:</p>
+                        <p className="text-xs text-amber-700">{seasonal.avoid}</p>
                       </div>
                     </div>
                   </motion.div>
@@ -549,68 +313,52 @@ export default function DateRangePicker({
         </motion.div>
       )}
 
-      {/* Selection Status */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="text-center"
-      >
-        <p className="text-xs text-gray-500">
-          {!startDate && !endDate && 'Select your travel dates to continue'}
-          {startDate && !endDate && '✓ Start date selected. Now choose your return date'}
-          {startDate && endDate && '✓ Dates confirmed! Ready to plan your trip'}
-        </p>
-      </motion.div>
+      {/* ── Status hint ── */}
+      <p className="text-center text-xs text-slate-400">
+        {!startDate && !endDate && 'Select your travel dates to continue'}
+        {startDate  && !endDate  && '✓ Start date set — now choose your return date'}
+        {startDate  && endDate   && '✓ Dates confirmed — ready to plan your trip'}
+      </p>
     </div>
   );
 }
 
-// ==================== CALENDAR DAY COMPONENT ====================
+// ── DAY CELL ───────────────────────────────────────────────────────────────────
 
-interface CalendarDayProps {
-  dayInfo: DateInfo;
-  onClick: () => void;
-  onHover: () => void;
-}
+function DayCell({ di, onClick, onHover }: { di: DateInfo; onClick: () => void; onHover: () => void }) {
+  const { date, isToday, isSelected, isInRange, isStartDate, isEndDate, isDisabled, priceTrend } = di;
 
-function CalendarDay({ dayInfo, onClick, onHover }: CalendarDayProps) {
-  const { date, isToday, isSelected, isInRange, isStartDate, isEndDate, isDisabled, priceTrend } =
-    dayInfo;
+  let bg = '', textColor = '', ring = '';
+  if (isSelected)                          { bg = SKY;      textColor = 'white'; }
+  else if (isInRange)                      { bg = '#E0F2FE'; textColor = '#0284C7'; }
+  else if (!isDisabled)                    { bg = '';        textColor = '#0F172A'; }
+  else                                     { bg = '';        textColor = '#CBD5E1'; }
+  if (isToday && !isSelected)             ring = `ring-2 ring-sky-400`;
 
   return (
     <motion.button
-      whileHover={!isDisabled ? { scale: 1.05 } : {}}
-      whileTap={!isDisabled ? { scale: 0.95 } : {}}
+      whileHover={!isDisabled ? { scale: 1.08 } : {}}
+      whileTap={!isDisabled ? { scale: 0.94 } : {}}
       onClick={onClick}
       onMouseEnter={onHover}
       disabled={isDisabled}
-      className={`
-        relative aspect-square rounded-lg text-sm font-medium transition-all
-        ${isDisabled ? 'text-gray-300 cursor-not-allowed' : 'cursor-pointer'}
-        ${isToday && !isSelected ? 'ring-2 ring-purple-400' : ''}
-        ${isSelected ? 'bg-purple-600 text-white shadow-lg' : ''}
-        ${isInRange && !isSelected ? 'bg-purple-100 text-purple-900' : ''}
-        ${!isSelected && !isInRange && !isDisabled ? 'hover:bg-gray-100' : ''}
-        ${isStartDate || isEndDate ? 'font-bold' : ''}
-      `}
+      className={`relative aspect-square rounded-xl text-xs font-bold transition-all ${ring} ${!isSelected && !isInRange && !isDisabled ? 'hover:bg-sky-50' : ''}`}
+      style={{ background: bg, color: textColor }}
     >
       <span className="relative z-10">{date.getDate()}</span>
 
-      {/* Price Trend Indicator */}
+      {/* Price trend dot */}
       {priceTrend && !isDisabled && !isSelected && (
-        <div className="absolute bottom-1 left-1/2 -translate-x-1/2">
-          {priceTrend === 'low' && <TrendingDown size={10} className="text-green-600" />}
-          {priceTrend === 'high' && <TrendingUp size={10} className="text-red-600" />}
-          {priceTrend === 'medium' && (
-            <div className="w-1 h-1 bg-yellow-600 rounded-full"></div>
-          )}
+        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2">
+          {priceTrend === 'low'    && <TrendingDown size={8} className="text-emerald-500" />}
+          {priceTrend === 'high'   && <TrendingUp   size={8} className="text-red-400"     />}
+          {priceTrend === 'medium' && <div className="w-1 h-1 rounded-full bg-amber-400" />}
         </div>
       )}
 
-      {/* Today indicator */}
+      {/* Today dot */}
       {isToday && !isSelected && (
-        <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-purple-600 rounded-full"></div>
+        <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full" style={{ background: SKY }} />
       )}
     </motion.button>
   );

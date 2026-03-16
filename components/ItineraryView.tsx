@@ -292,7 +292,15 @@ function PackingReminder({ eventType, isEventDay }: { eventType: string; isEvent
 }
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
-export default function ItineraryView({ data }: { data?: ItineraryData }) {
+export default function ItineraryView({
+  data,
+  startDate,
+  endDate,
+}: {
+  data?:       ItineraryData;
+  startDate?:  Date | null;
+  endDate?:    Date | null;
+}) {
   const [selectedDay, setSelectedDay] = useState(1);
   const city    = data?.eventAnchor?.city ?? data?.tripSummary?.cities?.[0] ?? '';
   const weather = useWeather(city);
@@ -334,6 +342,21 @@ export default function ItineraryView({ data }: { data?: ItineraryData }) {
               <span className="flex items-center gap-1.5"><MapPin size={13} />{data.eventAnchor.venue}</span>
               <span className="w-1 h-1 rounded-full bg-slate-300" />
               <span className="flex items-center gap-1.5"><Calendar size={13} />{fmtDate(data.eventAnchor.eventDate)}</span>
+              {(startDate || endDate) && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-300" />
+                  <span className="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-white text-xs font-bold text-slate-600">
+                    <Calendar size={11} style={{ color: '#0EA5E9' }} />
+                    {startDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {endDate && ` → ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    {startDate && endDate && (
+                      <span className="px-1.5 py-0.5 rounded-full text-white text-[10px] font-black" style={{ background: '#0EA5E9' }}>
+                        {Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000)}d
+                      </span>
+                    )}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -369,9 +392,22 @@ export default function ItineraryView({ data }: { data?: ItineraryData }) {
             {data.tripSummary?.cities?.[0] || 'Your Trip'}
           </h1>
           <p className="text-slate-500 leading-relaxed">{data.overview}</p>
-          <div className="flex gap-6 pt-2 text-sm">
+          <div className="flex flex-wrap gap-4 pt-2 text-sm items-center">
             <div><span className="text-2xl font-black text-slate-900">{data.tripSummary.totalDays}</span><p className="text-slate-400">days</p></div>
             <div><span className="text-2xl font-black text-slate-900">{data.budget.totalBudget.replace('USD ', '')}</span><p className="text-slate-400">budget</p></div>
+            {(startDate || endDate) && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border-2 border-slate-100 text-xs font-bold text-slate-600">
+                <Calendar size={12} style={{ color: SKY }} />
+                {startDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {endDate && ` → ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                {startDate && endDate && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-white text-[10px] font-black"
+                    style={{ background: SKY }}>
+                    {Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000)}d
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
