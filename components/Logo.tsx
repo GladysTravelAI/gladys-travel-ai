@@ -4,168 +4,257 @@ interface LogoProps {
   size?: number;
   className?: string;
   showText?: boolean;
-  variant?: 'light' | 'dark'; // NEW: To handle different backgrounds
+  variant?: 'light' | 'dark';
 }
 
-export default function Logo({ 
-  size = 40, 
-  className = "", 
-  showText = true, 
-  variant = 'dark' // Default to dark text
+// ─── MAIN LOGO ────────────────────────────────────────────────────────────────
+
+export default function Logo({
+  size = 40,
+  className = "",
+  showText = true,
+  variant = 'dark'
 }: LogoProps) {
+  // Scale the wordmark proportionally based on size
+  const scale  = size / 40;
+  const wWidth = Math.round(260 * scale);
+  const wHeight= Math.round(56 * scale);
+
   return (
-    <div className={`flex items-center space-x-3 ${className}`}>
-      {/* Logo Icon - This SVG is great, no changes needed */}
-      <div 
-        className="relative rounded-2xl flex items-center justify-center"
-        style={{ width: size, height: size }}
-      >
-        <svg
-          width={size}
-          height={size}
-          viewBox="0 0 100 100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* ... (Your entire <svg> code is perfect) ... */ }
-          {/* Gradient Definitions */}
-           <defs>
-             <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-               <stop offset="0%" stopColor="#3B82F6" />
-               <stop offset="50%" stopColor="#2563EB" />
-               <stop offset="100%" stopColor="#1E40AF" />
-             </linearGradient>
-             <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-               <stop offset="0%" stopColor="#FCD34D" />
-               <stop offset="50%" stopColor="#FBBF24" />
-               <stop offset="100%" stopColor="#F59E0B" />
-             </linearGradient>
-             <radialGradient id="whiteGlow" cx="50%" cy="50%" r="50%">
-               <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.3" />
-               <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-             </radialGradient>
-           </defs>
-
-           {/* Outer Glow */}
-           <circle cx="50" cy="50" r="48" fill="url(#whiteGlow)" />
-
-           {/* Main Circle Background - Blue Gradient */}
-           <circle cx="50" cy="50" r="45" fill="url(#blueGradient)" />
-           
-           {/* Globe Lines - White */}
-           <circle cx="50" cy="50" r="35" stroke="white" strokeWidth="2.5" fill="none" opacity="0.9" />
-           
-           {/* Vertical Ellipse */}
-           <ellipse cx="50" cy="50" rx="15" ry="35" stroke="white" strokeWidth="2" fill="none" opacity="0.8" />
-           
-           {/* Horizontal Line - Equator */}
-           <line x1="15" y1="50" x2="85" y2="50" stroke="white" strokeWidth="2.5" opacity="0.9" />
-           
-           {/* Horizontal Ellipse */}
-           <ellipse cx="50" cy="50" rx="35" ry="15" stroke="white" strokeWidth="2" fill="none" opacity="0.7" />
-
-           {/* Additional Detail Lines */}
-           <ellipse cx="50" cy="50" rx="25" ry="35" stroke="white" strokeWidth="1.5" fill="none" opacity="0.5" />
-           <line x1="15" y1="35" x2="85" y2="35" stroke="white" strokeWidth="1.5" opacity="0.6" />
-           <line x1="15" y1="65" x2="85" y2="65" stroke="white" strokeWidth="1.5" opacity="0.6" />
-
-           {/* Airplane - Gold */}
-           <g transform="translate(62, 28) rotate(45 0 0)">
-             <path 
-               d="M12 2L8 8L2 10L8 12L12 18L16 12L22 10L16 8L12 2Z" 
-               fill="url(#goldGradient)"
-               filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"
-             />
-             {/* Airplane highlight */}
-             <path 
-               d="M12 2L10 6L8 8L10 9L12 12L14 9L16 8L14 6L12 2Z" 
-               fill="white"
-               opacity="0.4"
-             />
-           </g>
-
-           {/* Gold Sparkles */}
-           <g fill="url(#goldGradient)">
-             {/* Top Right Sparkle */}
-             <circle cx="78" cy="22" r="3" />
-             <path d="M78 18L78.5 20L80 20.5L78.5 21L78 23L77.5 21L76 20.5L77.5 20Z" fill="white" opacity="0.6" />
-             
-             {/* Bottom Left Sparkle */}
-             <circle cx="22" cy="78" r="2.5" opacity="0.9" />
-             <path d="M22 75L22.4 76.5L24 77L22.4 77.5L22 79L21.6 77.5L20 77L21.6 76.5Z" fill="white" opacity="0.5" />
-             
-             {/* Small accent sparkle */}
-             <circle cx="70" cy="70" r="2" opacity="0.7" />
-           </g>
-
-           {/* White accent dots for extra detail */}
-           <circle cx="30" cy="30" r="1.5" fill="white" opacity="0.8" />
-           <circle cx="65" cy="50" r="1" fill="white" opacity="0.6" />
-           <circle cx="35" cy="50" r="1" fill="white" opacity="0.6" />
-
-           {/* Subtle outer ring for depth */}
-           <circle cx="50" cy="50" r="47" stroke="white" strokeWidth="1" fill="none" opacity="0.3" />
-        </svg>
-      </div>
-
-      {/* Logo Text */}
-      {showText && (
-        <div className="flex flex-col">
-          {/* NEW: Conditional text color */}
-          <span className={`text-2xl font-bold leading-tight ${
-            variant === 'light' 
-              ? 'text-white' 
-              : 'bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent'
-          }`}>
-            Gladys
-          </span>
-          <span className={`text-sm font-medium tracking-wide ${
-             variant === 'light'
-               ? 'text-amber-400' // Use gold for the "light" variant
-               : 'bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent'
-          }`}>
-            Travel AI
-          </span>
-        </div>
+    <div className={`flex items-center ${className}`}>
+      {showText ? (
+        <Wordmark width={wWidth} height={wHeight} variant={variant} />
+      ) : (
+        <AppIcon size={size} />
       )}
     </div>
   );
 }
 
-// Compact version for favicons or small spaces
-export function LogoCompact({ size = 32 }: { size?: number }) {
-  // ... (Your LogoCompact component is perfect as-is) ...
+// ─── WORDMARK ─────────────────────────────────────────────────────────────────
+// Matches image top: GladysTravel.com + plane arc + smile arc
+
+function Wordmark({ width = 260, height = 56, variant = 'dark' }: {
+  width?: number; height?: number; variant?: 'light' | 'dark'
+}) {
+  const gladysColor = variant === 'light' ? '#FFFFFF'  : '#1A2D6B'  // Dark navy
+  const travelColor = variant === 'light' ? '#7DD3FC'  : '#2B7FD4'  // Medium blue
+  const dotComColor = variant === 'light' ? '#7DD3FC'  : '#2B7FD4'  // Same as Travel
+  const smileColor  = variant === 'light' ? 'rgba(56,189,248,0.8)' : '#38BDF8'
+  const planeColor  = variant === 'light' ? '#FFFFFF'  : '#1A2D6B'
+
   return (
-     <div 
-       className="relative rounded-xl flex items-center justify-center shadow-lg"
-       style={{ width: size, height: size }}
-     >
-       <svg
-         width={size}
-         height={size}
-         viewBox="0 0 100 100"
-         fill="none"
-         xmlns="http://www.w3.org/2000/svg"
-       >
-         <defs>
-           <linearGradient id="compactBlue" x1="0%" y1="0%" x2="100%" y2="100%">
-             <stop offset="0%" stopColor="#3B82F6" />
-             <stop offset="100%" stopColor="#1E40AF" />
-           </linearGradient>
-           <linearGradient id="compactGold" x1="0%" y1="0%" x2="100%" y2="100%">
-             <stop offset="0%" stopColor="#FCD34D" />
-             <stop offset="100%" stopColor="#F59E0B" />
-           </linearGradient>
-         </defs>
-         <circle cx="50" cy="50" r="48" fill="url(#compactBlue)" />
-         <circle cx="50" cy="50" r="35" stroke="white" strokeWidth="2.5" fill="none" />
-         <ellipse cx="50" cy="50" rx="15" ry="35" stroke="white" strokeWidth="2" fill="none" />
-         <line x1="15" y1="50" x2="85" y2="50" stroke="white" strokeWidth="2.5" />
-         <g transform="translate(62, 28) rotate(45 0 0)">
-           <path d="M12 2L8 8L2 10L8 12L12 18L16 12L22 10L16 8L12 2Z" fill="url(#compactGold)" />
-         </g>
-       </svg>
-     </div>
-   );
+    <svg
+      width={width}
+      height={height}
+      viewBox="0 0 260 56"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ overflow: 'visible' }}
+    >
+      <defs>
+        {/* Orange → transparent trail going left to right, bottom to top */}
+        <linearGradient id="wm_trail" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#F97316" stopOpacity="0"  />
+          <stop offset="30%"  stopColor="#F97316" stopOpacity="0.5"/>
+          <stop offset="100%" stopColor="#FBBF24" stopOpacity="1"  />
+        </linearGradient>
+        {/* Smile gradient */}
+        <linearGradient id="wm_smile" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor={smileColor} stopOpacity="0.2"/>
+          <stop offset="40%"  stopColor={smileColor} stopOpacity="1"  />
+          <stop offset="100%" stopColor={smileColor} stopOpacity="0.3"/>
+        </linearGradient>
+      </defs>
+
+      {/* ── Smile arc — sits just below text baseline ── */}
+      {/* Sweeps from left edge to right edge of full wordmark */}
+      <path
+        d="M 2 44 Q 115 58 228 44"
+        stroke="url(#wm_smile)"
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* ── Orange trail — from ~midpoint sweeping to plane ── */}
+      <path
+        d="M 155 30 Q 178 15 198 2"
+        stroke="url(#wm_trail)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        fill="none"
+      />
+
+      {/* ── Plane at top-right ── */}
+      {/* Rotated ~-35deg, pointing top-right */}
+      <g transform="translate(205, -2) rotate(-35)">
+        {/* Fuselage */}
+        <ellipse cx="0" cy="0" rx="10" ry="4.5" fill={planeColor} />
+        {/* Top wing */}
+        <path d="M -3 -1 L -12 -8 L -9 -8 L 1 -3 Z" fill={planeColor} />
+        {/* Bottom wing */}
+        <path d="M -3  1 L -12  8 L -9  8 L 1  3 Z" fill={planeColor} />
+        {/* Tail */}
+        <path d="M -7 -1 L -12 -5 L -10 -5 L -5 -1 Z" fill={planeColor} opacity="0.85" />
+      </g>
+
+      {/* ── Text: Gladys ── dark navy, heavy */}
+      <text
+        x="0"
+        y="37"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="900"
+        fontSize="36"
+        letterSpacing="-1.2"
+        fill={gladysColor}
+      >
+        Gladys
+      </text>
+
+      {/* ── Text: Travel ── medium blue, regular weight */}
+      <text
+        x="128"
+        y="37"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="500"
+        fontSize="36"
+        letterSpacing="-0.8"
+        fill={travelColor}
+      >
+        Travel
+      </text>
+
+      {/* ── Text: .com ── same blue, smaller, baseline-aligned */}
+      <text
+        x="231"
+        y="37"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="400"
+        fontSize="22"
+        letterSpacing="0"
+        fill={dotComColor}
+      >
+        .com
+      </text>
+    </svg>
+  );
 }
 
+// ─── APP ICON ─────────────────────────────────────────────────────────────────
+// Matches image bottom: gradient blue square, stacked Gladys/Travel/.com + plane + orange smile
+
+function AppIcon({ size = 40 }: { size?: number }) {
+  const id = `ai_${size}`;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        {/* Sky blue gradient — lighter top-right, deeper bottom-left, matches image */}
+        <linearGradient id={`${id}_bg`} x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%"   stopColor="#4FC3F7" />
+          <stop offset="40%"  stopColor="#0EA5E9" />
+          <stop offset="100%" stopColor="#1E40AF" />
+        </linearGradient>
+        {/* Orange trail */}
+        <linearGradient id={`${id}_trail`} x1="0%" y1="100%" x2="85%" y2="0%">
+          <stop offset="0%"   stopColor="#F97316" stopOpacity="0"  />
+          <stop offset="40%"  stopColor="#F97316" stopOpacity="0.7"/>
+          <stop offset="100%" stopColor="#FBBF24"                  />
+        </linearGradient>
+        {/* Orange smile */}
+        <linearGradient id={`${id}_smile`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor="#F97316" stopOpacity="0.3"/>
+          <stop offset="50%"  stopColor="#FBBF24"                  />
+          <stop offset="100%" stopColor="#F97316" stopOpacity="0.3"/>
+        </linearGradient>
+        <clipPath id={`${id}_clip`}>
+          <rect width="100" height="100" rx="22" />
+        </clipPath>
+      </defs>
+
+      {/* Background */}
+      <rect width="100" height="100" rx="22" fill={`url(#${id}_bg)`} />
+      {/* Subtle border */}
+      <rect width="100" height="100" rx="22" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" />
+
+      {/* Orange trail sweeping from bottom-left area up to plane */}
+      <path
+        d="M 14 75 Q 45 45 72 14"
+        stroke={`url(#${id}_trail)`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        fill="none"
+        clipPath={`url(#${id}_clip)`}
+      />
+
+      {/* Plane at top-right */}
+      <g transform="translate(74, 12) rotate(-38)">
+        <ellipse cx="0" cy="0" rx="9" ry="4" fill="white" />
+        <path d="M -2 -0.5 L -10 -7 L -7.5 -7 L 1 -2.5 Z" fill="white" />
+        <path d="M -2  0.5 L -10  7 L -7.5  7 L 1  2.5 Z" fill="white" />
+        <path d="M -6 -0.5 L -10 -4 L -8.5 -4 L -4.5 -0.5 Z" fill="white" opacity="0.8" />
+      </g>
+
+      {/* Orange smile arc at bottom */}
+      <path
+        d="M 12 82 Q 50 96 88 82"
+        stroke={`url(#${id}_smile)`}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+        clipPath={`url(#${id}_clip)`}
+      />
+
+      {/* Text: Gladys — white bold, left-aligned */}
+      <text
+        x="12"
+        y="52"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="800"
+        fontSize="22"
+        letterSpacing="-0.5"
+        fill="white"
+      >
+        Gladys
+      </text>
+
+      {/* Text: Travel — light cyan, below Gladys */}
+      <text
+        x="12"
+        y="68"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="500"
+        fontSize="18"
+        letterSpacing="-0.3"
+        fill="#7DD3FC"
+      >
+        Travel
+      </text>
+
+      {/* Text: .com — small, below Travel */}
+      <text
+        x="12"
+        y="81"
+        fontFamily="'DM Sans', 'Plus Jakarta Sans', -apple-system, sans-serif"
+        fontWeight="400"
+        fontSize="12"
+        letterSpacing="0"
+        fill="rgba(125,211,252,0.8)"
+      >
+        .com
+      </text>
+    </svg>
+  );
+}
+
+// ─── COMPACT (favicon / small) ────────────────────────────────────────────────
+
+export function LogoCompact({ size = 32 }: { size?: number }) {
+  return <AppIcon size={size} />;
+}

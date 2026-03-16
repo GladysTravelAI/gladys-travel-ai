@@ -1,6 +1,6 @@
 // app/api/agent/route.ts
 // 🤖 GLADYS AGENT - INFRASTRUCTURE GRADE
-// Orchestrates: EventRegistry → Ticketmaster → LogicEngine → AI Content → AffiliateWrapper
+// Orchestrates: EventRegistry → Ticketmaster → API-Football → LogicEngine → AI Content → AffiliateWrapper
 
 import { NextRequest, NextResponse } from 'next/server';
 import { openai, OPENAI_CONFIG } from '@/lib/openai/client';
@@ -11,7 +11,6 @@ import { searchEvents, findEventById, getCitiesForEvent } from '@/lib/data/event
 import { executeHotelSearch } from '@/lib/tools/travelpayoutsHotelTool';
 import { executeFlightSearch } from '@/lib/tools/travelpayoutsFlightTool';
 import { findBestEventMatch, type NormalizedEvent } from '@/lib/services/ticketmaster';
-import { findBestPHQMatch } from '@/lib/services/predicthq';
 
 // ==================== TYPES ====================
 
@@ -49,6 +48,79 @@ function estimateBudget(budgetLevel: BudgetLevel) {
 function parseBudgetLevel(raw: string): BudgetLevel {
   if (raw === 'budget' || raw === 'luxury') return raw;
   return 'mid';
+}
+
+// ==================== API-FOOTBALL SEARCH (replaces PredictHQ) ====================
+
+const LEAGUE_ID_MAP: Record<string, number> = {
+  'premier league':    39,
+  'la liga':           140,
+  'bundesliga':        78,
+  'serie a':           135,
+  'ligue 1':           61,
+  'champions league':  2,
+  'europa league':     3,
+  'world cup':         1,
+  'world cup 2026':    1,
+  'mls':               253,
+  'copa america':      9,
+  'euros':             4,
+  'afcon':             6,
+};
+
+async function findBestFootballMatch(query: string): Promise<NormalizedEvent | null> {
+  const key = process.env.API_FOOTBALL_KEY;
+  if (!key) return null;
+
+  try {
+    const q = query.toLowerCase();
+
+    // Detect if this is a football query at all
+    const footballKeywords = ['football', 'soccer', 'match', 'fixture', 'premier league', 'la liga',
+      'bundesliga', 'serie a', 'champions league', 'world cup', 'mls', 'uefa', 'fifa', 'copa',
+      'afcon', 'euros', 'fc ', ' fc', ' united', ' city', ' real ', ' atletico', ' barcelona',
+      ' arsenal', ' chelsea', ' liverpool', ' madrid'];
+    const isFootball = footballKeywords.some(kw => q.includes(kw));
+    if (!isFootball) return null;
+
+    // Find matching league ID
+    const leagueId = Object.entries(LEAGUE_ID_MAP).find(([k]) => q.includes(k))?.[1];
+
+    const params = new URLSearchParams({ next: '1', season: '2024' });
+    if (leagueId) params.append('league', String(leagueId));
+
+    // Also try searching by team name if present
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?${params}`, {
+      headers: { 'x-apisports-key': key },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json();
+    const fixture = data.response?.[0];
+    if (!fixture) return null;
+
+    const matchDate = new Date(fixture.fixture.date);
+
+    return {
+      id:          `football-${fixture.fixture.id}`,
+      name:        `${fixture.teams.home.name} vs ${fixture.teams.away.name}`,
+      category:    'sports',
+      date:        matchDate.toISOString().split('T')[0],
+      time:        matchDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      venue:       fixture.fixture.venue?.name ?? fixture.fixture.venue?.city ?? 'TBC',
+      city:        fixture.fixture.venue?.city ?? '',
+      country:     fixture.league?.country ?? '',
+      countryCode: '',
+      ticketUrl:   '',
+      image:       fixture.league?.logo,
+      status:      'onsale',
+      attraction:  fixture.league?.name,
+    };
+  } catch (err) {
+    console.error('[API-Football] search error:', err);
+    return null;
+  }
 }
 
 // ==================== CITY SELECTION RESPONSE ====================
@@ -134,7 +206,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // PHASE 2: Ticketmaster — real event data for everything else
+    // PHASE 2: Ticketmaster — concerts, sports, arts
     console.log('🎟️ Checking Ticketmaster for:', message);
     const tmEvent = await findBestEventMatch(message);
     if (tmEvent) {
@@ -149,27 +221,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // PHASE 3: PredictHQ — soccer globally, African/Asian festivals, free events
-    console.log('🌍 Checking PredictHQ for:', message);
-    const phqEvent = await findBestPHQMatch(message);
-    if (phqEvent) {
-      console.log(`✅ PHQ found: ${phqEvent.name} in ${phqEvent.city}`);
-      const mappedEvent: NormalizedEvent = {
-        id: phqEvent.id,
-        name: phqEvent.name,
-        category: phqEvent.category,
-        date: phqEvent.date,
-        venue: phqEvent.venue || phqEvent.city,
-        city: phqEvent.city,
-        country: phqEvent.country,
-        countryCode: phqEvent.countryCode,
-        ticketUrl: '',
-        image: undefined,
-        status: 'onsale',
-        attraction: undefined,
-      };
+    // PHASE 3: API-Football — football/soccer matches worldwide (replaces PredictHQ)
+    console.log('⚽ Checking API-Football for:', message);
+    const footballEvent = await findBestFootballMatch(message);
+    if (footballEvent) {
+      console.log(`✅ Football found: ${footballEvent.name} in ${footballEvent.city}`);
       return await buildTicketmasterTripResponse({
-        tmEvent: mappedEvent,
+        tmEvent: footballEvent,
         message,
         budgetLevel,
         originCountryCode: origin_country_code,
@@ -222,10 +280,8 @@ async function buildTicketmasterTripResponse({
   const departureDate = new Date(eventDate);
   departureDate.setDate(departureDate.getDate() + (totalDays - 3));
 
-  // Stable event_id for affiliate tracking
   const tmEventId = `tm-${tmEvent.id}`;
 
-  // Build day slots with strict DayType
   const daySlots = Array.from({ length: totalDays }, (_, i) => {
     const d = new Date(arrivalDate);
     d.setDate(d.getDate() + i);
@@ -243,10 +299,10 @@ async function buildTicketmasterTripResponse({
       date: dateStr,
       day_type: dayType,
       label:
-        dayType === 'event_day'    ? 'Event Day'
-        : dayType === 'arrival'    ? 'Arrival Day'
-        : dayType === 'departure'  ? 'Departure Day'
-        : dayType === 'pre_event'  ? 'Pre-Event Day'
+        dayType === 'event_day'   ? 'Event Day'
+        : dayType === 'arrival'   ? 'Arrival Day'
+        : dayType === 'departure' ? 'Departure Day'
+        : dayType === 'pre_event' ? 'Pre-Event Day'
         : 'Post-Event Day',
     };
   });
@@ -262,7 +318,7 @@ async function buildTicketmasterTripResponse({
     }).catch(() => []),
     executeFlightSearch({
       origin: originIATA,
-      destination: tmEvent.countryCode,
+      destination: tmEvent.countryCode || tmEvent.country,
       departure_date: fmt(arrivalDate),
       return_date: fmt(departureDate),
     }).catch(() => []),
@@ -280,9 +336,6 @@ async function buildTicketmasterTripResponse({
           country: tmEvent.country,
           event_date: tmEvent.date,
           event_category: tmEvent.category,
-          
-          
-          
           budget_level: budgetLevel,
           day_slots: daySlots,
         })
@@ -297,51 +350,55 @@ async function buildTicketmasterTripResponse({
     success: true,
     data: {
       intent: 'event_trip',
-      source: 'ticketmaster',
+      source: tmEvent.id.startsWith('football-') ? 'api-football' : 'ticketmaster',
       destination: { city: tmEvent.city, country: tmEvent.country },
       event: {
-        name: tmEvent.name,
-        type: mapTMCategory(tmEvent.category),
-        date: tmEvent.date,
-        time: tmEvent.time,
-        venue: tmEvent.venue,
-        image: tmEvent.image,
-        ticketUrl: tmEvent.ticketUrl,
-        priceMin: tmEvent.priceMin,
-        priceMax: tmEvent.priceMax,
-        currency: tmEvent.currency,
+        name:       tmEvent.name,
+        type:       mapTMCategory(tmEvent.category),
+        date:       tmEvent.date,
+        time:       tmEvent.time,
+        venue:      tmEvent.venue,
+        image:      tmEvent.image,
+        ticketUrl:  tmEvent.ticketUrl,
+        priceMin:   tmEvent.priceMin,
+        priceMax:   tmEvent.priceMax,
+        currency:   tmEvent.currency,
         attraction: tmEvent.attraction,
       },
       travel_dates: {
-        arrival_date: fmt(arrivalDate),
+        arrival_date:   fmt(arrivalDate),
         departure_date: fmt(departureDate),
-        total_nights: totalDays - 1,
-        day_slots: daySlots,
+        total_nights:   totalDays - 1,
+        day_slots:      daySlots,
       },
       budget,
       hotels,
       flights,
-      itinerary: aiContent?.daily_itinerary || [],
+      itinerary:     aiContent?.daily_itinerary     || [],
+      local_experiences:    aiContent?.local_experiences    || [],
+      food_recommendations: aiContent?.food_recommendations || [],
+      hidden_gems:          aiContent?.hidden_gems          || [],
+      event_tips:           aiContent?.event_tips           || [],
       affiliate_links: {
         hotel: buildHotelUrl({
-          city: tmEvent.city,
-          check_in: fmt(arrivalDate),
-          check_out: fmt(departureDate),
-          event_id: tmEventId,        // ✅ required field satisfied
+          city:         tmEvent.city,
+          check_in:     fmt(arrivalDate),
+          check_out:    fmt(departureDate),
+          event_id:     tmEventId,
           budget_level: budgetLevel,
           user_session: userSession,
         }).url,
         flight: buildFlightUrl({
-          origin_iata: originIATA,
-          dest_iata: tmEvent.countryCode,
-          depart_date: fmt(arrivalDate),
-          return_date: fmt(departureDate),
-          city: tmEvent.city,
-          event_id: tmEventId,        // ✅ required field satisfied
+          origin_iata:  originIATA,
+          dest_iata:    tmEvent.countryCode || tmEvent.country,
+          depart_date:  fmt(arrivalDate),
+          return_date:  fmt(departureDate),
+          city:         tmEvent.city,
+          event_id:     tmEventId,
           budget_level: budgetLevel,
           user_session: userSession,
         }).url,
-        tickets: tmEvent.ticketUrl,
+        tickets: tmEvent.ticketUrl || null,
       },
       upsells: { insurance: true, esim: true },
       message: `Your trip to ${tmEvent.name} in ${tmEvent.city} is ready.`,
@@ -423,14 +480,14 @@ async function buildRegistryTripResponse({
       {
         role: 'user',
         content: buildAIUserPrompt({
-          trip_plan: tripPlan,
-          event_name: event.name,
-          city_name: city.name,
-          country: city.country,
-          event_date: matchDate,
+          trip_plan:      tripPlan,
+          event_name:     event.name,
+          city_name:      city.name,
+          country:        city.country,
+          event_date:     matchDate,
           event_category: event.category,
-          day_slots: tripPlan.travel_dates.day_slots,
-          budget_level: budgetLevel,
+          day_slots:      tripPlan.travel_dates.day_slots,
+          budget_level:   budgetLevel,
         })
       }
     ],
@@ -442,78 +499,78 @@ async function buildRegistryTripResponse({
   return NextResponse.json({
     success: true,
     data: {
-      intent: 'event_trip',
-      event_id: eventId,
+      intent:     'event_trip',
+      event_id:   eventId,
       event_name: event.name,
       destination: {
-        city: city.name,
-        country: city.country,
+        city:      city.name,
+        country:   city.country,
         iata_code: city.iata_code,
       },
       event: {
-        name: event.name,
-        type: event.category,
-        date: matchDate,
+        name:  event.name,
+        type:  event.category,
+        date:  matchDate,
         venue: event.venues.find(v => v.city_id === cityId)?.name || city.name,
       },
-      travel_dates: tripPlan.travel_dates,
-      budget: tripPlan.budget,
-      upsells: tripPlan.upsells,
+      travel_dates:         tripPlan.travel_dates,
+      budget:               tripPlan.budget,
+      upsells:              tripPlan.upsells,
       hotels,
       flights,
-      itinerary: aiContent?.daily_itinerary || [],
-      local_experiences: aiContent?.local_experiences || [],
+      itinerary:            aiContent?.daily_itinerary     || [],
+      local_experiences:    aiContent?.local_experiences    || [],
       food_recommendations: aiContent?.food_recommendations || [],
-      hidden_gems: aiContent?.hidden_gems || [],
-      event_tips: aiContent?.event_tips || [],
+      hidden_gems:          aiContent?.hidden_gems          || [],
+      event_tips:           aiContent?.event_tips           || [],
       affiliate_links: {
         hotel: buildHotelUrl({
-          city: city.name,
-          check_in: tripPlan.travel_dates.arrival_date,
-          check_out: tripPlan.travel_dates.departure_date,
-          event_id: eventId,
+          city:         city.name,
+          check_in:     tripPlan.travel_dates.arrival_date,
+          check_out:    tripPlan.travel_dates.departure_date,
+          event_id:     eventId,
           budget_level: budgetLevel,
           user_session: userSession,
         }).url,
         flight: buildFlightUrl({
-          origin_iata: 'JNB',
-          dest_iata: city.iata_code,
-          depart_date: tripPlan.travel_dates.arrival_date,
-          return_date: tripPlan.travel_dates.departure_date,
-          event_id: eventId,
-          city: city.name,
+          origin_iata:  'JNB',
+          dest_iata:    city.iata_code,
+          depart_date:  tripPlan.travel_dates.arrival_date,
+          return_date:  tripPlan.travel_dates.departure_date,
+          event_id:     eventId,
+          city:         city.name,
           budget_level: budgetLevel,
           user_session: userSession,
         }).url,
         esim: tripPlan.upsells.esim
           ? buildESimUrl({
               destination_country: city.country,
-              event_id: eventId,
-              city: city.name,
+              event_id:    eventId,
+              city:        city.name,
               user_session: userSession,
             }).url
           : null,
         insurance: tripPlan.upsells.insurance
           ? buildInsuranceUrl({
               destination: city.country,
-              start_date: tripPlan.travel_dates.arrival_date,
-              end_date: tripPlan.travel_dates.departure_date,
-              event_id: eventId,
-              city: city.name,
+              start_date:  tripPlan.travel_dates.arrival_date,
+              end_date:    tripPlan.travel_dates.departure_date,
+              event_id:    eventId,
+              city:        city.name,
               user_session: userSession,
             }).url
           : null,
         transfer: buildTransferUrl({
-          from: `${city.iata_code} Airport`,
-          to: city.name,
-          date: tripPlan.travel_dates.arrival_date,
-          event_id: eventId,
-          city: city.name,
+          from:        `${city.iata_code} Airport`,
+          to:          city.name,
+          date:        tripPlan.travel_dates.arrival_date,
+          event_id:    eventId,
+          city:        city.name,
           user_session: userSession,
         }).url,
         airhelp: buildAirHelpUrl({
-          event_id: eventId,
-          city: city.name,
+          event_id:    eventId,
+          city:        city.name,
           user_session: userSession,
         }).url,
       },

@@ -1,495 +1,495 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Calendar, MapPin, Ticket, Filter, Search, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import { getFeaturedEvents, type Event } from '@/lib/event-data';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Search, Trophy, Music, PartyPopper, Sparkles,
+  TrendingUp, Calendar, MapPin, Flame, Globe,
+  Loader2, ArrowRight, Ticket, ChevronLeft, ChevronRight,
+  X, SlidersHorizontal,
+} from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import Navbar  from '@/components/Navbar'
+import Footer  from '@/components/Footer'
 
-// Type for API search results (from Ticketmaster)
-interface SearchResultEvent {
-  id: string;
-  name: string;
-  startDate: string;
-  venue: {
-    name: string;
-    city: string;
-    country: string;
-  };
-  priceRange: {
-    min: number;
-    max: number;
-    currency: string;
-  } | null;
-  url: string;
-  image: string;
-  description: string;
-  source: string;
+// ── TYPES ──────────────────────────────────────────────────────────────────────
+
+interface LiveEvent {
+  id:          string
+  name:        string
+  category:    'sports' | 'music' | 'festival' | 'other'
+  date:        string
+  time?:       string
+  venue:       string
+  city:        string
+  country:     string
+  image?:      string
+  ticketUrl?:  string
+  priceMin?:   number
+  currency?:   string
+  attraction?: string
+  rank?:       number
 }
 
-const EventsHub = () => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedSport, setSelectedSport] = useState<string>('all');
-  const [apiEvents, setApiEvents] = useState<SearchResultEvent[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState<'featured' | 'search'>('featured');
+const SKY = '#0EA5E9'
 
-  // Featured events from our curated list
-  const featuredEvents = getFeaturedEvents();
+// ── HELPERS ────────────────────────────────────────────────────────────────────
 
-  // Search API with debounce
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setApiEvents([]);
-      setActiveTab('featured');
-      return;
-    }
+function getDaysUntil(d: string) {
+  return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000)
+}
+function fmtDate(d: string) {
+  try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
+  catch { return d }
+}
+function catColor(cat: string) {
+  if (cat === 'sports')   return SKY
+  if (cat === 'music')    return '#8B5CF6'
+  if (cat === 'festival') return '#F97316'
+  return '#10B981'
+}
+function CatIcon({ cat, size = 12 }: { cat: string; size?: number }) {
+  if (cat === 'sports')   return <Trophy size={size} />
+  if (cat === 'music')    return <Music size={size} />
+  if (cat === 'festival') return <PartyPopper size={size} />
+  return <Sparkles size={size} />
+}
 
-    const timer = setTimeout(async () => {
-      setIsSearching(true);
-      setActiveTab('search');
-      
-      try {
-        const response = await fetch(`/api/events?query=${encodeURIComponent(searchQuery)}`);
-        const results: SearchResultEvent[] = await response.json();
-        setApiEvents(results);
-      } catch (error) {
-        console.error('Search error:', error);
-        setApiEvents([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 500);
+// ── HERO EVENT CARD (first result — full width) ────────────────────────────────
 
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Filter featured events
-  const filteredFeaturedEvents = useMemo(() => {
-    return featuredEvents.filter(event => {
-      const matchesType = selectedType === 'all' || event.type === selectedType;
-      const matchesSport = selectedSport === 'all' || event.sport === selectedSport;
-      return matchesType && matchesSport;
-    });
-  }, [selectedType, selectedSport, featuredEvents]);
-
-  // Display events based on active tab
-  const displayEvents = activeTab === 'featured' ? filteredFeaturedEvents : apiEvents;
-
-  const eventTypes = ['all', 'sports', 'music', 'festival', 'cultural'];
-  const sportTypes = ['all', 'football', 'american-football', 'basketball', 'baseball', 'tennis', 'racing', 'rugby', 'hockey', 'golf'];
-
-  return (
-    <main className="min-h-screen bg-white">
-      <Navbar />
-      
-      {/* Hero Section - Apple Style */}
-      <section className="relative pt-24 pb-16 px-4 overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-br from-purple-200 via-pink-200 to-blue-200 rounded-full blur-3xl opacity-30 animate-pulse-slow" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-br from-blue-200 via-purple-200 to-pink-200 rounded-full blur-3xl opacity-30 animate-pulse-slower" />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <Sparkles className="text-purple-600" size={48} />
-              <h1 className="text-5xl md:text-7xl font-semibold tracking-tight text-gray-900">
-                Discover Events
-              </h1>
-            </div>
-            
-            <p className="text-xl md:text-2xl text-gray-600 mb-4 max-w-3xl mx-auto font-normal">
-              From world championships to music festivals. Your next unforgettable experience awaits.
-            </p>
-
-            {/* Live Search Badge */}
-            <div className="flex items-center justify-center gap-2 mb-8">
-              <div className="px-4 py-2 bg-green-50 border-2 border-green-200 rounded-full flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-semibold text-green-700">Live Event Search Powered by Ticketmaster</span>
-              </div>
-            </div>
-
-            {/* Search & Filters */}
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
-                <Input
-                  type="text"
-                  placeholder="Search any event worldwide: NBA, Champions League, Taylor Swift..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-16 pl-16 pr-6 text-lg rounded-2xl border-2 border-gray-200 focus:border-blue-500 bg-white shadow-lg"
-                />
-                {isSearching && (
-                  <Loader2 className="absolute right-6 top-1/2 -translate-y-1/2 text-blue-600 animate-spin" size={24} />
-                )}
-              </div>
-
-              {/* Tab Selector */}
-              {searchQuery && (
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setActiveTab('featured')}
-                    className={`px-6 py-3 rounded-2xl font-semibold transition-all ${
-                      activeTab === 'featured'
-                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Featured ({filteredFeaturedEvents.length})
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('search')}
-                    className={`px-6 py-3 rounded-2xl font-semibold transition-all ${
-                      activeTab === 'search'
-                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg'
-                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    Search Results ({apiEvents.length})
-                  </button>
-                </div>
-              )}
-
-              {/* Filter Tabs - Only show for featured */}
-              {activeTab === 'featured' && (
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl">
-                    <Filter size={18} className="text-gray-600" />
-                    <span className="text-sm font-semibold text-gray-700">Filter by:</span>
-                  </div>
-                  
-                  {/* Type Filter */}
-                  <div className="flex flex-wrap gap-2">
-                    {eventTypes.map(type => (
-                      <button
-                        key={type}
-                        onClick={() => setSelectedType(type)}
-                        className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
-                          selectedType === type
-                            ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg scale-105'
-                            : 'bg-white text-gray-700 hover:bg-gray-100 border-2 border-gray-200'
-                        }`}
-                      >
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Sport Filter */}
-                  {selectedType === 'sports' && (
-                    <div className="flex flex-wrap gap-2">
-                      {sportTypes.map(sport => (
-                        <button
-                          key={sport}
-                          onClick={() => setSelectedSport(sport)}
-                          className={`px-4 py-2 rounded-full font-medium text-xs transition-all ${
-                            selectedSport === sport
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                        >
-                          {sport === 'all' ? 'All Sports' : sport.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Events Grid */}
-      <section className="py-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          {/* Section Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <TrendingUp className="text-blue-600" size={28} />
-              <h2 className="text-3xl font-bold text-gray-900">
-                {activeTab === 'featured' 
-                  ? (selectedType === 'all' ? 'Featured Events' : `${selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Events`)
-                  : 'Search Results'
-                }
-              </h2>
-            </div>
-            <p className="text-gray-600 font-medium">
-              {displayEvents.length} {displayEvents.length === 1 ? 'event' : 'events'} found
-            </p>
-          </div>
-
-          {/* Loading State */}
-          {isSearching && (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Loader2 className="text-blue-600 animate-spin mb-4" size={48} />
-              <p className="text-gray-600 text-lg">Searching live events worldwide...</p>
-            </div>
-          )}
-
-          {/* Events Grid */}
-          {!isSearching && displayEvents.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {displayEvents.map((event, index) => (
-                <EventCard 
-                  key={event.id} 
-                  event={event} 
-                  index={index}
-                  isApiEvent={activeTab === 'search'}
-                />
-              ))}
-            </div>
-          ) : !isSearching && (
-            <div className="text-center py-20">
-              <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                <Calendar className="text-gray-400" size={48} />
-              </div>
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                {activeTab === 'search' ? 'No events found' : 'No events match your filters'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {activeTab === 'search' 
-                  ? 'Try searching for popular events like "NBA", "Champions League", or "Coachella"'
-                  : 'Try adjusting your filters or search for specific events'
-                }
-              </p>
-              <Button
-                onClick={() => {
-                  setSearchQuery('');
-                  setSelectedType('all');
-                  setSelectedSport('all');
-                  setActiveTab('featured');
-                }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700"
-              >
-                {activeTab === 'search' ? 'View Featured Events' : 'Clear Filters'}
-              </Button>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <Footer />
-
-      <style jsx global>{`
-        @keyframes pulse-slow {
-          0%, 100% { opacity: 0.3; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(1.05); }
-        }
-
-        @keyframes pulse-slower {
-          0%, 100% { opacity: 0.2; transform: scale(1); }
-          50% { opacity: 0.4; transform: scale(1.1); }
-        }
-
-        .animate-pulse-slow {
-          animation: pulse-slow 4s ease-in-out infinite;
-        }
-
-        .animate-pulse-slower {
-          animation: pulse-slower 6s ease-in-out infinite;
-        }
-      `}</style>
-    </main>
-  );
-};
-
-// Event Card Component
-const EventCard = ({ event, index, isApiEvent }: { event: Event | SearchResultEvent; index: number; isApiEvent?: boolean }) => {
-  // Handle different image field names
-  const getImageUrl = (event: Event | SearchResultEvent): string => {
-    // Cast to any to access properties safely
-    const e = event as any;
-    if (e.image) return e.image;
-    if (e.heroImage) return e.heroImage;
-    if (e.thumbnail) return e.thumbnail;
-    return '';
-  };
-
-  const imageUrl = getImageUrl(event);
-  const imageStyle = imageUrl.startsWith('linear-gradient') 
-    ? { background: imageUrl }
-    : { backgroundImage: `url(${imageUrl})` };
+function HeroEventCard({ ev, onPlan }: { ev: LiveEvent; onPlan: (n: string) => void }) {
+  const color = catColor(ev.category)
+  const days  = getDaysUntil(ev.date)
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
+      onClick={() => onPlan(ev.name)}
+      className="relative rounded-3xl overflow-hidden cursor-pointer group col-span-full"
+      style={{ background: '#0F172A', minHeight: 320 }}
     >
-      {isApiEvent && 'url' in event && event.url ? (
-        <a href={event.url} target="_blank" rel="noopener noreferrer" className="group block">
-          <EventCardContent event={event} imageStyle={imageStyle} isApiEvent={isApiEvent} />
-        </a>
-      ) : (
-        <Link href={`/events/${event.id}`} className="group block">
-          <EventCardContent event={event} imageStyle={imageStyle} isApiEvent={isApiEvent} />
-        </Link>
+      {ev.image && (
+        <img src={ev.image} alt={ev.name}
+          className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-75 group-hover:scale-105 transition-all duration-700" />
       )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent" />
+
+      <div className="relative p-8 sm:p-10 flex flex-col justify-end h-full" style={{ minHeight: 320 }}>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-[11px] font-black px-2.5 py-1 rounded-full text-white"
+            style={{ background: `${color}CC` }}>
+            <span className="flex items-center gap-1"><CatIcon cat={ev.category} size={10} />
+            {ev.category.charAt(0).toUpperCase() + ev.category.slice(1)}</span>
+          </span>
+          {days >= 0 && days <= 30 && (
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500 text-white flex items-center gap-1">
+              <Flame size={9} />{days <= 7 ? 'This week' : `${days}d away`}
+            </span>
+          )}
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-black text-white leading-tight mb-2 line-clamp-2">
+          {ev.name}
+        </h2>
+        {ev.attraction && <p className="text-white/50 text-sm mb-3">{ev.attraction}</p>}
+        <div className="flex flex-wrap items-center gap-4 mb-5 text-white/60 text-sm">
+          <span className="flex items-center gap-1.5"><Calendar size={13} />{fmtDate(ev.date)}</span>
+          {ev.venue && <span className="flex items-center gap-1.5"><MapPin size={13} />{ev.venue}, {ev.city}</span>}
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={e => { e.stopPropagation(); onPlan(ev.name) }}
+            className="flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black text-white shadow-lg hover:opacity-90 active:scale-[0.97] transition-all"
+            style={{ background: `linear-gradient(135deg, ${color}, ${color}99)` }}>
+            <Sparkles size={13} />Plan This Trip
+          </button>
+          {ev.priceMin && (
+            <div className="px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm text-white text-sm font-bold">
+              From {ev.currency ?? 'USD'} {ev.priceMin.toLocaleString()}
+            </div>
+          )}
+        </div>
+      </div>
     </motion.div>
-  );
-};
+  )
+}
 
-// --- FIX STARTS HERE ---
-const EventCardContent = ({ event, imageStyle, isApiEvent }: { event: Event | SearchResultEvent; imageStyle: any; isApiEvent?: boolean }) => {
-  // Safe property access using casting
-  const e = event as any;
-  const eventType = e.type || 'Event';
-  const isFeatured = e.featured || false;
-  const eventSource = e.source || undefined;
-  const eventDescription = e.description || undefined;
+// ── REGULAR EVENT CARD ─────────────────────────────────────────────────────────
 
-  // Helper to safely get location string
-  const getLocation = () => {
-    // Handle API events (SearchResultEvent)
-    if ('venue' in event) {
-      return `${event.venue.city}, ${event.venue.country}`;
-    }
-    // Handle Local events (Event) which has location object
-    if ('location' in event) {
-       // We know local event has location: { city, country }
-       return `${event.location.city}, ${event.location.country}`;
-    }
-    return 'TBD';
-  };
-
-  // Helper to safely get price info
-  const getPriceInfo = (): { currency: string; min: number } | null => {
-    // Check for estimatedTicketPrice (Local data)
-    if (e.estimatedTicketPrice) {
-      return {
-        currency: e.estimatedTicketPrice.currency || 'USD',
-        min: e.estimatedTicketPrice.min || 0
-      };
-    }
-    // Check for priceRange (API data)
-    if (e.priceRange) {
-      return {
-        currency: e.priceRange.currency || 'USD',
-        min: e.priceRange.min || 0
-      };
-    }
-    return null;
-  };
-
-  const priceInfo = getPriceInfo();
-  const locationString = getLocation();
+function EventCard({ ev, onPlan, index }: { ev: LiveEvent; onPlan: (n: string) => void; index: number }) {
+  const color = catColor(ev.category)
+  const days  = getDaysUntil(ev.date)
 
   return (
-    <div className="relative h-full bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200">
-      {/* Image */}
-      <div className="relative h-64 overflow-hidden">
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-          style={imageStyle}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-        
-        {/* Live Badge for API events */}
-        {isApiEvent && (
-          <div className="absolute top-4 right-4 px-3 py-1.5 bg-green-500 text-white rounded-full text-xs font-bold flex items-center gap-1.5 shadow-lg">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-            LIVE
-          </div>
-        )}
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.3) }}
+      onClick={() => onPlan(ev.name)}
+      className="group bg-white border-2 border-slate-100 rounded-2xl overflow-hidden hover:border-slate-200 hover:shadow-xl transition-all duration-300 cursor-pointer active:scale-[0.98]"
+    >
+      <div className="relative h-44 overflow-hidden bg-slate-900">
+        {ev.image
+          ? <img src={ev.image} alt={ev.name}
+              className="w-full h-full object-cover opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+          : <div className="w-full h-full flex items-center justify-center"
+              style={{ background: `linear-gradient(135deg, #0F172A, ${color}40)` }}>
+              <CatIcon cat={ev.category} size={36} />
+            </div>
+        }
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
 
-        {/* Featured Badge */}
-        {isFeatured && !isApiEvent && (
-          <div className="absolute top-4 right-4 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-full text-xs font-bold flex items-center gap-2 shadow-lg">
-            <Sparkles size={14} />
-            Featured
-          </div>
-        )}
-
-        {/* Type Badge */}
-        <div className="absolute top-4 left-4 px-3 py-1.5 bg-white/20 backdrop-blur-md text-white rounded-full text-xs font-semibold border border-white/30">
-          {eventType ? String(eventType).charAt(0).toUpperCase() + String(eventType).slice(1) : 'Event'}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          <span className="flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full text-white"
+            style={{ background: `${color}DD` }}>
+            <CatIcon cat={ev.category} size={9} />
+            {ev.category.charAt(0).toUpperCase() + ev.category.slice(1)}
+          </span>
         </div>
-
-        {/* Event Name */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <h3 className="text-2xl font-bold text-white mb-2 line-clamp-2 group-hover:text-blue-200 transition-colors">
-            {event.name}
-          </h3>
+        {days >= 0 && days <= 14 && (
+          <div className="absolute top-3 right-3">
+            <span className="flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-red-500 text-white">
+              <Flame size={8} />{days <= 7 ? 'This week' : 'Soon'}
+            </span>
+          </div>
+        )}
+        <div className="absolute bottom-3 left-3 right-3">
+          <p className="text-white font-black text-sm leading-tight line-clamp-2">{ev.name}</p>
+          {ev.attraction && <p className="text-white/40 text-[11px] mt-0.5 truncate">{ev.attraction}</p>}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6 space-y-4">
-        {/* Meta Info */}
-        <div className="space-y-2">
-          {event.startDate && (
-            <div className="flex items-center gap-2 text-gray-600">
-              <Calendar size={16} />
-              <span className="text-sm font-medium">
-                {new Date(event.startDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </span>
-            </div>
-          )}
-          
-          <div className="flex items-center gap-2 text-gray-600">
-            <MapPin size={16} />
-            <span className="text-sm font-medium">
-              {locationString}
-            </span>
+      <div className="p-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="space-y-0.5 min-w-0">
+            <p className="text-xs text-slate-500 flex items-center gap-1 truncate">
+              <Calendar size={10} className="flex-shrink-0" />{fmtDate(ev.date)}
+              {days > 0 && days <= 60 && (
+                <span className="ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                  style={{ background: color }}>{days}d</span>
+              )}
+            </p>
+            <p className="text-xs text-slate-400 flex items-center gap-1 truncate">
+              <MapPin size={10} className="flex-shrink-0" />
+              {ev.venue ? `${ev.venue}, ` : ''}{ev.city}{ev.country ? `, ${ev.country}` : ''}
+            </p>
           </div>
-          
-          {priceInfo && (
-            <div className="flex items-center gap-2 text-gray-600">
-              <Ticket size={16} />
-              <span className="text-sm font-medium">
-                From {priceInfo.currency} ${priceInfo.min.toLocaleString()}
-              </span>
+          {ev.priceMin && (
+            <div className="text-right flex-shrink-0">
+              <p className="text-[9px] text-slate-400 font-bold uppercase">From</p>
+              <p className="text-xs font-black text-slate-900">
+                {ev.currency ?? 'USD'} {ev.priceMin.toLocaleString()}
+              </p>
             </div>
           )}
         </div>
+        <button
+          onClick={e => { e.stopPropagation(); onPlan(ev.name) }}
+          className="w-full py-2.5 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-[0.97] transition-all"
+          style={{ background: `linear-gradient(135deg, ${color}, ${color}88)` }}>
+          <Sparkles size={11} />Plan This Trip
+        </button>
+      </div>
+    </motion.div>
+  )
+}
 
-        {/* Description */}
-        {eventDescription && (
-          <p className="text-gray-600 text-sm line-clamp-2">
-            {String(eventDescription)}
+// ── MAIN PAGE ──────────────────────────────────────────────────────────────────
+
+const FILTERS = [
+  { label: 'All',       value: 'all'     },
+  { label: '🏆 Sports',  value: 'sports'  },
+  { label: '🎵 Music',   value: 'music'   },
+  { label: '🎪 Festival',value: 'festival'},
+  { label: '🎭 Arts',    value: 'arts'    },
+] as const
+
+type FilterValue = typeof FILTERS[number]['value']
+
+export default function ExploreEventsPage() {
+  const router = useRouter()
+
+  const [events,   setEvents]   = useState<LiveEvent[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [query,    setQuery]    = useState('')
+  const [filter,   setFilter]   = useState<FilterValue>('all')
+  const [city,     setCity]     = useState('')
+  const [page,     setPage]     = useState(0)
+  const [total,    setTotal]    = useState(0)
+  const [pages,    setPages]    = useState(0)
+  const [typing,   setTyping]   = useState(false)
+
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const PAGE_SIZE   = 20
+
+  const fetchEvents = useCallback(async (q: string, f: FilterValue, c: string, p: number) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        size: String(PAGE_SIZE),
+        page: String(p),
+      })
+      if (q.trim())   params.set('keyword',  q.trim())
+      if (f !== 'all') params.set('category', f)
+      if (c.trim())   params.set('city',     c.trim())
+
+      const res  = await fetch(`/api/explore-events?${params}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setEvents(data.events ?? [])
+        setTotal(data.total ?? 0)
+        setPages(data.pages ?? 0)
+      } else {
+        setEvents([])
+      }
+    } catch (err) {
+      console.error('[explore]', err)
+      setEvents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Initial load
+  useEffect(() => {
+    fetchEvents('', 'all', '', 0)
+  }, [])
+
+  // Debounced search
+  useEffect(() => {
+    setTyping(true)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setTyping(false)
+      setPage(0)
+      fetchEvents(query, filter, city, 0)
+    }, 500)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query, filter, city])
+
+  // Page change
+  useEffect(() => {
+    if (page > 0) fetchEvents(query, filter, city, page)
+  }, [page])
+
+  function handlePlan(name: string) {
+    router.push(`/?q=${encodeURIComponent(name)}`)
+  }
+
+  function handleFilterChange(f: FilterValue) {
+    setFilter(f); setPage(0)
+  }
+
+  const hero = events[0]
+  const rest = events.slice(1)
+
+  return (
+    <main className="min-h-screen bg-white"
+      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
+      <Navbar />
+
+      {/* ── HERO SEARCH ── */}
+      <section className="pt-28 pb-10 px-4 sm:px-6 border-b border-slate-100" style={{ background: '#F8FAFC' }}>
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="w-2 h-2 rounded-full animate-pulse bg-emerald-500" />
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">
+              Live · Powered by Ticketmaster
+            </span>
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight mb-3">
+            Explore <span style={{ color: SKY }}>Any Event</span>
+          </h1>
+          <p className="text-base text-slate-500 mb-8 max-w-lg mx-auto">
+            Search millions of events worldwide — concerts, sports, festivals, theatre. Find it, plan it, go.
           </p>
-        )}
 
-        {/* Source Badge */}
-        {isApiEvent && eventSource && (
-          <div className="pt-2">
-            <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">
-              via {String(eventSource)}
-            </span>
+          {/* Search row */}
+          <div className="flex flex-col sm:flex-row gap-3 max-w-3xl mx-auto mb-5">
+            {/* Keyword */}
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Artist, event, team, festival..."
+                className="w-full h-12 pl-11 pr-10 rounded-2xl border-2 border-slate-200 bg-white text-slate-900 text-sm outline-none focus:border-sky-400 transition-all shadow-sm"
+              />
+              {(typing || (loading && query)) && (
+                <Loader2 size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-sky-500 animate-spin" />
+              )}
+              {query && !typing && !loading && (
+                <button onClick={() => setQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* City */}
+            <div className="relative sm:w-44">
+              <MapPin size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={city}
+                onChange={e => setCity(e.target.value)}
+                placeholder="City (optional)"
+                className="w-full h-12 pl-10 pr-4 rounded-2xl border-2 border-slate-200 bg-white text-slate-900 text-sm outline-none focus:border-sky-400 transition-all shadow-sm"
+              />
+            </div>
           </div>
-        )}
 
-        {/* CTA */}
-        <div className="pt-2">
-          <div className="inline-flex items-center gap-2 text-blue-600 font-semibold text-sm group-hover:gap-3 transition-all">
-            {isApiEvent ? 'Buy Tickets' : 'View Details'}
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
+          {/* Filter pills */}
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            {FILTERS.map(f => (
+              <button key={f.value} onClick={() => handleFilterChange(f.value)}
+                className="px-4 py-2 rounded-full text-sm font-bold transition-all active:scale-[0.96]"
+                style={{
+                  background: filter === f.value
+                    ? f.value === 'all' ? SKY : f.value === 'sports' ? SKY : f.value === 'music' ? '#8B5CF6' : f.value === 'festival' ? '#F97316' : '#10B981'
+                    : '#E2E8F0',
+                  color: filter === f.value ? 'white' : '#64748B',
+                }}>
+                {f.label}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
+      </section>
 
-export default EventsHub;
+      {/* ── RESULTS ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+
+        {/* Result count */}
+        {!loading && (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                {total > 0
+                  ? `${total.toLocaleString()} events found${query ? ` for "${query}"` : ''}${city ? ` in ${city}` : ''}`
+                  : 'No events found'
+                }
+              </p>
+              {pages > 1 && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Page {page + 1} of {pages}
+                </p>
+              )}
+            </div>
+            {(query || city || filter !== 'all') && (
+              <button
+                onClick={() => { setQuery(''); setCity(''); setFilter('all'); setPage(0) }}
+                className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
+                <X size={12} />Clear all
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="space-y-5">
+            <div className="h-80 rounded-3xl bg-slate-200 animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {[1,2,3,4,5,6,7,8].map(i => (
+                <div key={i} className="h-64 rounded-2xl bg-slate-100 animate-pulse" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Events grid */}
+        {!loading && events.length > 0 && (
+          <div className="space-y-5">
+            {/* Hero card — first result */}
+            {hero && page === 0 && (
+              <HeroEventCard ev={hero} onPlan={handlePlan} />
+            )}
+
+            {/* Rest in grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {(page === 0 ? rest : events).map((ev, i) => (
+                <EventCard key={ev.id} ev={ev} onPlan={handlePlan} index={i} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && events.length === 0 && (
+          <div className="text-center py-24">
+            <Globe size={48} className="mx-auto mb-4 text-slate-300" />
+            <p className="text-xl font-black text-slate-900 mb-2">No events found</p>
+            <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
+              Try a different search term, remove the city filter, or browse all categories.
+            </p>
+            <button onClick={() => { setQuery(''); setCity(''); setFilter('all'); setPage(0) }}
+              className="px-6 py-3 rounded-2xl text-sm font-black text-white shadow-md"
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+              Browse all events
+            </button>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && pages > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-10">
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+              <ChevronLeft size={16} />Previous
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: Math.min(pages, 5) }, (_, i) => {
+                const p = page < 3 ? i : page - 2 + i
+                if (p >= pages) return null
+                return (
+                  <button key={p}
+                    onClick={() => setPage(p)}
+                    className="w-9 h-9 rounded-xl text-sm font-bold transition-all"
+                    style={{
+                      background: p === page ? SKY : '#F1F5F9',
+                      color: p === page ? 'white' : '#64748B',
+                    }}>
+                    {p + 1}
+                  </button>
+                )
+              })}
+            </div>
+
+            <button
+              onClick={() => setPage(p => Math.min(pages - 1, p + 1))}
+              disabled={page >= pages - 1}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+              Next<ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Plan any event CTA */}
+        <div className="mt-16 rounded-3xl p-8 sm:p-10 text-center border-2 border-dashed border-slate-200 bg-slate-50">
+          <Ticket size={28} className="mx-auto mb-3 text-slate-300" />
+          <h3 className="text-lg font-black text-slate-900 mb-2">
+            Can't find your event?
+          </h3>
+          <p className="text-sm text-slate-400 mb-5 max-w-xs mx-auto">
+            We can plan any event worldwide — even if it's not listed here. Just describe it on the homepage.
+          </p>
+          <Link href="/"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-black text-white shadow-md hover:opacity-90 transition-opacity"
+            style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+            <Sparkles size={13} />Plan any event →
+          </Link>
+        </div>
+      </div>
+
+      <Footer />
+    </main>
+  )
+}
