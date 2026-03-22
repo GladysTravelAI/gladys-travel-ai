@@ -1,258 +1,264 @@
+'use client';
+
 // components/TripUpsells.tsx
-// 💰 TRIP UPSELLS — Wires all connected TravelPayouts programs
-// Yesim (eSIM), EKTA (insurance), Kiwitaxi (transfers), AirHelp, GetTransfer, Radical Storage
+// Affiliate partner cards shown at the bottom of every itinerary
+// Uses real partner logos for trust + brand recognition
 
-"use client";
+import { useState } from 'react';
+import { ExternalLink, Plane, Hotel, Ticket, Map, ChevronDown } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { trackAffiliateClick } from '@/lib/analytics';
 
-import { useState } from "react";
-import {
-  Wifi, Shield, Car, Plane, Package, Luggage,
-  ExternalLink, ChevronDown, ChevronUp, Sparkles, Zap
-} from "lucide-react";
+const SKY = '#0EA5E9';
 
-// ── TRAVELPAYOUTS MARKER ──────────────────────────────────────────────────────
-// Replace with your actual marker ID from app.travelpayouts.com → Tools → Your marker
-const TP_MARKER = process.env.NEXT_PUBLIC_TRAVELPAYOUTS_MARKER || '500540';
-
-// ── LINK BUILDERS ─────────────────────────────────────────────────────────────
-
-function yesimLink(country: string): string {
-  // Yesim eSIM — 18% commission, 90 day cookie
-  return `https://yesim.app/?ref=gladystravel&country=${encodeURIComponent(country)}`;
+interface Props {
+  city:          string;
+  country:       string;
+  arrivalDate?:  string;
+  departureDate?: string;
+  eventName?:    string;
+  accentColor?:  string;
 }
 
-function airaloLink(country: string): string {
-  // Airalo eSIM — 12% commission, 30 day cookie
-  return `https://ref.airalo.com/gladystravel?country=${encodeURIComponent(country)}`;
+// ── PARTNER LOGO SVGs ─────────────────────────────────────────────────────────
+// Inline SVGs — no external image dependency, renders instantly
+
+const BookingLogo = () => (
+  <svg viewBox="0 0 120 30" className="h-5 w-auto" aria-label="Booking.com">
+    <text x="0" y="22" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="20" fill="#003580">
+      booking
+    </text>
+    <text x="72" y="22" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="20" fill="#003580">
+      .
+    </text>
+    <text x="78" y="22" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="20" fill="#0071C2">
+      com
+    </text>
+  </svg>
+);
+
+const SkyscannerLogo = () => (
+  <svg viewBox="0 0 140 30" className="h-5 w-auto" aria-label="Skyscanner">
+    <rect x="0" y="4" width="22" height="22" rx="4" fill="#0770E3"/>
+    <path d="M5 20 L11 8 L17 20 M8 16 L14 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+    <text x="28" y="22" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="17" fill="#0770E3">
+      Skyscanner
+    </text>
+  </svg>
+);
+
+const TicketmasterLogo = () => (
+  <svg viewBox="0 0 150 30" className="h-5 w-auto" aria-label="Ticketmaster">
+    <rect x="0" y="2" width="26" height="26" rx="4" fill="#026CDF"/>
+    <text x="5" y="20" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="16" fill="white">TM</text>
+    <text x="33" y="21" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="15" fill="#026CDF">
+      Ticketmaster
+    </text>
+  </svg>
+);
+
+const ViatorLogo = () => (
+  <svg viewBox="0 0 90 30" className="h-5 w-auto" aria-label="Viator">
+    <rect x="0" y="2" width="26" height="26" rx="13" fill="#1A1A2E"/>
+    <text x="6" y="20" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="13" fill="white">V</text>
+    <text x="32" y="21" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="17" fill="#1A1A2E">
+      Viator
+    </text>
+  </svg>
+);
+
+const GetYourGuideLogo = () => (
+  <svg viewBox="0 0 145 30" className="h-5 w-auto" aria-label="GetYourGuide">
+    <rect x="0" y="2" width="26" height="26" rx="4" fill="#FF5533"/>
+    <text x="4" y="20" fontFamily="Arial, sans-serif" fontWeight="900" fontSize="13" fill="white">GYG</text>
+    <text x="32" y="21" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="14" fill="#FF5533">
+      GetYourGuide
+    </text>
+  </svg>
+);
+
+const AgodaLogo = () => (
+  <svg viewBox="0 0 100" className="h-5 w-auto" aria-label="Agoda">
+    <text x="0" y="22" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="20" fill="#E3001B">
+      agoda
+    </text>
+  </svg>
+);
+
+// ── PARTNER CARDS DATA ────────────────────────────────────────────────────────
+
+function buildPartners(city: string, country: string, arrival?: string, departure?: string, eventName?: string) {
+  const citySlug     = encodeURIComponent(city);
+  const checkin      = arrival   || '';
+  const checkout     = departure || '';
+  const eventEncoded = encodeURIComponent(eventName || city);
+
+  return [
+    // FLIGHTS
+    {
+      type:     'flights' as const,
+      label:    'Search Flights',
+      desc:     `Find the cheapest flights to ${city}`,
+      Logo:     SkyscannerLogo,
+      bg:       '#EFF6FF',
+      border:   '#BFDBFE',
+      btnColor: '#0770E3',
+      url:      `https://www.skyscanner.com/transport/flights/anywhere/${citySlug}/?utm_source=gladystravel`,
+      partner:  'Skyscanner',
+    },
+    // HOTELS
+    {
+      type:     'hotels' as const,
+      label:    'Find Hotels',
+      desc:     `Compare hotels in ${city} for your dates`,
+      Logo:     BookingLogo,
+      bg:       '#EFF6FF',
+      border:   '#BFDBFE',
+      btnColor: '#003580',
+      url:      `https://www.booking.com/searchresults.html?ss=${citySlug}${checkin ? `&checkin=${checkin}` : ''}${checkout ? `&checkout=${checkout}` : ''}&utm_source=gladystravel`,
+      partner:  'Booking.com',
+    },
+    // TICKETS
+    {
+      type:     'tickets' as const,
+      label:    'Get Tickets',
+      desc:     `Official tickets for ${eventName || 'your event'}`,
+      Logo:     TicketmasterLogo,
+      bg:       '#EFF6FF',
+      border:   '#BFDBFE',
+      btnColor: '#026CDF',
+      url:      `https://www.ticketmaster.com/search?q=${eventEncoded}&utm_source=gladystravel`,
+      partner:  'Ticketmaster',
+    },
+    // TOURS & EXPERIENCES
+    {
+      type:     'tours' as const,
+      label:    'Tours & Experiences',
+      desc:     `Things to do in ${city} — guided tours, day trips`,
+      Logo:     ViatorLogo,
+      bg:       '#F5F3FF',
+      border:   '#DDD6FE',
+      btnColor: '#1A1A2E',
+      url:      `https://www.viator.com/searchResults/all?text=${citySlug}&utm_source=gladystravel`,
+      partner:  'Viator',
+    },
+    // ACTIVITIES
+    {
+      type:     'activities' as const,
+      label:    'Activities & Day Trips',
+      desc:     `Top-rated activities in ${city}`,
+      Logo:     GetYourGuideLogo,
+      bg:       '#FFF5F3',
+      border:   '#FED7CC',
+      btnColor: '#FF5533',
+      url:      `https://www.getyourguide.com/s/?q=${citySlug}&utm_source=gladystravel`,
+      partner:  'GetYourGuide',
+    },
+  ];
 }
 
-function ektaLink(destination: string, startDate: string, endDate: string): string {
-  // EKTA Insurance — 20% commission, 30 day cookie
-  return `https://ekta.io/?marker=${TP_MARKER}&destination=${encodeURIComponent(destination)}&from=${startDate}&to=${endDate}`;
-}
-
-function kiwitaxiLink(city: string, date: string): string {
-  // Kiwitaxi airport transfer — 9-11% commission, 30 day cookie
-  return `https://kiwitaxi.com/?marker=${TP_MARKER}&city=${encodeURIComponent(city)}&date=${date}`;
-}
-
-function getTransferLink(city: string): string {
-  // GetTransfer — 4-25% commission, 30 day cookie
-  return `https://gettransfer.com/?marker=${TP_MARKER}&city=${encodeURIComponent(city)}`;
-}
-
-function airhelpLink(): string {
-  // AirHelp — 15-16.6% commission, 45 day cookie
-  return `https://www.airhelp.com/en/?marker=${TP_MARKER}`;
-}
-
-function radicalStorageLink(city: string): string {
-  // Radical Storage luggage — 8% commission
-  return `https://radicalstorage.com/?marker=${TP_MARKER}&city=${encodeURIComponent(city)}`;
-}
-
-// ── TYPES ─────────────────────────────────────────────────────────────────────
-
-interface TripUpsellsProps {
-  city: string;
-  country: string;
-  arrivalDate: string;
-  departureDate: string;
-  eventName: string;
-  accentColor?: string;
-}
-
-interface UpsellItem {
-  id: string;
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  description: string;
-  cta: string;
-  url: string;
-  commission: string;
-  tag?: string;
-  tagColor?: string;
-  color: string;
-  bg: string;
-  border: string;
-}
+const TYPE_ICONS = {
+  flights:    Plane,
+  hotels:     Hotel,
+  tickets:    Ticket,
+  tours:      Map,
+  activities: Map,
+};
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
 export default function TripUpsells({
-  city,
-  country,
-  arrivalDate,
-  departureDate,
-  eventName,
-  accentColor = '#0EA5E9',
-}: TripUpsellsProps) {
+  city, country, arrivalDate, departureDate, eventName, accentColor,
+}: Props) {
   const [expanded, setExpanded] = useState(true);
+  const partners = buildPartners(city, country, arrivalDate, departureDate, eventName);
 
-  const upsells: UpsellItem[] = [
-    {
-      id: 'esim',
-      icon: Wifi,
-      title: 'Stay Connected',
-      subtitle: 'eSIM for ' + country,
-      description: `Instant data in ${country}. No roaming fees. Activate before you land.`,
-      cta: 'Get eSIM',
-      url: yesimLink(country),
-      commission: '18% back',
-      tag: 'Best Value',
-      tagColor: '#10B981',
-      color: '#0EA5E9',
-      bg: '#F0F9FF',
-      border: '#BAE6FD',
-    },
-    {
-      id: 'insurance',
-      icon: Shield,
-      title: 'Trip Insurance',
-      subtitle: 'EKTA Travel Cover',
-      description: `Event cancelled? Flight delayed? Covered from ${arrivalDate} to ${departureDate}.`,
-      cta: 'Get Covered',
-      url: ektaLink(country, arrivalDate, departureDate),
-      commission: '20% back',
-      tag: 'Recommended',
-      tagColor: '#8B5CF6',
-      color: '#8B5CF6',
-      bg: '#F5F3FF',
-      border: '#DDD6FE',
-    },
-    {
-      id: 'transfer',
-      icon: Car,
-      title: 'Airport Transfer',
-      subtitle: 'Private ride to ' + city,
-      description: `Skip the taxi queue. Private driver waiting when you land in ${city}.`,
-      cta: 'Book Transfer',
-      url: kiwitaxiLink(city, arrivalDate),
-      commission: '9-11% back',
-      color: '#F97316',
-      bg: '#FFF7ED',
-      border: '#FED7AA',
-    },
-    {
-      id: 'airhelp',
-      icon: Plane,
-      title: 'Flight Disruption?',
-      subtitle: 'Claim up to €600',
-      description: 'If your flight to the event is delayed or cancelled, AirHelp claims your compensation.',
-      cta: 'Check Eligibility',
-      url: airhelpLink(),
-      commission: '15% back',
-      tag: '🔥 Hot',
-      tagColor: '#EF4444',
-      color: '#EF4444',
-      bg: '#FFF1F2',
-      border: '#FECDD3',
-    },
-    {
-      id: 'luggage',
-      icon: Luggage,
-      title: 'Luggage Storage',
-      subtitle: 'Near the venue',
-      description: `Store bags on event day. Explore ${city} hands-free, pick up after.`,
-      cta: 'Find Storage',
-      url: radicalStorageLink(city),
-      commission: '8% back',
-      color: '#64748B',
-      bg: '#F8FAFC',
-      border: '#E2E8F0',
-    },
-    {
-      id: 'rideshare',
-      icon: Package,
-      title: 'Private Transfers',
-      subtitle: 'GetTransfer · ' + city,
-      description: `Hotel to venue and back. Book in advance, no surge pricing on event night.`,
-      cta: 'Book Ride',
-      url: getTransferLink(city),
-      commission: '4-25% back',
-      color: '#F59E0B',
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-    },
-  ];
+  const handleClick = (partner: string, type: string, url: string) => {
+    trackAffiliateClick({ partner, type, eventName: eventName || city, city });
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <div className="mt-8 rounded-3xl border-2 border-slate-100 overflow-hidden bg-white">
+    <div className="rounded-3xl border-2 border-slate-100 overflow-hidden bg-white shadow-sm">
+
       {/* Header */}
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-6 py-5 flex items-center justify-between bg-slate-50 border-b border-slate-100 hover:bg-slate-100 transition-colors"
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: accentColor + '15' }}>
-            <Sparkles size={16} style={{ color: accentColor }} />
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: '#F0F9FF' }}>
+            <ExternalLink size={17} style={{ color: SKY }} />
           </div>
           <div className="text-left">
-            <p className="font-black text-slate-900 text-sm">Complete Your Trip</p>
-            <p className="text-xs text-slate-400 mt-0.5">eSIM · Insurance · Transfers · More</p>
+            <p className="text-sm font-black text-slate-900">Book Your Trip</p>
+            <p className="text-xs text-slate-400 mt-0.5">Flights · Hotels · Tickets · Activities</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full text-white"
-            style={{ background: accentColor }}>
-            6 extras
-          </span>
-          {expanded
-            ? <ChevronUp size={16} className="text-slate-400" />
-            : <ChevronDown size={16} className="text-slate-400" />}
-        </div>
+        <ChevronDown
+          size={16}
+          className="text-slate-400 transition-transform"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
       </button>
 
-      {/* Grid */}
-      {expanded && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-          {upsells.map((item) => {
-            const Icon = item.icon;
-            return (
-              <a
-                key={item.id}
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex flex-col p-5 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: item.bg, border: `1.5px solid ${item.border}` }}>
-                    <Icon size={17} style={{ color: item.color }} />
-                  </div>
-                  {item.tag && (
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
-                      style={{ background: item.tagColor }}>
-                      {item.tag}
-                    </span>
-                  )}
-                </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-4">
+              {partners.map((p, i) => {
+                const TypeIcon = TYPE_ICONS[p.type];
+                return (
+                  <motion.div
+                    key={p.partner}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex flex-col justify-between rounded-2xl p-4 border-2 transition-all hover:shadow-md"
+                    style={{ background: p.bg, borderColor: p.border }}
+                  >
+                    {/* Logo + category badge */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <p.Logo />
+                      <span className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full bg-white/70 text-slate-500">
+                        <TypeIcon size={9} />
+                        {p.type.charAt(0).toUpperCase() + p.type.slice(1)}
+                      </span>
+                    </div>
 
-                <div className="flex-1">
-                  <p className="font-black text-slate-900 text-sm leading-tight">{item.title}</p>
-                  <p className="text-xs font-semibold mt-0.5 mb-2" style={{ color: item.color }}>
-                    {item.subtitle}
-                  </p>
-                  <p className="text-xs text-slate-400 leading-relaxed">{item.description}</p>
-                </div>
+                    {/* Description */}
+                    <p className="text-xs text-slate-500 leading-relaxed mb-3 flex-1">{p.desc}</p>
 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-                  <span className="flex items-center gap-1 text-xs font-bold text-emerald-600">
-                    <Zap size={10} />{item.commission}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs font-bold transition-colors group-hover:opacity-70"
-                    style={{ color: item.color }}>
-                    {item.cta} <ExternalLink size={10} />
-                  </span>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      )}
+                    {/* CTA button */}
+                    <button
+                      onClick={() => handleClick(p.partner, p.type, p.url)}
+                      className="w-full h-9 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90 active:scale-[0.97]"
+                      style={{ background: p.btnColor }}
+                    >
+                      {p.label} <ExternalLink size={10} />
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Disclaimer */}
+            <div className="px-5 py-3 border-t border-slate-100">
+              <p className="text-[11px] text-slate-300 text-center">
+                Links above are affiliate links — Gladys Travel earns a small commission at no extra cost to you.
+                Prices shown on partner sites.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

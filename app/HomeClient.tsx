@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { trackSearch, trackEventSearch, trackTripPlanGenerated } from '@/lib/analytics';
 import { useRouter } from "next/navigation";
 import {
   Search, Sparkles, Trophy, Music, PartyPopper,
@@ -23,6 +24,7 @@ import CityPicker         from "@/components/CityPicker";
 import GladysCompanion    from "@/components/GladysCompanion";
 import FeaturedEvents     from "@/components/FeaturedEvents";
 import DateRangePicker   from "@/components/DateRangePicker";
+import SearchBar          from "@/components/SearchBar";
 
 import { ItineraryData }  from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
@@ -334,6 +336,9 @@ export default function HomeClient() {
     const loc = q || query;
     if (!loc.trim()) { toast.error('Enter an event or destination'); return; }
     if (!eventType)  { toast.error('Select Sports, Music or Festivals first'); return; }
+    // Track search
+    trackSearch(loc);
+    trackEventSearch(loc, eventType);
     setLoading(true); setItineraryData(null);
     const t = toast.loading(`Searching "${loc}"...`);
     try {
@@ -348,6 +353,16 @@ export default function HomeClient() {
       if (!result.success) throw new Error(result.error);
       setResponse(result.data);
       if (user) await profileManager.trackTripPlanned(user.uid, loc);
+      // GA4 — trip plan generated
+      if (result.data.event?.name) {
+        trackTripPlanGenerated({
+          eventName: result.data.event.name,
+          eventType: result.data.event.type ?? eventType ?? 'sports',
+          city:      result.data.destination?.city ?? loc,
+          days:      5,
+          source:    'search',
+        });
+      }
       toast.success(
         result.data.intent === 'city_selection_required'
           ? `${result.data.event_name} — pick your city`
@@ -385,8 +400,19 @@ export default function HomeClient() {
       <Navbar />
 
       {/* ════════════ HERO ═══════════════════════════════════════════════════ */}
-      <section className="min-h-[100svh] flex flex-col justify-center px-4 sm:px-5 pt-20 md:pt-24 pb-10 bg-white">
-        <div className="max-w-2xl mx-auto w-full space-y-7 md:space-y-10">
+      <section
+        className="min-h-[100svh] flex flex-col justify-center px-4 sm:px-5 pt-20 md:pt-24 pb-10 relative overflow-hidden"
+        style={{ background: 'white' }}
+      >
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-[0.12]"
+            style={{ background: 'radial-gradient(circle, #38BDF8, #0284C7)' }} />
+          <div className="absolute -bottom-24 -right-24 w-[420px] h-[420px] rounded-full opacity-[0.09]"
+            style={{ background: 'radial-gradient(circle, #0EA5E9, #38BDF8)' }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] rounded-full opacity-[0.06]"
+            style={{ background: 'radial-gradient(circle, #BAE6FD, #0EA5E9)' }} />
+        </div>
+        <div className="relative z-10 max-w-2xl mx-auto w-full space-y-7 md:space-y-10">
 
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
@@ -432,17 +458,18 @@ export default function HomeClient() {
           </div>
 
           <div className="space-y-3">
-            <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={e => { setQuery(e.target.value); if (e.target.value && !showDates) setShowDates(true); }}
-                onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                placeholder={cfg?.placeholder || 'Search any event worldwide...'}
-                className="w-full h-13 sm:h-14 pl-12 pr-5 text-sm sm:text-base rounded-2xl border-2 outline-none transition-all"
-                style={{ borderColor: cfg ? cfg.border : '#E2E8F0', background: cfg ? cfg.bg : 'white' }}
-              />
-            </div>
+            <SearchBar
+              value={query}
+              onChange={v => setQuery(v)}
+              onSearch={q => { setQuery(q); handleSearch(q); }}
+              onShowDates={() => setShowDates(true)}
+              placeholder={cfg?.placeholder || 'Search any event worldwide...'}
+              borderColor={cfg?.border}
+              background={cfg?.bg}
+              accentColor={cfg?.accent}
+              loading={loading}
+              eventType={eventType}
+            />
 
             {showDates && (
               <DateRangePicker
@@ -459,7 +486,7 @@ export default function HomeClient() {
             <button
               onClick={() => handleSearch()}
               disabled={!query.trim() || !eventType || loading}
-              className="w-full h-13 sm:h-14 font-bold rounded-2xl text-sm sm:text-base transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80"
+              className="w-full h-14 sm:h-16 font-black rounded-2xl text-base sm:text-lg transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80"
               style={{ background: cfg?.accent || SKY }}
             >
               {loading
@@ -493,52 +520,9 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* ════════════ STATS ══════════════════════════════════════════════════ */}
-      <section className="py-8 md:py-10 border-y border-slate-100 bg-slate-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 text-center">
-            {[
-              { n: 12847, s: '+', l: 'Trips planned'  },
-              { n: 150,   s: '+', l: 'Countries'       },
-              { n: 23,    s: '%', l: 'Average savings' },
-              { n: 13,    s: '',  l: 'AI tools active' },
-            ].map((stat, i) => (
-              <div key={i}>
-                <p className="text-2xl sm:text-3xl md:text-4xl font-black mb-1"
-                  style={{ color: i === 0 ? SKY : '#0F172A' }}>
-                  <Counter to={stat.n} suffix={stat.s} />
-                </p>
-                <p className="text-xs sm:text-sm text-slate-500">{stat.l}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
-      {/* ════════════ TRUST BADGES ═══════════════════════════════════════════ */}
-      <section className="py-8 md:py-10 border-b border-slate-100 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-            {[
-              { icon: Shield,      label: 'Secure Booking',   sub: 'Bank-level encryption',    color: SKY       },
-              { icon: Ticket,      label: 'Live Event Data',  sub: 'Ticketmaster powered',     color: '#8B5CF6' },
-              { icon: CheckCircle, label: 'Trusted Partners', sub: 'TravelPayouts network',    color: '#10B981' },
-              { icon: Sparkles,    label: 'Voice + Chat AI',  sub: 'Gladys — 13 tools active', color: '#F97316' },
-            ].map((b, i) => (
-              <div key={i} className="flex items-center gap-2.5 md:gap-3 p-3 md:p-4 rounded-2xl border border-slate-100">
-                <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: b.color + '15' }}>
-                  <b.icon size={16} style={{ color: b.color }} />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-900 text-xs md:text-sm leading-tight">{b.label}</p>
-                  <p className="text-[10px] md:text-xs text-slate-400 mt-0.5 hidden sm:block">{b.sub}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
+
 
       {/* ════════════ GROUP TRAVEL BANNER ════════════════════════════════════ */}
       <section className="py-10 md:py-12 px-4 sm:px-5 bg-slate-900">
@@ -729,7 +713,17 @@ export default function HomeClient() {
       )}
       {showSaved && <SavedTrips />}
 
-      <GladysCompanion eventContext={gladysContext} />
+      <GladysCompanion
+        eventContext={gladysContext}
+        onTripPlan={name => {
+          setQuery(name);
+          if (!eventType) setEventType('sports');
+          setShowDates(true);
+          setTimeout(() => handleSearch(name), 80);
+          // Scroll to results
+          setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 900);
+        }}
+      />
       <EventNotificationToast userLocation={origin} />
     </div>
   );

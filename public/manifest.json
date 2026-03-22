@@ -1,0 +1,25 @@
+{
+  "name": "Gladys Travel",
+  "short_name": "Gladys",
+  "description": "Plan trips around events you love — AI-powered travel companion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0EA5E9",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/favicon-32x32.png",  "sizes": "32x32",   "type": "image/png" },
+    { "src": "/icon-192.png",        "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/icon-512.png",        "sizes": "512x512", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/favicon.svg",         "sizes": "any",     "type": "image/svg+xml" }
+  ],
+  "categories": ["travel", "lifestyle"],
+  "screenshots": [
+    {
+      "src": "/api/og",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "Gladys Travel homepage"
+    }
+  ]
+}

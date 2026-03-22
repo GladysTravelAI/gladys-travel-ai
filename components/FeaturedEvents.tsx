@@ -288,6 +288,128 @@ type Filter = typeof FILTERS[number]
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
 
+// ── MOBILE HERO CARD ──────────────────────────────────────────────────────────
+function MobileHeroCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => void }) {
+  const cat   = ev.category ?? 'other'
+  const color = cat === 'sports' ? '#0EA5E9' : cat === 'music' ? '#8B5CF6' : '#F97316'
+  const daysAway = Math.ceil((new Date(ev.date).getTime() - Date.now()) / 86_400_000)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      className="relative h-[260px] rounded-3xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
+      onClick={() => onSearch(ev.name)}
+    >
+      {ev.image
+        ? <img src={ev.image} alt={ev.name} className="absolute inset-0 w-full h-full object-cover" />
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${color}33, ${color}99)` }} />
+      }
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+      {/* Top badges */}
+      <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+        <span className="text-xs font-black px-3 py-1 rounded-full text-white uppercase tracking-wide"
+          style={{ background: color }}>
+          {cat}
+        </span>
+        {daysAway >= 0 && daysAway <= 7 && (
+          <span className="text-xs font-black px-3 py-1 rounded-full bg-rose-500 text-white">This week</span>
+        )}
+      </div>
+
+      {/* Bottom content */}
+      <div className="absolute bottom-4 left-4 right-4">
+        {ev.attraction && (
+          <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color }}>
+            {ev.attraction}
+          </p>
+        )}
+        <h3 className="text-white font-black text-xl leading-tight mb-2 line-clamp-2">{ev.name}</h3>
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-white/70 text-xs flex items-center gap-1">
+              <Calendar size={10} />
+              {new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+            {ev.venue && (
+              <p className="text-white/60 text-xs flex items-center gap-1">
+                <MapPin size={10} />{ev.venue}{ev.city ? `, ${ev.city}` : ''}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={e => { e.stopPropagation(); onSearch(ev.name); }}
+            className="flex items-center gap-1.5 text-xs font-black px-4 py-2.5 rounded-2xl text-white flex-shrink-0"
+            style={{ background: color }}
+          >
+            <Sparkles size={12} />Plan Trip
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ── MOBILE SCROLL CARD ─────────────────────────────────────────────────────────
+function MobileCard({ ev, onSearch, index }: { ev: LiveEvent; onSearch: (n: string) => void; index: number }) {
+  const cat   = ev.category ?? 'other'
+  const color = cat === 'sports' ? '#0EA5E9' : cat === 'music' ? '#8B5CF6' : '#F97316'
+  const daysAway = Math.ceil((new Date(ev.date).getTime() - Date.now()) / 86_400_000)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.05 }}
+      onClick={() => onSearch(ev.name)}
+      className="snap-card flex-shrink-0 w-[220px] bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm active:scale-[0.97] transition-transform cursor-pointer"
+    >
+      {/* Image */}
+      <div className="relative h-[130px] overflow-hidden">
+        {ev.image
+          ? <img src={ev.image} alt={ev.name} className="w-full h-full object-cover" />
+          : <div className="w-full h-full" style={{ background: `linear-gradient(135deg, ${color}40, ${color}80)` }} />
+        }
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+        <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+          <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-white uppercase"
+            style={{ background: color }}>{cat}</span>
+          {daysAway >= 0 && daysAway <= 7 && (
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500 text-white">This week</span>
+          )}
+        </div>
+        {daysAway >= 0 && (
+          <div className="absolute bottom-2 left-3">
+            <span className="text-[10px] font-black text-white/70">
+              {daysAway === 0 ? 'Today' : daysAway === 1 ? 'Tomorrow' : `${daysAway}d away`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="p-3">
+        <p className="font-black text-slate-900 text-sm leading-tight line-clamp-2 mb-1.5">{ev.name}</p>
+        <p className="text-[11px] text-slate-400 flex items-center gap-1 mb-0.5">
+          <Calendar size={9} />
+          {new Date(ev.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </p>
+        {ev.city && (
+          <p className="text-[11px] text-slate-400 flex items-center gap-1 mb-3">
+            <MapPin size={9} />{ev.city}
+          </p>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); onSearch(ev.name); }}
+          className="w-full py-2 rounded-xl text-xs font-black text-white transition-opacity hover:opacity-90"
+          style={{ background: `linear-gradient(135deg, ${color}DD, ${color})` }}
+        >
+          Plan This Trip
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function FeaturedEvents({ onSearch }: FeaturedEventsProps) {
   const [events,      setEvents]      = useState<LiveEvent[]>([])
   const [loading,     setLoading]     = useState(true)
@@ -313,31 +435,37 @@ export default function FeaturedEvents({ onSearch }: FeaturedEventsProps) {
 
   return (
     <section
-      className="py-16 md:py-20 px-4 sm:px-5"
+      className="py-10 md:py-20"
       style={{ background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+        .snap-carousel { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
+        .snap-card     { scroll-snap-align: start; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
       <div className="max-w-7xl mx-auto">
 
         {/* ── Section header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-10">
+        <div className="flex items-end justify-between gap-4 mb-6 px-4 sm:px-5">
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-1.5">
               <div className="w-2 h-2 rounded-full animate-pulse bg-emerald-500" />
               <span className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">Live · Updated now</span>
             </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Upcoming Events</h2>
-            <p className="text-slate-500 mt-1 text-sm">Real events worldwide. Click any to plan instantly.</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-900 tracking-tight">Upcoming Events</h2>
+            <p className="text-slate-500 mt-1 text-xs sm:text-sm">Real events worldwide. Tap any to plan instantly.</p>
           </div>
 
-          {/* Filter pills */}
-          <div className="flex gap-2 flex-wrap">
+          {/* Filter pills — horizontal scroll on mobile */}
+          <div className="flex gap-1.5 overflow-x-auto hide-scrollbar flex-shrink-0 pb-0.5">
             {FILTERS.map(f => (
               <button
                 key={f}
                 onClick={() => { setFilter(f); setShowAll(false) }}
-                className="px-4 py-2 rounded-full text-sm font-bold transition-all active:scale-[0.96]"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-[0.96] whitespace-nowrap flex-shrink-0"
                 style={{
                   background: filter === f
                     ? f === 'All' ? '#0EA5E9' : f === 'Sports' ? '#0EA5E9' : f === 'Music' ? '#8B5CF6' : '#F97316'
@@ -353,84 +481,115 @@ export default function FeaturedEvents({ onSearch }: FeaturedEventsProps) {
 
         {/* ── Loading ── */}
         {loading && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="lg:col-span-2 h-[420px] rounded-3xl bg-slate-200 animate-pulse" />
-            <div className="space-y-4">
-              {[1,2,3].map(i => <div key={i} className="h-24 rounded-2xl bg-slate-200 animate-pulse" />)}
+          <>
+            {/* Mobile loading skeleton — horizontal scroll */}
+            <div className="flex gap-4 overflow-x-auto hide-scrollbar px-4 sm:px-5 pb-2 md:hidden">
+              {[1,2,3].map(i => (
+                <div key={i} className="flex-shrink-0 w-[260px] h-[300px] rounded-3xl bg-slate-200 animate-pulse snap-card" />
+              ))}
             </div>
-          </div>
+            {/* Desktop loading skeleton */}
+            <div className="hidden md:grid grid-cols-3 gap-5 px-5">
+              <div className="col-span-2 h-[420px] rounded-3xl bg-slate-200 animate-pulse" />
+              <div className="space-y-4">
+                {[1,2,3].map(i => <div key={i} className="h-24 rounded-2xl bg-slate-200 animate-pulse" />)}
+              </div>
+            </div>
+          </>
         )}
 
         {/* ── No results ── */}
         {!loading && filtered.length === 0 && (
-          <div className="text-center py-20 text-slate-400">
+          <div className="text-center py-20 text-slate-400 px-4">
             <Sparkles size={40} className="mx-auto mb-4 opacity-30" />
             <p className="font-semibold">No events found</p>
           </div>
         )}
 
-        {/* ── MAIN LAYOUT ── */}
+        {/* ── MOBILE: Horizontal snap carousel ── */}
         {!loading && filtered.length > 0 && (
-          <div className="space-y-5">
-
-            {/* Row 1: Hero + side stack */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-              {/* Hero — takes 3 cols */}
+          <>
+            <div className="md:hidden">
+              {/* Featured pill card — full width */}
               {hero && (
-                <div className="lg:col-span-3">
-                  <HeroCard ev={hero} onSearch={onSearch} />
+                <div className="px-4 mb-4">
+                  <MobileHeroCard ev={hero} onSearch={onSearch} />
                 </div>
               )}
 
-              {/* Side stack — 2 cols */}
-              {sideCards.length > 0 && (
-                <div className="lg:col-span-2 flex flex-col gap-3">
-                  {sideCards.map((ev, i) => (
-                    <CompactCard key={ev.id} ev={ev} onSearch={onSearch} index={i} />
-                  ))}
+              {/* Horizontal scroll row */}
+              <div className="flex gap-3 overflow-x-auto snap-carousel hide-scrollbar px-4 pb-3">
+                {filtered.slice(1).map((ev, i) => (
+                  <MobileCard key={ev.id} ev={ev} onSearch={onSearch} index={i} />
+                ))}
+              </div>
 
-                  {/* "More events" CTA if side stack has space */}
-                  {sideCards.length < 3 && (
-                    <div className="flex-1 flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center">
-                      <div>
-                        <Ticket size={24} className="mx-auto mb-2 text-slate-300" />
-                        <p className="text-sm font-bold text-slate-400">More events loading</p>
+              {/* View all link */}
+              <div className="px-4 mt-4">
+                <button
+                  onClick={() => window.location.href = '/events'}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 bg-white active:scale-[0.98] transition-all"
+                >
+                  Browse all events <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* ── DESKTOP: Editorial layout (unchanged) ── */}
+            <div className="hidden md:block px-5 space-y-5">
+
+              {/* Row 1: Hero + side stack */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+                {hero && (
+                  <div className="lg:col-span-3">
+                    <HeroCard ev={hero} onSearch={onSearch} />
+                  </div>
+                )}
+                {sideCards.length > 0 && (
+                  <div className="lg:col-span-2 flex flex-col gap-3">
+                    {sideCards.map((ev, i) => (
+                      <CompactCard key={ev.id} ev={ev} onSearch={onSearch} index={i} />
+                    ))}
+                    {sideCards.length < 3 && (
+                      <div className="flex-1 flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center">
+                        <div>
+                          <Ticket size={24} className="mx-auto mb-2 text-slate-300" />
+                          <p className="text-sm font-bold text-slate-400">More events loading</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Row 2: 3-col grid */}
+              {filtered.slice(4).length > 0 && (
+                <AnimatePresence>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {gridCards.map((ev, i) => (
+                      <GridCard key={ev.id} ev={ev} onSearch={onSearch} index={i} />
+                    ))}
+                  </div>
+                </AnimatePresence>
+              )}
+
+              {/* Show more / less */}
+              {filtered.slice(4).length > 3 && (
+                <div className="text-center pt-2">
+                  <button
+                    onClick={() => setShowAll(!showAll)}
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300 hover:bg-white transition-all active:scale-[0.97]"
+                  >
+                    {showAll ? 'Show less' : `View all ${filtered.length} events`}
+                    <ArrowRight size={14} className={`transition-transform ${showAll ? 'rotate-180' : ''}`} />
+                  </button>
                 </div>
               )}
             </div>
-
-            {/* Row 2: 3-col grid */}
-            {filtered.slice(4).length > 0 && (
-              <AnimatePresence>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {gridCards.map((ev, i) => (
-                    <GridCard key={ev.id} ev={ev} onSearch={onSearch} index={i} />
-                  ))}
-                </div>
-              </AnimatePresence>
-            )}
-
-            {/* Show more / less */}
-            {filtered.slice(4).length > 3 && (
-              <div className="text-center pt-2">
-                <button
-                  onClick={() => setShowAll(!showAll)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:border-slate-300 hover:bg-white transition-all active:scale-[0.97]"
-                >
-                  {showAll
-                    ? 'Show less'
-                    : `View all ${filtered.length} events`
-                  }
-                  <ArrowRight size={14} className={`transition-transform ${showAll ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-            )}
-          </div>
+          </>
         )}
-      </div>
+          </div>
+        
     </section>
   )
 }

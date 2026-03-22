@@ -69,6 +69,14 @@ export default function SignUpClient() {
       await signup(email, password);
       setSuccess(true);
       toast.success("Account created!", { description: "Redirecting to your dashboard..." });
+
+      // Send welcome email via Resend (fire-and-forget)
+      fetch('/api/emails', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'welcome', to: email }),
+      }).catch(() => {/* silent — email is non-critical */});
+
       setTimeout(() => router.push("/"), 1200);
     } catch (err: any) {
       const msg =
@@ -86,6 +94,14 @@ export default function SignUpClient() {
     try {
       await loginWithGoogle();
       toast.success("Account created with Google!");
+
+      // Send welcome email via Resend
+      fetch('/api/emails', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ type: 'welcome', to: email }),
+      }).catch(() => {});
+
       setTimeout(() => { router.push("/"); router.refresh(); }, 600);
     } catch {
       setError("Google sign-up failed. Please try again.");

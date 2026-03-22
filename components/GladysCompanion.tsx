@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { useVapiContext } from './VapiProvider';
+import { useAuth } from '@/lib/AuthContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ interface AffiliateCard {
 
 // Structured results from intelligence tools
 interface ToolCard {
-  type: 'weather' | 'packing' | 'tips' | 'flight_status' | 'nearby' | 'affiliate';
+  type: 'weather' | 'packing' | 'tips' | 'flight_status' | 'nearby' | 'affiliate' | 'trip' | 'football' | 'airport' | 'live_match' | 'checklist';
   data: any;
 }
 
@@ -100,11 +101,15 @@ const SERVICE_COLORS: Record<string, string> = {
 function detectToolCard(toolName: string, result: any): ToolCard | null {
   if (!result) return null;
   switch (toolName) {
-    case 'get_weather':             return { type: 'weather',       data: result };
-    case 'get_packing_list':        return { type: 'packing',       data: result };
-    case 'get_travel_tips':         return { type: 'tips',          data: result };
-    case 'check_flight_status':     return { type: 'flight_status', data: result };
-    case 'find_nearby_attractions': return { type: 'nearby',        data: result };
+    case 'get_weather':              return { type: 'weather',       data: result };
+    case 'get_packing_list':         return { type: 'packing',       data: result };
+    case 'get_travel_tips':          return { type: 'tips',          data: result };
+    case 'check_flight_status':      return { type: 'flight_status', data: result };
+    case 'find_nearby_attractions':  return { type: 'nearby',        data: result };
+    case 'find_football_fixtures':   return { type: 'football',      data: result };
+    case 'get_airport_info':         return { type: 'airport',       data: result };
+    case 'live_match':               return { type: 'live_match',    data: result };
+    case 'event_checklist':          return { type: 'checklist',     data: result };
     default: return null;
   }
 }
@@ -430,15 +435,516 @@ function AffiliateCardItem({ card }: { card: AffiliateCard }) {
   );
 }
 
+// ─── Trip Card ───────────────────────────────────────────────────────────────
+
+const SKY = '#0EA5E9';
+
+function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) => void }) {
+  const color =
+    data.eventType === 'music'    ? '#8B5CF6' :
+    data.eventType === 'festival' ? '#F97316' : SKY;
+
+  const fmtDate = (d: string) => {
+    try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch { return d; }
+  };
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-gray-100 bg-white mt-2 shadow-sm">
+      {/* Image */}
+      {data.image && (
+        <div className="relative h-32 overflow-hidden">
+          <img src={data.image} alt={data.eventName} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+          <div className="absolute bottom-2 left-3 right-3">
+            <p className="text-white font-black text-sm leading-tight line-clamp-2">{data.eventName}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="p-3">
+        {!data.image && (
+          <p className="font-black text-gray-900 text-sm mb-2 leading-tight">{data.eventName}</p>
+        )}
+
+        <div className="space-y-1 mb-3">
+          {data.eventDate && (
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              <span>📅</span>{fmtDate(data.eventDate)}
+            </p>
+          )}
+          {(data.venue || data.city) && (
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              <span>📍</span>{[data.venue, data.city].filter(Boolean).join(', ')}
+            </p>
+          )}
+          {data.budget && (
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              <span>💰</span>Est. {data.budget.currency || 'USD'} {data.budget.total?.toLocaleString()} total
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          {/* Plan Trip — triggers full homepage flow */}
+          <button
+            onClick={() => onTripPlan?.(data.query || data.eventName)}
+            className="flex-1 py-2.5 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
+            style={{ background: `linear-gradient(135deg, ${color}DD, ${color})` }}
+          >
+            ✈️ Plan Full Trip
+          </button>
+
+          {/* Buy Tickets */}
+          {data.ticketUrl && (
+            <a
+              href={data.ticketUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold text-center border-2 transition-colors hover:bg-gray-50"
+              style={{ borderColor: color, color }}
+            >
+              🎫 Tickets{data.priceMin ? ` · ${data.currency || '$'}${data.priceMin}+` : ''}
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Tool Card renderer ───────────────────────────────────────────────────────
 
-function ToolCardRenderer({ card }: { card: ToolCard }) {
+// ─── Football Fixtures Card ───────────────────────────────────────────────────
+
+function FootballFixturesCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) => void }) {
+  const fixtures = data.fixtures ?? [];
+  if (!fixtures.length) {
+    return (
+      <div className="rounded-xl border border-gray-100 bg-white mt-2 p-4 text-center text-xs text-gray-400">
+        No upcoming fixtures found for {data.league ?? 'this league'}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white mt-2 overflow-hidden">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-gray-900">⚽ {data.league ?? 'Football'}</p>
+          <p className="text-[10px] text-gray-400 mt-0.5">{fixtures.length} upcoming fixtures</p>
+        </div>
+        <span className="text-lg">🏆</span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {fixtures.slice(0, 5).map((f: any, i: number) => (
+          <button
+            key={i}
+            onClick={() => onTripPlan?.(f.match)}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left group"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-gray-900 truncate">{f.match}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] text-gray-400">{f.date} · {f.time}</p>
+                {f.venue && f.venue !== 'TBC' && (
+                  <p className="text-[10px] text-gray-400 truncate">📍 {f.city || f.venue}</p>
+                )}
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-sky-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              Plan →
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100">
+        <p className="text-[10px] text-gray-400 text-center">Tap any match to plan your trip</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Airport Info Card ───────────────────────────────────────────────────────
+
+function AirportCard({ data }: { data: any }) {
+  const [tab, setTab] = useState<'transport' | 'lounges' | 'tips' | 'navigation'>('transport');
+  if (!data.found) {
+    return (
+      <div className="rounded-xl border border-gray-100 bg-white mt-2 p-4">
+        <p className="text-xs font-semibold text-gray-900 mb-2">✈️ {data.airport}</p>
+        <div className="space-y-1.5">
+          {(data.guidance ?? []).map((g: string, i: number) => (
+            <p key={i} className="text-xs text-gray-600 flex gap-2"><span className="text-gray-300 flex-shrink-0">—</span>{g}</p>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-3">
+          {data.uber && <a href={data.uber} target="_blank" rel="noopener noreferrer" className="text-xs font-bold px-3 py-1.5 rounded-xl bg-black text-white">🚗 Uber</a>}
+          {data.maps && <a href={data.maps} target="_blank" rel="noopener noreferrer" className="text-xs font-bold px-3 py-1.5 rounded-xl border border-gray-200 text-gray-700">🗺 Map</a>}
+        </div>
+      </div>
+    );
+  }
+
+  const tabs = [
+    { id: 'transport',  label: '🚌 Transport' },
+    { id: 'lounges',    label: '🛋 Lounges'   },
+    { id: 'tips',       label: '💡 Tips'      },
+  ].filter(t => data[t.id]);
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white mt-2 overflow-hidden">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <p className="text-xs font-semibold text-gray-900">✈️ {data.airport}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">{data.city}</p>
+      </div>
+
+      {/* Tab pills */}
+      <div className="flex gap-1.5 px-4 pt-3 pb-2 overflow-x-auto">
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id as any)}
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap transition-all ${
+              tab === t.id ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+            }`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-4 pb-4">
+        {tab === 'transport' && data.transport && (
+          <div className="space-y-2">
+            {Object.entries(data.transport).map(([k, v]: [string, any]) => (
+              <div key={k} className="flex gap-2">
+                <span className="text-[10px] font-black uppercase text-gray-400 w-14 flex-shrink-0 mt-0.5">{k}</span>
+                <p className="text-xs text-gray-700">{v}</p>
+              </div>
+            ))}
+            {data.uberLink && (
+              <a href={data.uberLink} target="_blank" rel="noopener noreferrer"
+                className="mt-2 flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl bg-black text-white w-fit">
+                🚗 Book Uber from Airport
+              </a>
+            )}
+          </div>
+        )}
+        {tab === 'lounges' && data.lounges && (
+          <div className="space-y-1.5">
+            {data.lounges.map((l: string, i: number) => (
+              <p key={i} className="text-xs text-gray-700 flex gap-2"><span className="text-gray-300 flex-shrink-0">—</span>{l}</p>
+            ))}
+          </div>
+        )}
+        {tab === 'tips' && data.tips && (
+          <div className="space-y-1.5">
+            {data.tips.map((t: string, i: number) => (
+              <p key={i} className="text-xs text-gray-700 flex gap-2"><span className="text-amber-400 flex-shrink-0">★</span>{t}</p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {data.mapsLink && (
+        <div className="px-4 pb-3">
+          <a href={data.mapsLink} target="_blank" rel="noopener noreferrer"
+            className="text-xs font-bold text-sky-500 hover:underline">
+            View airport on Google Maps →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Live Match Card (compact, for chat panel) ───────────────────────────────
+
+function LiveMatchCard({ data }: { data: any }) {
+  const [liveData,  setLiveData]  = useState<any>(null);
+  const [loading,   setLoading]   = useState(false);
+  const [lastSync,  setLastSync]  = useState<Date | null>(null);
+  const [tab,       setTab]       = useState<'score' | 'events' | 'setlist'>('score');
+  const intervalRef = useRef<any>(null);
+
+  const fetch_ = async () => {
+    setLoading(true);
+    try {
+      const params = data.fixtureId
+        ? `type=football&fixtureId=${data.fixtureId}`
+        : `type=concert&artist=${encodeURIComponent(data.artistName ?? '')}&date=${data.eventDate}`;
+      const res  = await fetch(`/api/live-match?${params}`);
+      const json = await res.json();
+      setLiveData(json);
+      setLastSync(new Date());
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if (data.autoFetch) fetch_();
+    intervalRef.current = setInterval(() => {
+      if (liveData?.status?.isLive) fetch_();
+    }, 30_000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  const isLive  = liveData?.status?.isLive;
+  const isEnded = liveData?.status?.isEnded;
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white mt-2 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">{data.eventType === 'sports' ? '⚽' : '🎵'}</span>
+          <p className="text-xs font-black text-gray-900 truncate">{data.eventName}</p>
+          {isLive  && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-red-500 text-white animate-pulse">LIVE</span>}
+          {isEnded && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-gray-400 text-white">FT</span>}
+        </div>
+        <button onClick={fetch_} disabled={loading}
+          className="text-[10px] font-bold text-sky-500 hover:underline disabled:opacity-40">
+          {loading ? '...' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Not fetched yet */}
+      {!liveData && !loading && (
+        <div className="text-center py-5">
+          <p className="text-xs text-gray-400 mb-2">
+            {data.autoFetch ? 'Loading...' : 'Live updates available on event day'}
+          </p>
+          {!data.autoFetch && (
+            <button onClick={fetch_}
+              className="text-xs font-bold px-4 py-2 rounded-xl text-white"
+              style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
+              Load Now
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Football scoreboard */}
+      {liveData?.type === 'football' && (
+        <div className="p-3 space-y-3">
+          {/* Score */}
+          <div className="flex items-center gap-2 justify-between">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              {liveData.teams?.home?.logo && (
+                <img src={liveData.teams.home.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
+              )}
+              <p className="text-xs font-black text-gray-900 truncate">{liveData.teams?.home?.name}</p>
+            </div>
+            <div className="text-center flex-shrink-0 px-3">
+              <p className="text-2xl font-black text-gray-900 leading-none">
+                {liveData.teams?.home?.score ?? '–'}&nbsp;:&nbsp;{liveData.teams?.away?.score ?? '–'}
+              </p>
+              {liveData.status?.elapsed && (
+                <p className="text-[10px] font-bold mt-0.5" style={{ color: isLive ? '#EF4444' : '#94A3B8' }}>
+                  {isLive ? `${liveData.status.elapsed}'` : liveData.status.label}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+              <p className="text-xs font-black text-gray-900 truncate text-right">{liveData.teams?.away?.name}</p>
+              {liveData.teams?.away?.logo && (
+                <img src={liveData.teams.away.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
+              )}
+            </div>
+          </div>
+
+          {/* Tab pills */}
+          <div className="flex gap-1.5">
+            {[{ id: 'score', label: '⚡ Events' }, { id: 'events', label: '👥 Lineups' }].map(t => (
+              <button key={t.id} onClick={() => setTab(t.id as any)}
+                className="text-[10px] font-bold px-2.5 py-1 rounded-full transition-all"
+                style={{ background: tab === t.id ? '#0EA5E9' : '#F1F5F9', color: tab === t.id ? 'white' : '#64748B' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Goals */}
+          {tab === 'score' && (
+            <div className="space-y-1.5 max-h-36 overflow-y-auto">
+              {(liveData.goals ?? []).map((g: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-green-50 border border-green-200">
+                  <span className="text-sm">⚽</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-black text-gray-900 truncate">{g.player}</p>
+                    <p className="text-[9px] text-gray-400">{g.team}</p>
+                  </div>
+                  <span className="text-[10px] font-black text-gray-400 flex-shrink-0">{g.minute}'</span>
+                </div>
+              ))}
+              {(liveData.cards ?? []).map((c: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <span className="text-sm">{c.type?.includes('Red') ? '🟥' : '🟨'}</span>
+                  <p className="text-[11px] font-black text-gray-900 flex-1 truncate">{c.player}</p>
+                  <span className="text-[10px] font-black text-gray-400 flex-shrink-0">{c.minute}'</span>
+                </div>
+              ))}
+              {!(liveData.goals?.length) && !(liveData.cards?.length) && (
+                <p className="text-[11px] text-gray-400 text-center py-2">No events yet</p>
+              )}
+            </div>
+          )}
+
+          {/* Lineups */}
+          {tab === 'events' && (
+            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
+              {(liveData.lineups ?? []).map((l: any, i: number) => (
+                <div key={i}>
+                  <p className="text-[10px] font-black text-gray-700 mb-1 truncate">{l.team} <span className="font-normal text-gray-400">({l.formation})</span></p>
+                  {(l.startingXI ?? []).slice(0, 5).map((p: any, j: number) => (
+                    <p key={j} className="text-[10px] text-gray-600 leading-5 truncate">
+                      <span className="text-[9px] text-gray-400 mr-1">{p.number}</span>{p.name}
+                    </p>
+                  ))}
+                  {l.startingXI?.length > 5 && <p className="text-[9px] text-gray-400">+{l.startingXI.length - 5} more</p>}
+                </div>
+              ))}
+              {!liveData.lineups?.length && <p className="text-[11px] text-gray-400 col-span-2 text-center py-2">Lineups not announced</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Concert setlist */}
+      {liveData?.type === 'concert' && (
+        <div className="p-3 space-y-2">
+          {liveData.note && <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl px-3 py-2 border border-amber-200">{liveData.note}</p>}
+          {(liveData.setlist ?? []).length > 0 && (
+            <div className="max-h-40 overflow-y-auto space-y-0.5">
+              {liveData.setlist.map((song: string, i: number) => (
+                <div key={i} className="flex items-center gap-2.5 py-1">
+                  <span className="text-[10px] font-black text-gray-300 w-4 text-right flex-shrink-0">{i + 1}</span>
+                  <p className="text-[11px] font-semibold text-gray-900">{song}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Last sync */}
+      {lastSync && (
+        <div className="px-4 py-2 border-t border-gray-50 flex items-center justify-between">
+          <p className="text-[9px] text-gray-300">
+            Updated {lastSync.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+            {isLive && ' · auto-refreshing'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Checklist Card (compact, for chat panel) ─────────────────────────────────
+
+function ChecklistCard({ data }: { data: any }) {
+  const storageKey = `gladys_checklist_${data.eventDate}`;
+  const [checks, setChecks] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? '{}'); } catch { return {}; }
+  });
+  const [notifSet, setNotifSet] = useState(false);
+
+  const toggle = (id: string) => {
+    setChecks(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const daysUntil = data.eventDate
+    ? Math.ceil((new Date(data.eventDate).getTime() - new Date().setHours(0,0,0,0)) / 86_400_000)
+    : null;
+
+  const items = [
+    { id: 'ticket',    emoji: '🎫', label: 'Ticket saved / screenshotted'   },
+    { id: 'weather',   emoji: '🌤', label: 'Checked event-day weather'       },
+    { id: 'transport', emoji: '🚌', label: 'Transport to venue planned'      },
+    { id: 'packing',   emoji: '🎒', label: 'ID, phone, charger, cash packed' },
+  ];
+  const doneCount = items.filter(i => checks[i.id]).length;
+  const progress  = doneCount / items.length;
+  const allDone   = doneCount === items.length;
+
+  const scheduleAlert = async () => {
+    if (!('Notification' in window)) return;
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') setNotifSet(true);
+  };
+
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white mt-2 overflow-hidden">
+      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-black text-gray-900">
+            {daysUntil === 0 ? '🎉 Event Day Checklist'
+            : daysUntil === 1 ? '⚡ Event Tomorrow!'
+            : daysUntil !== null ? `📋 ${daysUntil} days to go`
+            : '📋 Event Checklist'}
+          </p>
+          <span className="text-[10px] font-black text-gray-400">{doneCount}/{items.length}</span>
+        </div>
+        {/* Progress bar */}
+        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${progress * 100}%`, background: allDone ? '#10B981' : '#0EA5E9' }}
+          />
+        </div>
+      </div>
+
+      <div className="p-3 space-y-1.5">
+        {items.map(item => (
+          <button key={item.id} onClick={() => toggle(item.id)}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${
+              checks[item.id] ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-100 hover:border-gray-200'
+            }`}>
+            <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+              checks[item.id] ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'
+            }`}>
+              {checks[item.id] && <span className="text-white text-[10px] font-black">✓</span>}
+            </div>
+            <span className="text-sm flex-shrink-0">{item.emoji}</span>
+            <p className={`text-xs font-semibold flex-1 ${checks[item.id] ? 'text-emerald-700 line-through' : 'text-gray-900'}`}>
+              {item.label}
+            </p>
+          </button>
+        ))}
+      </div>
+
+      {allDone ? (
+        <div className="mx-3 mb-3 px-4 py-3 rounded-xl bg-emerald-500 text-white text-center">
+          <p className="text-xs font-black">🎉 You're all set for {data.eventName}!</p>
+        </div>
+      ) : !notifSet ? (
+        <div className="px-3 pb-3">
+          <button onClick={scheduleAlert}
+            className="w-full py-2.5 rounded-xl text-xs font-black text-white"
+            style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
+            🔔 Set 24hr Reminder
+          </button>
+        </div>
+      ) : (
+        <p className="text-center text-[10px] text-emerald-500 font-bold pb-3">✓ Reminder set!</p>
+      )}
+    </div>
+  );
+}
+
+function ToolCardRenderer({ card, onTripPlan }: { card: ToolCard; onTripPlan?: (q: string) => void }) {
   switch (card.type) {
     case 'weather':       return <WeatherCard data={card.data} />;
     case 'packing':       return <PackingCard data={card.data} />;
     case 'tips':          return <TipsCard data={card.data} />;
     case 'flight_status': return <FlightStatusCard data={card.data} />;
     case 'nearby':        return <NearbyCard data={card.data} />;
+    case 'trip':          return <TripCard data={card.data} onTripPlan={onTripPlan} />;
+    case 'football':      return <FootballFixturesCard data={card.data} onTripPlan={onTripPlan} />;
+    case 'airport':       return <AirportCard data={card.data} />;
+    case 'live_match':    return <LiveMatchCard data={card.data} />;
+    case 'checklist':     return <ChecklistCard data={card.data} />;
     default:              return null;
   }
 }
@@ -496,7 +1002,11 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
 
 // ─── Chat Bubble ──────────────────────────────────────────────────────────────
 
-function ChatBubble({ message }: { message: ChatMessage }) {
+function ChatBubble({ message, onTripPlan, isStreaming }: {
+  message:     ChatMessage;
+  onTripPlan?: (q: string) => void;
+  isStreaming?: boolean;
+}) {
   const isUser = message.role === 'user';
   return (
     <div className={`flex flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
@@ -505,12 +1015,18 @@ function ChatBubble({ message }: { message: ChatMessage }) {
           ? 'bg-black text-white rounded-br-sm'
           : 'bg-gray-50 text-gray-900 rounded-bl-sm border border-gray-100'
       }`}>
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        <p className="whitespace-pre-wrap">
+          {message.content}
+          {/* Blinking cursor while streaming */}
+          {isStreaming && (
+            <span className="inline-block w-0.5 h-3.5 bg-gray-400 ml-0.5 align-middle animate-pulse" />
+          )}
+        </p>
       </div>
 
       {message.toolCard && (
         <div className="w-full max-w-[95%]">
-          <ToolCardRenderer card={message.toolCard} />
+          <ToolCardRenderer card={message.toolCard} onTripPlan={onTripPlan} />
         </div>
       )}
 
@@ -554,19 +1070,21 @@ const VOICE_PROMPTS = [
 // Grouped prompts — shown on empty chat state
 const CHAT_PROMPT_GROUPS = [
   {
-    label: 'Say hello',
+    label: 'Plan a trip',
     prompts: [
-      { text: 'Hey Gladys! 👋',              emoji: '👋' },
-      { text: "What can you help me with?",   emoji: '💡' },
+      { text: 'Plan a trip to the Champions League Final', emoji: '🏆' },
+      { text: 'I want to go to Coachella 2026',           emoji: '🎪' },
+      { text: 'Plan a trip to the NBA Finals',            emoji: '🏀' },
+      { text: 'Book me a trip to Formula 1 Monaco',       emoji: '🏎️' },
     ],
   },
   {
     label: 'Live tools',
     prompts: [
-      { text: "Weather in Dubai next week?",       emoji: '🌤' },
-      { text: 'Pack list for 5 days in London',    emoji: '🧳' },
+      { text: "What's the score?",                 emoji: '🔴' },
+      { text: 'Show my event checklist',            emoji: '✅' },
       { text: 'Check flight status for BA456',     emoji: '✈️' },
-      { text: "What's on near me in New York?",    emoji: '📍' },
+      { text: "Weather in Dubai next week?",        emoji: '🌤' },
     ],
   },
   {
@@ -612,20 +1130,125 @@ function getToastConfig(toolName: string, result: any): { title: string; descrip
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function GladysCompanion({ eventContext }: { eventContext?: string }) {
+// ─── Event intent detector ───────────────────────────────────────────────────
+
+const TRIP_PATTERNS = [
+  /plan.*trip/i, /book.*trip/i, /travel.*to/i,
+  /flights?.*to/i, /hotels?.*in/i, /itinerary/i,
+  /visit.*(for|to)/i, /go.*to/i,
+  /world cup/i, /uchampions league/i, /ucl/i,
+  /nba finals/i, /super bowl/i, /coachella/i,
+  /glaston(bury)?/i, /formula 1/i, /f1.*grand prix/i,
+  /vs\.?/i, // "Chelsea vs Arsenal" pattern
+]
+
+function detectTripIntent(text: string): boolean {
+  return TRIP_PATTERNS.some(p => p.test(text))
+}
+
+const LIVE_PATTERNS = [
+  /score/i, /what.*happening/i, /how.*match/i, /how.*game/i,
+  /live.*update/i, /any.*goal/i, /half.?time/i, /full.?time/i,
+  /setlist/i, /what.*playing/i, /what.*song/i, /lineup/i,
+  /who.*scored/i, /result/i, /update.*match/i,
+]
+function detectLiveIntent(text: string): boolean {
+  return LIVE_PATTERNS.some(p => p.test(text))
+}
+
+const CHECKLIST_PATTERNS = [
+  /checklist/i, /am i ready/i, /ready for/i, /what do i need/i,
+  /pre.?event/i, /before.*event/i, /don't forget/i, /remind me/i,
+  /show.*checklist/i, /my list/i, /preparation/i, /prepared/i,
+]
+function detectChecklistIntent(text: string): boolean {
+  return CHECKLIST_PATTERNS.some(p => p.test(text))
+}
+
+export default function GladysCompanion({
+  eventContext,
+  onTripPlan,
+}: {
+  eventContext?: string;
+  onTripPlan?: (query: string) => void;
+}) {
   const vapi = useVapiContext();
-  const [isOpen,   setIsOpen]   = useState(false);
-  const [mode,     setMode]     = useState<Mode>('voice');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input,    setInput]    = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef       = useRef<HTMLInputElement>(null);
-  const prevToolCount  = useRef(0);
+  const { user, userProfile } = useAuth();
+
+  const [isOpen,      setIsOpen]      = useState(false);
+  const [mode,        setMode]        = useState<Mode>('voice');
+  const [messages,    setMessages]    = useState<ChatMessage[]>([]);
+  const [input,       setInput]       = useState('');
+  const [isTyping,    setIsTyping]    = useState(false);
+  const [streamingId, setStreamingId] = useState<string | null>(null);
+
+  const messagesEndRef   = useRef<HTMLDivElement>(null);
+  const inputRef         = useRef<HTMLInputElement>(null);
+  const prevToolCount    = useRef(0);
+  const proactiveFired   = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  // ── Proactive first message when panel opens with context ─────────────────
+  useEffect(() => {
+    if (!isOpen || mode !== 'chat') return;
+    if (proactiveFired.current || messages.length > 0) return;
+    if (!eventContext && !userProfile) return;
+
+    proactiveFired.current = true;
+
+    // Build a contextual greeting based on what we know
+    const name       = userProfile?.name || user?.displayName || null;
+    const greeting   = name ? `Hey ${name.split(' ')[0]}! 👋` : 'Hey! 👋';
+    const today         = new Date().toISOString().split('T')[0];
+    const dateInCtx     = eventContext?.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+    const isEventToday  = dateInCtx === today;
+    const cleanCtx      = eventContext
+      ?.replace('User is planning a trip to ', '')
+      .replace('User is planning a trip for ', '') ?? '';
+
+    const contextual = eventContext
+      ? isEventToday
+        ? `It looks like your event is **today** — ${cleanCtx}! Ask me for live scores, your event checklist, or directions to the venue.`
+        : `I see you're planning a trip to **${cleanCtx}**. Want me to check the weather there, find things to do nearby, or show your event checklist?`
+      : `I'm Gladys, your AI travel companion. I can check weather, find football fixtures, build packing lists, track flights, and plan full event trips. What are you thinking?`;
+
+    // Stream the proactive message word by word
+    const proactiveId = `proactive-${Date.now()}`;
+    const fullText    = `${greeting} ${contextual}`;
+    const words       = fullText.split(' ');
+
+    setMessages([{
+      id:        proactiveId,
+      role:      'assistant',
+      content:   '',
+      timestamp: new Date(),
+    }]);
+    setStreamingId(proactiveId);
+
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setMessages(prev => prev.map(m =>
+        m.id === proactiveId
+          ? { ...m, content: words.slice(0, i).join(' ') }
+          : m
+      ));
+      if (i >= words.length) {
+        clearInterval(interval);
+        setStreamingId(null);
+      }
+    }, 45);
+
+    return () => clearInterval(interval);
+  }, [isOpen, mode]);
+
+  // Reset proactive flag when context changes (new trip search)
+  useEffect(() => {
+    proactiveFired.current = false;
+  }, [eventContext]);
 
   // Handle all tool results from Vapi voice calls
   useEffect(() => {
@@ -671,8 +1294,8 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
     else if (vapi.status === 'idle') vapi.startCall(eventContext);
   }, [vapi, eventContext]);
 
-  // ─── handleSend — /api/gladys-chat (~2-3s) ───────────────────────────────
-  // Replaced from /api/agent (was 38s due to Ticketmaster + PredictHQ lookup)
+  // ─── handleSend ─────────────────────────────────────────────────────────────
+  // Smart routing: trip intent → /api/agent | everything else → /api/gladys-chat
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isTyping) return;
@@ -684,38 +1307,247 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
     setInput('');
     setIsTyping(true);
 
+    const isTripQuery      = detectTripIntent(text);
+    const isLiveQuery      = detectLiveIntent(text);
+    const isChecklistQuery = detectChecklistIntent(text);
+
     try {
-      const res    = await fetch('/api/gladys-chat', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: text, context: eventContext }),
-      });
-      const result = await res.json();
+      // ── LIVE MATCH PATH ───────────────────────────────────────────────────────
+      if (isLiveQuery && eventContext) {
+        // Extract fixture context from eventContext string
+        const fixtureMatch  = eventContext.match(/fixtureId[=:](\d+)/i)
+        const fixtureId     = fixtureMatch?.[1]
+        const artistMatch   = eventContext.match(/artist[=:]([^,]+)/i)
+        const artistName    = artistMatch?.[1]?.trim()
+        const dateMatch     = eventContext.match(/(\d{4}-\d{2}-\d{2})/)
+        const eventDate     = dateMatch?.[1] ?? new Date().toISOString().split('T')[0]
+        const today         = new Date().toISOString().split('T')[0]
+        const isToday       = eventDate === today
 
-      // Build tool card if a tool was triggered
-      const toolCard = result.toolName
-        ? detectToolCard(result.toolName, result.toolResult)
-        : undefined;
+        const liveId = `live-${Date.now()}`
+        setMessages(prev => [...prev, {
+          id: liveId, role: 'assistant', timestamp: new Date(),
+          content: isToday
+            ? 'Here are the live updates for your event 🔴'
+            : "Live updates will be available on event day. Here's what I have:",
+          toolCard: {
+            type: 'live_match' as const,
+            data: {
+              fixtureId,
+              artistName,
+              eventDate,
+              eventName:  eventContext.replace(/fixtureId[=:]\d+/gi, '').replace(/artist[=:][^,]+/gi, '').trim() || 'Your Event',
+              eventType:  fixtureId ? 'sports' : 'music',
+              autoFetch:  isToday,
+            },
+          },
+        }])
+        return
 
-      // Show toast for tool results
-      if (result.toolName && result.toolResult) {
-        const { title, description } = getToastConfig(result.toolName, result.toolResult);
-        const isDisruption = result.toolName === 'check_flight_status' &&
-          ['cancelled', 'diverted'].includes(result.toolResult?.status);
-        if (isDisruption) {
-          toast.error(title, { description, duration: 10000 });
-        } else {
-          toast.success(title, { description, duration: 5000 });
-        }
+      // ── CHECKLIST PATH ────────────────────────────────────────────────────────
+      } else if (isChecklistQuery && eventContext) {
+        const dateMatch  = eventContext.match(/(\d{4}-\d{2}-\d{2})/)
+        const venueMatch = eventContext.match(/venue[=:]([^,]+)/i)
+        const eventDate  = dateMatch?.[1] ?? ''
+        const venue      = venueMatch?.[1]?.trim() ?? 'the venue'
+
+        const checkId = `checklist-${Date.now()}`
+        setMessages(prev => [...prev, {
+          id: checkId, role: 'assistant', timestamp: new Date(),
+          content: "Here's your pre-event checklist 📋",
+          toolCard: {
+            type: 'checklist' as const,
+            data: {
+              eventName: eventContext.split(',')[0]?.trim() || 'Your Event',
+              eventDate,
+              venue,
+              city: eventContext.match(/city[=:]([^,]+)/i)?.[1]?.trim() ?? '',
+            },
+          },
+        }])
+        return
+
+      } else if (isLiveQuery && !eventContext) {
+        // No active event — ask user which event they mean
+        setMessages(prev => [...prev, {
+          id: `no-event-${Date.now()}`, role: 'assistant', timestamp: new Date(),
+          content: "I don't have an active event loaded. Search for your event on the homepage first, then come back and I'll show you live updates!",
+        }])
+        return
+
+      } else if (isChecklistQuery && !eventContext) {
+        setMessages(prev => [...prev, {
+          id: `no-event-${Date.now()}`, role: 'assistant', timestamp: new Date(),
+          content: "Search for your event on the homepage first and I'll pull up your personalised checklist!",
+        }])
+        return
       }
 
-      setMessages(prev => [...prev, {
-        id:        `assistant-${Date.now()}`,
-        role:      'assistant',
-        content:   result.reply ?? result.message ?? "I'm here to help with your travel plans!",
-        toolCard:  toolCard ?? undefined,
-        timestamp: new Date(),
-      }]);
+      if (isTripQuery) {
+        // ── TRIP PLANNING PATH ─────────────────────────────────────────────────
+        // Show "building trip" message immediately
+        const thinkingId = `thinking-${Date.now()}`;
+        setMessages(prev => [...prev, {
+          id:        thinkingId,
+          role:      'assistant',
+          content:   `Planning your trip for "${text}"... Give me a moment ✈️`,
+          timestamp: new Date(),
+        }]);
+
+        // If parent provided onTripPlan, use it to trigger full homepage flow
+        if (onTripPlan) {
+          onTripPlan(text);
+          setMessages(prev => prev.map(m =>
+            m.id === thinkingId
+              ? { ...m, content: `I've started planning your trip for "${text}"! Check the results below 👇` }
+              : m
+          ));
+          setIsTyping(false);
+          return;
+        }
+
+        // Otherwise call /api/agent directly and render trip card inline
+        const res    = await fetch('/api/agent', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            message: text,
+            context: { eventType: 'sports', origin: 'Johannesburg, South Africa', days: 5 },
+          }),
+        });
+        const result = await res.json();
+
+        if (result.success && result.data?.event?.name) {
+          const d = result.data;
+          setMessages(prev => prev.map(m =>
+            m.id === thinkingId
+              ? {
+                  ...m,
+                  content: `Here's what I found for "${d.event.name}"! Tap Plan Trip to get the full itinerary.`,
+                  toolCard: {
+                    type: 'trip' as const,
+                    data: {
+                      eventName:  d.event.name,
+                      eventDate:  d.event.date,
+                      venue:      d.event.venue,
+                      city:       d.destination?.city,
+                      country:    d.destination?.country,
+                      image:      d.event.image,
+                      ticketUrl:  d.event.ticketUrl || d.affiliate_links?.tickets,
+                      priceMin:   d.event.priceMin,
+                      currency:   d.event.currency,
+                      eventType:  d.event.type,
+                      budget:     d.budget,
+                      query:      text,
+                    },
+                  },
+                }
+              : m
+          ));
+        } else {
+          // Agent didn't find event — fall through to chat
+          setMessages(prev => prev.map(m =>
+            m.id === thinkingId
+              ? { ...m, content: result.data?.message || "I couldn't find that event — try searching on the homepage for the best results!" }
+              : m
+          ));
+        }
+
+      } else {
+        // ── CHAT PATH — STREAMING ─────────────────────────────────────────────
+        const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
+
+        // Inject user memory into context
+        const userContext = userProfile
+          ? `User: ${userProfile.name || user?.displayName || 'Traveller'}, based in ${userProfile.homeCity || 'Johannesburg'}.`
+          : undefined;
+
+        const res = await fetch('/api/gladys-chat/stream', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            message: text,
+            context: eventContext || userContext,
+            history,
+            userContext,
+          }),
+        });
+
+        if (!res.ok || !res.body) {
+          // Fallback to non-streaming if stream endpoint fails
+          const fallback = await fetch('/api/gladys-chat', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, context: eventContext, history }),
+          });
+          const result = await fallback.json();
+          const toolCard = result.toolName ? detectToolCard(result.toolName, result.toolResult) : undefined;
+          if (result.toolName && result.toolResult) {
+            const { title, description } = getToastConfig(result.toolName, result.toolResult);
+            const isDisruption = result.toolName === 'check_flight_status' && ['cancelled', 'diverted'].includes(result.toolResult?.status);
+            if (isDisruption) toast.error(title, { description, duration: 10000 });
+            else toast.success(title, { description, duration: 5000 });
+          }
+          setMessages(prev => [...prev, { id: `assistant-${Date.now()}`, role: 'assistant', content: result.reply ?? "I'm here to help!", toolCard: toolCard ?? undefined, timestamp: new Date() }]);
+          return;
+        }
+
+        // ── Stream the response word by word ──
+        const streamId = `stream-${Date.now()}`;
+        setStreamingId(streamId);
+        setMessages(prev => [...prev, {
+          id: streamId, role: 'assistant', content: '', timestamp: new Date(),
+        }]);
+
+        const reader  = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer    = '';
+        let toolName: string | null   = null;
+        let toolResult: any           = null;
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() ?? '';
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') break;
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if (parsed.type === 'text') {
+                  // Append text chunk to message
+                  setMessages(prev => prev.map(m =>
+                    m.id === streamId ? { ...m, content: m.content + parsed.text } : m
+                  ));
+                } else if (parsed.type === 'tool') {
+                  // Tool result arrived — update message with card
+                  toolName   = parsed.toolName;
+                  toolResult = parsed.toolResult;
+                  const toolCard = detectToolCard(toolName!, toolResult);
+                  if (toolName && toolResult) {
+                    const { title, description } = getToastConfig(toolName, toolResult);
+                    const isDisruption = toolName === 'check_flight_status' && ['cancelled', 'diverted'].includes(toolResult?.status);
+                    if (isDisruption) toast.error(title, { description, duration: 10000 });
+                    else toast.success(title, { description, duration: 5000 });
+                  }
+                  setMessages(prev => prev.map(m =>
+                    m.id === streamId ? { ...m, toolCard: toolCard ?? undefined } : m
+                  ));
+                }
+              } catch {}
+            }
+          }
+        } finally {
+          setStreamingId(null);
+        }
+      }
     } catch {
       setMessages(prev => [...prev, {
         id:        `error-${Date.now()}`,
@@ -726,7 +1558,7 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
     } finally {
       setIsTyping(false);
     }
-  }, [input, isTyping, eventContext]);
+  }, [input, isTyping, eventContext, onTripPlan]);
 
   // Clicking a prompt chip fires immediately (no extra Enter needed)
   const handlePromptClick = (text: string) => {
@@ -748,23 +1580,32 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 16 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2"
+            className="fixed bottom-24 sm:bottom-8 right-4 sm:right-6 z-50 flex flex-col items-end gap-2"
           >
+            {/* Label pill */}
             <motion.div
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-              className="bg-black text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg"
+              transition={{ delay: 0.6 }}
+              className="flex items-center gap-1.5 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg"
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}
             >
+              <IconMic size={11} />
               Talk to Gladys
             </motion.div>
 
+            {/* Main FAB button */}
             <button
-              onClick={() => setIsOpen(true)}
-              className="relative w-14 h-14 rounded-full bg-black shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+              onClick={() => { setIsOpen(true); if (eventContext) setMode('chat'); }}
+              className="relative w-16 h-16 sm:w-14 sm:h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)',
+                boxShadow: '0 8px 32px rgba(14,165,233,0.45)' }}
             >
+              {/* Pulse ring */}
+              <span className="absolute inset-0 rounded-full animate-ping opacity-20"
+                style={{ background: '#0EA5E9' }} />
               {hasActivity && (
-                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white" />
               )}
               {isVoiceActive ? (
                 <div className="flex gap-0.5 items-center">
@@ -774,7 +1615,9 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
                   ))}
                 </div>
               ) : (
-                <IconMic size={22} />
+                <div className="text-white">
+                  <IconMic size={24} />
+                </div>
               )}
             </button>
           </motion.div>
@@ -804,15 +1647,16 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
               {/* ── Header ─────────────────────────────────────── */}
               <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-50">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
                     <span className="text-white text-xs font-bold">G</span>
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 leading-tight">Gladys</h3>
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${isVoiceActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full ${isVoiceActive ? 'bg-green-500 animate-pulse' : streamingId ? 'bg-sky-400 animate-pulse' : 'bg-gray-300'}`} />
                       <span className="text-xs text-gray-400">
-                        {isVoiceActive ? 'On a call' : isVoiceConnecting ? 'Connecting...' : 'AI Travel Companion'}
+                        {isVoiceActive ? 'On a call' : isVoiceConnecting ? 'Connecting...' : streamingId ? 'Typing...' : 'AI Travel Companion'}
                       </span>
                     </div>
                   </div>
@@ -953,8 +1797,15 @@ export default function GladysCompanion({ eventContext }: { eventContext?: strin
                         )}
 
                         {/* ── Messages ── */}
-                        {messages.map(msg => <ChatBubble key={msg.id} message={msg} />)}
-                        {isTyping && <TypingIndicator />}
+                        {messages.map(msg => (
+                          <ChatBubble
+                            key={msg.id}
+                            message={msg}
+                            onTripPlan={onTripPlan}
+                            isStreaming={streamingId === msg.id}
+                          />
+                        ))}
+                        {isTyping && !streamingId && <TypingIndicator />}
 
                         {/* ── Quick-reply chips after conversation starts ── */}
                         {messages.length > 0 && !isTyping && (

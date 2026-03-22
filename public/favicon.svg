@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#g)"/>
+  <!-- G -->
+  <text x="7" y="22" font-family="Arial Black, system-ui, sans-serif"
+        font-size="14" font-weight="900" fill="white">G</text>
+  <!-- T -->
+  <text x="17" y="22" font-family="Arial Black, system-ui, sans-serif"
+        font-size="14" font-weight="900" fill="white">T</text>
+  <!-- Small airplane hint -->
+  <text x="23" y="12" font-family="system-ui" font-size="6" fill="white">✈</text>
+</svg>

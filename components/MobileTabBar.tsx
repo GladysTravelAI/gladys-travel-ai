@@ -11,7 +11,7 @@ const TABS = [
   { label: 'Events',   href: '/events',        Icon: CalendarSearch  },
   { label: 'Features', href: '/features',      Icon: Zap             },
   { label: 'Trips',    href: '/trips',         Icon: Users           },
-  { label: 'How It Works', href: '/how-it-works', Icon: BookOpen    },
+  { label: 'Learn',        href: '/how-it-works', Icon: BookOpen    },
 ];
 
 export default function MobileTabBar() {
@@ -54,7 +54,7 @@ export default function MobileTabBar() {
                 className="text-[9px] font-semibold leading-none text-center"
                 style={{ color: active ? SKY : '#94A3B8' }}
               >
-                {label === 'How It Works' ? 'How It Works' : label}
+                {label}
               </span>
             </Link>
           );

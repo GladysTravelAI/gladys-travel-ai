@@ -8,9 +8,10 @@ import {
   Trophy, Music, PartyPopper, Sparkles, Hotel, Plane,
   Utensils, Ticket, Activity, CheckCircle, Navigation,
   ExternalLink, Sun, Sunset, Moon, UtensilsCrossed, Star,
-  ShoppingBag, Printer, Globe
+  ShoppingBag, Globe
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import type { ItineraryData, DayPlan, TimeBlock, EventBlock } from "@/lib/mock-itinerary";
 
 // ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
@@ -22,6 +23,8 @@ const SKY_MID   = '#BAE6FD';
 const EVENT_CFG = {
   sports:   { icon: Trophy,      accent: SKY,       accentLight: SKY_LIGHT, accentBorder: SKY_MID,    label: 'Sports Event', hero: 'linear-gradient(135deg,#0C4A6E,#0369A1,#0EA5E9)', pill: 'linear-gradient(135deg,#38BDF8,#0284C7)' },
   music:    { icon: Music,       accent: '#8B5CF6',  accentLight: '#F5F3FF', accentBorder: '#DDD6FE',  label: 'Music Event',  hero: 'linear-gradient(135deg,#2E1065,#6D28D9,#8B5CF6)', pill: 'linear-gradient(135deg,#A78BFA,#7C3AED)' },
+  // both singular and plural supported
+  festival: { icon: PartyPopper, accent: '#F97316',  accentLight: '#FFF7ED', accentBorder: '#FED7AA',  label: 'Festival',     hero: 'linear-gradient(135deg,#431407,#C2410C,#F97316)', pill: 'linear-gradient(135deg,#FB923C,#EA580C)' },
   festivals:{ icon: PartyPopper, accent: '#F97316',  accentLight: '#FFF7ED', accentBorder: '#FED7AA',  label: 'Festival',     hero: 'linear-gradient(135deg,#431407,#C2410C,#F97316)', pill: 'linear-gradient(135deg,#FB923C,#EA580C)' },
   other:    { icon: Sparkles,    accent: SKY,        accentLight: SKY_LIGHT, accentBorder: SKY_MID,    label: 'Event',        hero: 'linear-gradient(135deg,#0C4A6E,#0369A1,#0EA5E9)', pill: 'linear-gradient(135deg,#38BDF8,#0284C7)' },
 };
@@ -32,14 +35,22 @@ function fmtDate(d: string) {
   try { return new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); }
   catch { return d; }
 }
-function fmtShort(d: string) {
-  try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-  catch { return d; }
+
+// ── GT LOGO (inline — no external request needed) ─────────────────────────────
+function GTLogo({ size = 40 }: { size?: number }) {
+  return (
+    <img
+      src="/logo-gt.png"
+      alt="Gladys Travel"
+      width={size}
+      height={size}
+      style={{ borderRadius: Math.round(size * 0.22), display: 'block' }}
+    />
+  );
 }
 
 // ── COMPONENT ─────────────────────────────────────────────────────────────────
 export default function ItineraryPageClient() {
-  const router = useRouter();
   const [data, setData] = useState<ItineraryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copying, setCopying] = useState(false);
@@ -63,7 +74,9 @@ export default function ItineraryPageClient() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: data?.eventAnchor?.eventName ? `My trip to ${data.eventAnchor.eventName}` : 'My Gladys Travel Itinerary',
+          title: data?.eventAnchor?.eventName
+            ? `My trip to ${data.eventAnchor.eventName}`
+            : 'My Gladys Travel Itinerary',
           text: `Check out my travel itinerary${data?.eventAnchor?.eventName ? ` for ${data.eventAnchor.eventName}` : ''}, planned by Gladys AI!`,
           url,
         });
@@ -91,12 +104,14 @@ export default function ItineraryPageClient() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center max-w-sm mx-auto px-6">
-          <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6" style={{ background: SKY_LIGHT }}>
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6"
+            style={{ background: SKY_LIGHT }}>
             <MapPin size={36} style={{ color: SKY }} />
           </div>
           <h2 className="text-2xl font-black text-slate-900 mb-3">No Itinerary Found</h2>
           <p className="text-slate-400 mb-8">Go back and search for an event to generate your itinerary.</p>
-          <Link href="/" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold transition-opacity hover:opacity-90"
+          <Link href="/"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white font-bold transition-opacity hover:opacity-90"
             style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
             <ArrowLeft size={18} />Back to Gladys
           </Link>
@@ -105,7 +120,9 @@ export default function ItineraryPageClient() {
     );
   }
 
-  const cfg = data.eventAnchor ? EVENT_CFG[data.eventAnchor.eventType as keyof typeof EVENT_CFG] ?? EVENT_CFG.other : EVENT_CFG.other;
+  const cfg = data.eventAnchor
+    ? (EVENT_CFG as Record<string, typeof EVENT_CFG.other>)[data.eventAnchor.eventType] ?? EVENT_CFG.other
+    : EVENT_CFG.other;
   const EventIcon = cfg.icon;
 
   return (
@@ -124,29 +141,41 @@ export default function ItineraryPageClient() {
 
       <div className="min-h-screen bg-white">
 
-        {/* ── STICKY ACTION BAR (screen only) ───────────────────────────── */}
+        {/* ── STICKY ACTION BAR ────────────────────────────────────────────── */}
         <div className="no-print sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-100">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-semibold text-sm">
-              <ArrowLeft size={18} />
-              <span>Back to Gladys</span>
-            </Link>
 
-            <div className="flex items-center gap-2">
-              {/* Event pill */}
-              {data.eventAnchor && (
-                <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
-                  style={{ background: cfg.pill }}>
-                  <EventIcon size={12} />
-                  {data.eventAnchor.eventName}
-                </div>
-              )}
+            {/* Left — back + logo */}
+            <div className="flex items-center gap-3">
+              <Link href="/"
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-semibold text-sm">
+                <ArrowLeft size={18} />
+                <span className="hidden sm:inline">Back to Gladys</span>
+              </Link>
+              <div className="hidden sm:block w-px h-5 bg-slate-200" />
+              <div className="hidden sm:flex items-center gap-2">
+                <GTLogo size={28} />
+                <span className="font-black text-slate-900 text-sm">Gladys Travel</span>
+              </div>
             </div>
 
+            {/* Centre — event pill */}
+            {data.eventAnchor && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-white"
+                style={{ background: cfg.pill }}>
+                <EventIcon size={12} />
+                {data.eventAnchor.eventName}
+              </div>
+            )}
+
+            {/* Right — actions */}
             <div className="flex items-center gap-2">
               <button onClick={handleShare}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm hover:border-sky-300 hover:text-sky-600 transition-all">
-                {copying ? <><CheckCircle size={15} className="text-emerald-500" />Copied!</> : <><Share2 size={15} />Share</>}
+                {copying
+                  ? <><CheckCircle size={15} className="text-emerald-500" />Copied!</>
+                  : <><Share2 size={15} />Share</>
+                }
               </button>
               <button onClick={handlePrint}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
@@ -157,34 +186,30 @@ export default function ItineraryPageClient() {
           </div>
         </div>
 
-        {/* ── MAIN CONTENT ──────────────────────────────────────────────────── */}
+        {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
         <div ref={printRef} className="print-page max-w-4xl mx-auto px-4 py-10">
 
-          {/* ── PRINT HEADER (only shows in print) ───────────────────────── */}
+          {/* ── PRINT HEADER (shows only when printing) ──────────────────── */}
           <div className="hidden print:flex items-center justify-between mb-8 pb-6 border-b-2 border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
-                <Globe size={20} className="text-white" />
-              </div>
+              <GTLogo size={40} />
               <div>
-                <p className="font-black text-slate-900">Gladys Travel AI</p>
+                <p className="font-black text-slate-900">Gladys Travel</p>
                 <p className="text-xs text-slate-400">gladystravel.com</p>
               </div>
             </div>
-            <p className="text-xs text-slate-400">Generated {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+            <p className="text-xs text-slate-400">
+              Generated {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
           </div>
 
           {/* ── HERO ─────────────────────────────────────────────────────── */}
           {data.eventAnchor && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
-              {/* Event type pill */}
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-white mb-5"
                 style={{ background: cfg.pill }}>
                 <EventIcon size={14} />{cfg.label}
               </div>
-
-              {/* Title */}
               <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight leading-none mb-4">
                 {data.eventAnchor.eventName}
               </h1>
@@ -207,7 +232,8 @@ export default function ItineraryPageClient() {
                 { v: data.budget.totalBudget.replace('USD ','').replace('$',''), l: 'est. total', hi: false },
                 { v: data.tripSummary.totalDays,             l: 'total days',   hi: false },
               ].map((s, i) => (
-                <div key={i} className="flex-1 px-4 py-4 border-r border-slate-100 last:border-r-0 text-center"
+                <div key={i}
+                  className="flex-1 px-4 py-4 border-r border-slate-100 last:border-r-0 text-center"
                   style={{ background: s.hi ? SKY_LIGHT : 'white' }}>
                   <div className="text-2xl font-black" style={{ color: s.hi ? cfg.accent : '#0F172A' }}>{s.v}</div>
                   <div className="text-xs font-semibold mt-0.5" style={{ color: s.hi ? cfg.accent : '#94A3B8' }}>{s.l}</div>
@@ -246,7 +272,12 @@ export default function ItineraryPageClient() {
           {/* ── DAYS ──────────────────────────────────────────────────────── */}
           <div className="space-y-10">
             {data.days.map((day: DayPlan, idx: number) => (
-              <DaySection key={day.day} day={day} cfg={cfg} isLast={idx === data.days.length - 1} />
+              <DaySection
+                key={day.day}
+                day={day}
+                cfg={cfg}
+                isLast={idx === data.days.length - 1}
+              />
             ))}
           </div>
 
@@ -254,30 +285,27 @@ export default function ItineraryPageClient() {
           <div className="mt-16 pt-8 border-t-2 border-slate-100">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
-                  <Globe size={16} className="text-white" />
-                </div>
+                <GTLogo size={36} />
                 <div>
-                  <p className="font-black text-slate-900 text-sm">Gladys Travel AI</p>
-                  <p className="text-xs text-slate-400">Intelligent AI travel planning · gladystravel.com</p>
+                  <p className="font-black text-slate-900 text-sm">Gladys Travel</p>
+                  <p className="text-xs text-slate-400">AI-powered event travel planning · gladystravel.com</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-300">
-                <span>hello@gladystravel.com</span>
+                <span>contact@gladystravel.com</span>
                 <span>·</span>
                 <span>Generated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               </div>
             </div>
             {data.eventAnchor && (
               <p className="text-xs text-slate-300 mt-4 leading-relaxed max-w-2xl">
-                GladysTravelAI is an independent travel planning service and is not affiliated with, endorsed by, or sponsored by the event organizers. All event names and trademarks are the property of their respective owners. Prices are estimates only.
+                GladysTravel.com is an independent travel planning service and is not affiliated with, endorsed by, or sponsored by the event organizers. All event names and trademarks are the property of their respective owners. Prices are estimates only.
               </p>
             )}
           </div>
         </div>
 
-        {/* ── BOTTOM DOWNLOAD BAR (screen only) ───────────────────────────── */}
+        {/* ── BOTTOM BAR (mobile only) ─────────────────────────────────────── */}
         <div className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-4 py-4 flex items-center justify-center gap-3 sm:hidden">
           <button onClick={handleShare}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm">
@@ -295,15 +323,24 @@ export default function ItineraryPageClient() {
 }
 
 // ── DAY SECTION ───────────────────────────────────────────────────────────────
-function DaySection({ day, cfg, isLast }: { day: DayPlan; cfg: typeof EVENT_CFG[keyof typeof EVENT_CFG]; isLast: boolean }) {
+function DaySection({
+  day, cfg, isLast,
+}: {
+  day: DayPlan;
+  cfg: typeof EVENT_CFG[keyof typeof EVENT_CFG];
+  isLast: boolean;
+}) {
   const EventIcon = cfg.icon;
-  const accentColor = cfg.accent;
 
   return (
     <div className={`${!isLast ? 'pb-10 border-b-2 border-slate-50' : ''} print-break-avoid`}>
+
       {/* Day header */}
       <div className="rounded-3xl p-6 mb-6"
-        style={{ background: day.isEventDay ? cfg.hero : '#F8FAFC', border: day.isEventDay ? 'none' : '2px solid #F1F5F9' }}>
+        style={{
+          background: day.isEventDay ? cfg.hero : '#F8FAFC',
+          border: day.isEventDay ? 'none' : '2px solid #F1F5F9',
+        }}>
         <div className="flex items-start justify-between gap-4">
           <div>
             {day.isEventDay && (
@@ -355,11 +392,14 @@ function DaySection({ day, cfg, isLast }: { day: DayPlan; cfg: typeof EVENT_CFG[
                 <div>
                   <span className="text-xs font-black uppercase tracking-wider text-slate-400">{meal.meal}</span>
                   <p className="font-bold text-slate-900 text-sm mt-0.5">{meal.recommendation}</p>
-                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5"><MapPin size={10} />{meal.location}</p>
+                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                    <MapPin size={10} />{meal.location}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="font-black text-slate-900 text-sm">{meal.priceRange}</p>
-                  <button className="text-xs font-bold flex items-center gap-1 mt-1" style={{ color: accentColor }}>
+                  <button className="text-xs font-bold flex items-center gap-1 mt-1 ml-auto"
+                    style={{ color: cfg.accent }}>
                     Reserve <ExternalLink size={10} />
                   </button>
                 </div>
@@ -373,13 +413,13 @@ function DaySection({ day, cfg, isLast }: { day: DayPlan; cfg: typeof EVENT_CFG[
       {day.tips && day.tips.length > 0 && (
         <div className="rounded-2xl p-5"
           style={{ background: cfg.accentLight, border: `2px solid ${cfg.accentBorder}` }}>
-          <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: accentColor }}>
+          <p className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: cfg.accent }}>
             {day.isEventDay ? '★ Event Day Tips' : 'Tips for today'}
           </p>
           <ul className="space-y-2">
             {day.tips.map((tip: string, i: number) => (
               <li key={i} className="flex gap-3 text-sm text-slate-700">
-                <span className="font-black flex-shrink-0" style={{ color: accentColor }}>—</span>{tip}
+                <span className="font-black flex-shrink-0" style={{ color: cfg.accent }}>—</span>{tip}
               </li>
             ))}
           </ul>
@@ -467,7 +507,10 @@ function TimeBlockRow({ period, block, isEventDay, cfg }: {
     <div className="flex gap-4">
       <div className="flex-shrink-0">
         <div className="w-[52px] h-[52px] rounded-2xl flex items-center justify-center"
-          style={{ background: isEventDay ? cfg.pill : '#F1F5F9', color: isEventDay ? 'white' : '#94A3B8' }}>
+          style={{
+            background: isEventDay ? cfg.pill : '#F1F5F9',
+            color: isEventDay ? 'white' : '#94A3B8',
+          }}>
           <PeriodIcon size={20} />
         </div>
       </div>
@@ -487,7 +530,8 @@ function TimeBlockRow({ period, block, isEventDay, cfg }: {
             <MapPin size={10} />{block.location}
           </div>
           <div className="flex gap-2 no-print">
-            <button className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl transition-all"
+            <button
+              className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl transition-all"
               style={{ background: cfg.accentLight, color: cfg.accent }}>
               <ShoppingBag size={11} />Book
             </button>

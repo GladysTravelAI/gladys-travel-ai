@@ -204,6 +204,25 @@
 }
 
 /* ============================================
+   INPUT COMPONENT — Used across SettingsClient
+   ============================================ */
+
+@layer components {
+  .input {
+    @apply w-full h-11 px-4 border-2 border-slate-200 rounded-xl text-sm text-slate-900
+           outline-none focus:border-sky-400 transition-all bg-white;
+  }
+
+  .input:disabled {
+    @apply opacity-60 cursor-not-allowed bg-slate-50;
+  }
+
+  select.input {
+    @apply cursor-pointer;
+  }
+}
+
+/* ============================================
    SCROLLBAR STYLING - Enhanced & Clean
    ============================================ */
 

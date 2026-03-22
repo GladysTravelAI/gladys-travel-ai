@@ -6,11 +6,17 @@ import {
   Hotel, Plane, Activity, Sun, Sunset, Moon, Utensils,
   CloudRain, Cloud, Wind, Thermometer, Coffee, Landmark,
   ShoppingBag, Car, ArrowRight, Users, Zap, CheckCircle,
-  AlertCircle, Globe, DollarSign,
+  AlertCircle, Globe, DollarSign, ChevronDown,
 } from "lucide-react";
 
 import type { ItineraryData, TimeBlock, EventBlock, DayPlan } from "@/lib/mock-itinerary";
-import TripUpsells from "@/components/TripUpsells";
+import TripUpsells       from "@/components/TripUpsells";
+import VenueDirections   from "@/components/VenueDirections";
+import SeatMapViewer     from "@/components/SeatMapViewer";
+import LiveMatchTracker  from "@/components/LiveMatchTracker";
+import ImHereMode        from "@/components/ImHereMode";
+import ParkingHub        from "@/components/ParkingHub";
+import PreEventChecklist from "@/components/PreEventChecklist";
 
 // ── DESIGN TOKENS ─────────────────────────────────────────────────────────────
 const SKY        = '#0EA5E9';
@@ -33,6 +39,12 @@ const EVENT_CONFIG = {
     pillGradient: 'linear-gradient(135deg, #A78BFA, #7C3AED)',
   },
   festivals: {
+    icon: PartyPopper, accent: '#F97316', accentLight: '#FFF7ED', accentBorder: '#FED7AA',
+    label: 'Festival',
+    heroGradient: 'linear-gradient(135deg, #431407, #C2410C, #F97316)',
+    pillGradient: 'linear-gradient(135deg, #FB923C, #EA580C)',
+  },
+  festival: {
     icon: PartyPopper, accent: '#F97316', accentLight: '#FFF7ED', accentBorder: '#FED7AA',
     label: 'Festival',
     heroGradient: 'linear-gradient(135deg, #431407, #C2410C, #F97316)',
@@ -67,7 +79,20 @@ interface WeatherDay {
 }
 
 interface NearbyPlace {
-  name: string; category: string; address: string; distance: string; rating?: string; link: string;
+  id:       string;
+  name:     string;
+  category: string;
+  address:  string;
+  distance: string;
+  rating?:  string;
+  link:     string;
+  icon?:    string;
+}
+
+interface ExploreCityCategory {
+  label:  string;
+  emoji:  string;
+  places: NearbyPlace[];
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
@@ -114,32 +139,35 @@ function useWeather(city: string): WeatherDay[] {
   return weather;
 }
 
-// ── NEARBY PLACES HOOK ────────────────────────────────────────────────────────
-function useNearbyPlaces(city: string, enabled: boolean): { places: NearbyPlace[]; loading: boolean } {
-  const [places,  setPlaces]  = useState<NearbyPlace[]>([]);
-  const [loading, setLoading] = useState(false);
+// ── EXPLORE CITY HOOK ─────────────────────────────────────────────────────────
+function useExploreCity(city: string, enabled: boolean): {
+  categories: ExploreCityCategory[]; loading: boolean; error: string;
+} {
+  const [categories, setCategories] = useState<ExploreCityCategory[]>([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+
   useEffect(() => {
     if (!city || !enabled) return;
     let dead = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const res  = await fetch('/api/gladys-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: `What are the best things to do and restaurants in ${city}?` }),
-        });
-        const data = await res.json();
+    setLoading(true);
+    setError('');
+    fetch(`/api/explore-city?city=${encodeURIComponent(city)}`)
+      .then(r => r.json())
+      .then(data => {
         if (dead) return;
-        if (data.toolName === 'find_nearby_attractions' && data.toolResult?.places) {
-          setPlaces(data.toolResult.places.slice(0, 4));
+        if (data.success && data.categories?.length) {
+          setCategories(data.categories);
+        } else {
+          setError('No places found for this city.');
         }
-      } catch {} finally { if (!dead) setLoading(false); }
-    }
-    load();
+      })
+      .catch(() => { if (!dead) setError('Could not load places — check connection.'); })
+      .finally(() => { if (!dead) setLoading(false); });
     return () => { dead = true; };
   }, [city, enabled]);
-  return { places, loading };
+
+  return { categories, loading, error };
 }
 
 // ── WEATHER BADGE ──────────────────────────────────────────────────────────────
@@ -156,41 +184,48 @@ function WeatherBadge({ weather, date }: { weather: WeatherDay[]; date: string }
   );
 }
 
-// ── NEARBY PLACES STRIP ────────────────────────────────────────────────────────
+// ── EXPLORE CITY STRIP ────────────────────────────────────────────────────────
 function NearbyStrip({ city }: { city: string }) {
-  const [show, setShow] = useState(false);
-  const { places, loading } = useNearbyPlaces(city, show);
-
-  const catIcon = (cat: string) => {
-    const c = cat.toLowerCase();
-    if (c.includes('food') || c.includes('restaurant') || c.includes('dining')) return '🍽';
-    if (c.includes('bar') || c.includes('night')) return '🍸';
-    if (c.includes('park') || c.includes('outdoor')) return '🌿';
-    if (c.includes('museum') || c.includes('art')) return '🏛';
-    if (c.includes('shop')) return '🛍';
-    return '📍';
-  };
+  const [show,      setShow]      = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+  const { categories, loading, error } = useExploreCity(city, show);
 
   return (
-    <div className="rounded-2xl border-2 border-dashed border-slate-200 overflow-hidden">
+    <div className="rounded-3xl border-2 border-slate-100 overflow-hidden bg-white shadow-sm">
+
+      {/* Header — always visible */}
       <button
-        onClick={() => setShow(true)}
+        onClick={() => setShow(s => !s)}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
       >
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: SKY_LIGHT }}>
-            <Globe size={15} style={{ color: SKY }} />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: SKY_LIGHT }}>
+            <Globe size={18} style={{ color: SKY }} />
           </div>
           <div className="text-left">
             <p className="text-sm font-black text-slate-900">Explore {city}</p>
-            <p className="text-xs text-slate-400">Restaurants, bars, landmarks nearby</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {show && categories.length > 0
+                ? `${categories.reduce((s, c) => s + c.places.length, 0)} places across ${categories.length} categories`
+                : 'Restaurants · Attractions · Nightlife · Shopping'
+              }
+            </p>
           </div>
         </div>
-        {!show && (
-          <span className="text-xs font-bold px-3 py-1 rounded-full text-white" style={{ background: SKY }}>
-            Show
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {!show && (
+            <span className="text-xs font-black px-3 py-1.5 rounded-xl text-white"
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)' }}>
+              Explore
+            </span>
+          )}
+          <ChevronDown
+            size={16}
+            className="text-slate-400 transition-transform duration-200"
+            style={{ transform: show ? 'rotate(180deg)' : 'rotate(0deg)' }}
+          />
+        </div>
       </button>
 
       <AnimatePresence>
@@ -199,41 +234,111 @@ function NearbyStrip({ city }: { city: string }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4">
-              {loading ? (
-                <div className="flex items-center gap-2 py-3 text-slate-400 text-sm">
-                  <div className="w-4 h-4 border-2 border-slate-200 border-t-sky-400 rounded-full animate-spin" />
-                  Finding places near {city}...
-                </div>
-              ) : places.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {places.map((p, i) => (
-                    <a
-                      key={i}
-                      href={p.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-slate-100 group"
+            {/* Loading */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <div className="w-8 h-8 border-2 border-slate-200 border-t-sky-400 rounded-full animate-spin" />
+                <p className="text-sm text-slate-400 font-semibold">Finding the best spots in {city}...</p>
+              </div>
+            )}
+
+            {/* Error */}
+            {!loading && error && (
+              <div className="px-5 pb-5 text-center">
+                <p className="text-sm text-slate-400 py-4">{error}</p>
+              </div>
+            )}
+
+            {/* Content */}
+            {!loading && categories.length > 0 && (
+              <div>
+                {/* Category tabs */}
+                <div className="flex gap-1.5 px-4 py-3 overflow-x-auto border-b border-slate-100">
+                  {categories.map((cat, i) => (
+                    <button
+                      key={cat.label}
+                      onClick={() => setActiveTab(i)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0"
+                      style={{
+                        background: activeTab === i ? SKY : '#F1F5F9',
+                        color:      activeTab === i ? 'white' : '#64748B',
+                      }}
                     >
-                      <span className="text-xl leading-none mt-0.5">{catIcon(p.category)}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-900 text-sm truncate group-hover:underline">{p.name}</p>
-                        <p className="text-xs text-slate-400 truncate">{p.category}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-slate-400">{p.distance}</span>
-                          {p.rating && <span className="text-xs font-bold text-amber-500">★ {p.rating}</span>}
-                        </div>
-                      </div>
-                      <ExternalLink size={12} className="text-slate-300 group-hover:text-slate-500 flex-shrink-0 mt-1" />
-                    </a>
+                      <span>{cat.emoji}</span>
+                      {cat.label}
+                      <span className="text-[10px] opacity-70">({cat.places.length})</span>
+                    </button>
                   ))}
                 </div>
-              ) : (
-                <p className="text-sm text-slate-400 py-2">Search for an event first to load nearby places.</p>
-              )}
-            </div>
+
+                {/* Places grid */}
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+                  >
+                    {(categories[activeTab]?.places ?? []).map((p, i) => (
+                      <a
+                        key={p.id || i}
+                        href={p.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group flex items-start gap-3 p-3.5 rounded-2xl border-2 border-slate-100 hover:border-sky-200 hover:bg-sky-50/30 transition-all"
+                      >
+                        {/* Icon */}
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 bg-slate-100 overflow-hidden">
+                          {p.icon
+                            ? <img src={p.icon} alt={p.category} className="w-6 h-6 opacity-80" />
+                            : <span className="text-lg">{categories[activeTab].emoji}</span>
+                          }
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-slate-900 text-sm truncate group-hover:text-sky-600 transition-colors">
+                            {p.name}
+                          </p>
+                          <p className="text-xs text-slate-400 truncate mt-0.5">{p.category}</p>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            {p.distance && (
+                              <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                                <MapPin size={9} />{p.distance}
+                              </span>
+                            )}
+                            {p.rating && (
+                              <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-500">
+                                ★ {p.rating}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <ExternalLink size={12} className="text-slate-300 group-hover:text-sky-400 flex-shrink-0 mt-1 transition-colors" />
+                      </a>
+                    ))}
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Footer */}
+                <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs text-slate-300">Powered by Foursquare</span>
+                  <a
+                    href={`https://www.google.com/maps/search/${encodeURIComponent(city + ' ' + (categories[activeTab]?.label ?? ''))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-bold flex items-center gap-1 transition-colors"
+                    style={{ color: SKY }}
+                  >
+                    View on Maps <ExternalLink size={10} />
+                  </a>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -318,7 +423,9 @@ export default function ItineraryView({
     );
   }
 
-  const cfg        = data.eventAnchor ? EVENT_CONFIG[data.eventAnchor.eventType] ?? EVENT_CONFIG.other : EVENT_CONFIG.other;
+  const cfg        = data.eventAnchor
+    ? (EVENT_CONFIG as Record<string, typeof EVENT_CONFIG.other>)[data.eventAnchor.eventType] ?? EVENT_CONFIG.other
+    : EVENT_CONFIG.other;
   const EventIcon  = cfg.icon;
   const currentDay = data.days[selectedDay - 1];
 
@@ -474,7 +581,6 @@ export default function ItineraryView({
               </div>
 
               <div className="flex flex-col items-end gap-2">
-                {/* Weather for this day */}
                 <WeatherBadge weather={weather} date={currentDay.date} />
                 {currentDay.isEventDay && (
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white/20">
@@ -489,6 +595,76 @@ export default function ItineraryView({
           {currentDay.isEventDay && data.eventAnchor && (
             <PackingReminder eventType={data.eventAnchor.eventType} isEventDay={true} />
           )}
+
+          {/* Event-day tools */}
+          {currentDay.isEventDay && data.eventAnchor && (() => {
+            const eventBlock = data.days
+              .flatMap((d: any) => [d.morning, d.afternoon, d.evening])
+              .find((b: any) => b?.isEventBlock)
+            const ticketUrl = eventBlock?.eventDetails?.ticketUrl
+            const eventTime = eventBlock?.time
+
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <SeatMapViewer
+                    eventName={data.eventAnchor.eventName}
+                    venue={data.eventAnchor.venue}
+                    ticketUrl={ticketUrl}
+                    accentColor={cfg.accent}
+                  />
+                  <VenueDirections
+                    venue={data.eventAnchor.venue}
+                    city={data.eventAnchor.city}
+                    eventName={data.eventAnchor.eventName}
+                    eventDate={data.eventAnchor.eventDate}
+                    eventTime={eventTime}
+                    accentColor={cfg.accent}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <LiveMatchTracker
+                    eventType={(() => {
+                      const raw = (data.eventAnchor.eventType ?? 'sports') as string;
+                      if (raw === 'festivals') return 'festival';
+                      if (['sports', 'music', 'festival', 'other'].includes(raw)) return raw as 'sports' | 'music' | 'festival' | 'other';
+                      return 'other';
+                    })()}
+                    eventName={data.eventAnchor.eventName}
+                    eventDate={data.eventAnchor.eventDate}
+                    fixtureId={data.eventAnchor.fixtureId}
+                    attraction={data.eventAnchor.attraction}
+                    accentColor={cfg.accent}
+                  />
+                  <ImHereMode
+                    venue={data.eventAnchor.venue}
+                    city={data.eventAnchor.city}
+                    eventName={data.eventAnchor.eventName}
+                    eventDate={data.eventAnchor.eventDate}
+                    eventTime={eventTime}
+                    accentColor={cfg.accent}
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ParkingHub
+                    venue={data.eventAnchor.venue}
+                    city={data.eventAnchor.city}
+                    eventDate={data.eventAnchor.eventDate}
+                    accentColor={cfg.accent}
+                  />
+                  <PreEventChecklist
+                    eventName={data.eventAnchor.eventName}
+                    eventDate={data.eventAnchor.eventDate}
+                    eventTime={eventTime}
+                    venue={data.eventAnchor.venue}
+                    city={data.eventAnchor.city}
+                    ticketUrl={ticketUrl}
+                    accentColor={cfg.accent}
+                  />
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Timeline */}
           <div className="space-y-1">
@@ -549,7 +725,7 @@ export default function ItineraryView({
             </div>
           )}
 
-          {/* Nearby places — show on non-event days */}
+          {/* Explore City — non-event days */}
           {!currentDay.isEventDay && currentDay.city && (
             <NearbyStrip city={currentDay.city} />
           )}
@@ -614,7 +790,6 @@ function TimeBlockCard({ period, data, isEventDay, cfg }: {
   const eventDetails = 'eventDetails' in data ? data.eventDetails : null;
   const PeriodIcon   = TIME_ICONS[period];
 
-  // ── EVENT BLOCK ─────────────────────────────────────────────────────────
   if (isEventBlock) {
     return (
       <div className="rounded-3xl p-5 sm:p-6 text-white shadow-2xl relative overflow-hidden"
@@ -682,10 +857,8 @@ function TimeBlockCard({ period, data, isEventDay, cfg }: {
     );
   }
 
-  // ── REGULAR TIME BLOCK ───────────────────────────────────────────────────
   return (
     <div className="group flex gap-3 sm:gap-4">
-      {/* Period icon */}
       <div className="flex flex-col items-center flex-shrink-0">
         <div className="w-12 h-12 sm:w-[54px] sm:h-[54px] rounded-2xl flex items-center justify-center transition-all"
           style={{
@@ -696,7 +869,6 @@ function TimeBlockCard({ period, data, isEventDay, cfg }: {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 bg-white border-2 border-slate-100 rounded-3xl p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200">
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
@@ -708,13 +880,11 @@ function TimeBlockCard({ period, data, isEventDay, cfg }: {
           <span className="text-lg font-black text-slate-900 flex-shrink-0">{data.cost}</span>
         </div>
 
-        {/* Activity description */}
         <p className="text-sm text-slate-600 leading-relaxed mb-4">{data.activities}</p>
 
-        {/* Affiliate links if present */}
         {data.affiliateLinks && data.affiliateLinks.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
-            {data.affiliateLinks.filter(l => l.url).map((link, i) => (
+            {data.affiliateLinks.filter((l: any) => l.url).map((link: any, i: number) => (
               <a
                 key={i}
                 href={link.url}
@@ -730,7 +900,6 @@ function TimeBlockCard({ period, data, isEventDay, cfg }: {
           </div>
         )}
 
-        {/* Footer: location + actions */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-full min-w-0">
             <MapPin size={10} className="flex-shrink-0" />
