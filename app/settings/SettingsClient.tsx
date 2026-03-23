@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/AuthContext";
+import { useTheme, type Theme } from "@/lib/ThemeProvider";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, Bell, Lock, Globe, Mail, ChevronRight, LogOut, Trash2, Shield,
   MapPin, Plane, Camera, CheckCircle, AlertCircle, Loader2, X, Check,
   Sparkles, Star, Heart, Eye, EyeOff, Users, Save, BookOpen, Ticket,
+  Sun, Moon, Monitor,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -102,12 +104,13 @@ const DEFAULTS: UserSettings = {
 
 export default function SettingsClient() {
   const { user, userProfile, logout, loading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
 
   const [settings,  setSettings]  = useState<UserSettings>(DEFAULTS);
   const [saving,    setSaving]    = useState(false);
   const [loading,   setLoading]   = useState(true);
-  const [activeTab, setActiveTab] = useState<'profile' | 'travel' | 'identity' | 'notifications' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'travel' | 'identity' | 'notifications' | 'appearance' | 'security'>('profile');
   const [modal,     setModal]     = useState<string | null>(null);
 
   // Redirect if not logged in
@@ -115,7 +118,7 @@ export default function SettingsClient() {
     if (!authLoading && !user) router.push('/signin?redirect=/settings');
   }, [user, authLoading, router]);
 
-  // Load settings from Firestore
+  // Load settings: try Firestore first, fall back to localStorage
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -125,15 +128,22 @@ export default function SettingsClient() {
         setSettings(prev => ({
           ...prev,
           ...data,
-          displayName: data.displayName || userProfile?.name || user.displayName || '',
-          photoUrl:    data.photoUrl    || userProfile?.profileImage || user.photoURL || '',
+          displayName:     data.displayName     || userProfile?.name          || user.displayName || '',
+          photoUrl:        data.photoUrl        || userProfile?.profileImage  || user.photoURL    || '',
           travelPrefs:     { ...prev.travelPrefs,     ...(data.travelPrefs     ?? {}) },
           travelIdentity:  { ...prev.travelIdentity,  ...(data.travelIdentity  ?? {}) },
           emergencyContact:{ ...prev.emergencyContact, ...(data.emergencyContact?? {}) },
           notifications:   { ...prev.notifications,   ...(data.notifications   ?? {}) },
         }));
-      } catch (e) {
-        console.error('Settings load error:', e);
+      } catch {
+        // Firestore unavailable — load from localStorage instead
+        try {
+          const local = localStorage.getItem(`gladys-settings-${user.uid}`);
+          if (local) {
+            const data = JSON.parse(local) as Partial<UserSettings>;
+            setSettings(prev => ({ ...prev, ...data }));
+          }
+        } catch { /* localStorage also failed — use defaults */ }
       } finally {
         setLoading(false);
       }
@@ -143,29 +153,42 @@ export default function SettingsClient() {
   const save = async (updates: Partial<UserSettings>) => {
     if (!user) return;
     setSaving(true);
+
+    const next = { ...settings, ...updates };
+    setSettings(next);
+
+    // ── Step 1: Save to localStorage immediately — always works, no network needed
     try {
-      const next = { ...settings, ...updates };
-      setSettings(next);
-      await setDoc(doc(db, 'userSettings', user.uid), {
-        ...next,
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
+      localStorage.setItem(`gladys-settings-${user.uid}`, JSON.stringify(next));
       // Sync context for Gladys AI
       localStorage.setItem('gladys-context', JSON.stringify({
-        name:            next.displayName,
-        budget:          next.travelPrefs.budget,
-        homeCity:        next.travelPrefs.homeCity,
-        homeAirport:     next.travelPrefs.homeAirport,
-        travelStyle:     next.travelPrefs.tripStyle,
-        currency:        next.currency,
+        name:        next.displayName,
+        budget:      next.travelPrefs.budget,
+        homeCity:    next.travelPrefs.homeCity,
+        homeAirport: next.travelPrefs.homeAirport,
+        travelStyle: next.travelPrefs.tripStyle,
+        currency:    next.currency,
       }));
-      toast.success('Saved');
     } catch {
-      toast.error('Failed to save — check connection');
-    } finally {
-      setSaving(false);
+      // localStorage full — rare, non-fatal
     }
+
+    // Show success immediately — don't make user wait for Firestore
+    toast.success('Settings saved ✓');
+    setSaving(false);
+
+    // ── Step 2: Sync to Firestore in the background — silently
+    setDoc(doc(db, 'userSettings', user.uid), {
+      ...next,
+      updatedAt: serverTimestamp(),
+    }, { merge: true }).catch((err) => {
+      // Firestore failed but localStorage succeeded — data is safe locally
+      console.warn('Firestore sync failed (will retry on next save):', err?.code ?? err);
+    });
   };
+
+  // Load settings: try Firestore first, fall back to localStorage
+
 
   const stats = {
     tripsPlanned: userProfile?.totalTripsPlanned ?? 0,
@@ -180,6 +203,7 @@ export default function SettingsClient() {
     { id: 'travel',        label: 'Travel',        icon: Plane    },
     { id: 'identity',      label: 'Passport',      icon: BookOpen },
     { id: 'notifications', label: 'Alerts',        icon: Bell     },
+    { id: 'appearance',    label: 'Appearance',    icon: Sun      },
     { id: 'security',      label: 'Security',      icon: Shield   },
   ] as const;
 
@@ -323,6 +347,9 @@ export default function SettingsClient() {
             )}
             {activeTab === 'notifications' && (
               <NotificationsTab settings={settings} onSave={save} />
+            )}
+            {activeTab === 'appearance' && (
+              <AppearanceTab theme={theme} setTheme={setTheme} />
             )}
             {activeTab === 'security' && (
               <SecurityTab user={user} onSignOut={async () => { await logout(); router.push('/'); }} />
@@ -992,6 +1019,119 @@ function PwdField({ label, value, onChange, show, onToggle }: any) {
         className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
         {show ? <EyeOff size={15} /> : <Eye size={15} />}
       </button>
+    </div>
+  );
+}
+
+// ── APPEARANCE TAB ─────────────────────────────────────────────────────────────
+
+function AppearanceTab({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void }) {
+  const options: { value: Theme; label: string; description: string; icon: React.ReactNode }[] = [
+    {
+      value:       'light',
+      label:       'Light',
+      description: 'Clean white interface — great for daytime use',
+      icon:        <Sun size={22} />,
+    },
+    {
+      value:       'dark',
+      label:       'Dark',
+      description: 'Easy on the eyes at night',
+      icon:        <Moon size={22} />,
+    },
+    {
+      value:       'system',
+      label:       'Use System',
+      description: 'Automatically matches your device setting',
+      icon:        <Monitor size={22} />,
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <Card title="Theme" icon={Sun}>
+        <div className="p-5 sm:p-6 space-y-3">
+          <p className="text-sm text-slate-500 mb-4">
+            Choose how GladysTravel.com looks for you. Applies instantly and remembered across sessions.
+          </p>
+
+          {options.map(opt => {
+            const active = theme === opt.value;
+            return (
+              <motion.button
+                key={opt.value}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => setTheme(opt.value)}
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left ${
+                  active
+                    ? 'border-sky-400 bg-sky-50'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {/* Icon circle */}
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
+                    active ? 'text-white' : 'text-slate-500 bg-slate-100'
+                  }`}
+                  style={active ? { background: 'linear-gradient(135deg, #38BDF8, #0284C7)' } : {}}
+                >
+                  {opt.icon}
+                </div>
+
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  <p className={`font-bold text-sm ${active ? 'text-sky-700' : 'text-slate-900'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">{opt.description}</p>
+                </div>
+
+                {/* Check */}
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                  active ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
+                }`}>
+                  {active && <Check size={11} color="white" strokeWidth={3} />}
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Preview strip */}
+      <Card title="Preview" icon={Monitor}>
+        <div className="p-5 sm:p-6">
+          <div className="rounded-2xl overflow-hidden border border-slate-200">
+            {/* Light preview */}
+            <div className="bg-white p-4 border-b border-slate-100">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 rounded-full bg-sky-500" />
+                <div className="h-3 w-24 bg-slate-200 rounded-full" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-2.5 w-full bg-slate-100 rounded-full" />
+                <div className="h-2.5 w-3/4 bg-slate-100 rounded-full" />
+              </div>
+              <div className="mt-3 h-8 w-28 rounded-xl bg-gradient-to-r from-sky-400 to-sky-600" />
+              <p className="text-[10px] text-slate-400 mt-2 font-semibold">Light mode</p>
+            </div>
+            {/* Dark preview */}
+            <div className="bg-slate-900 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-6 h-6 rounded-full bg-sky-400" />
+                <div className="h-3 w-24 bg-slate-700 rounded-full" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-2.5 w-full bg-slate-800 rounded-full" />
+                <div className="h-2.5 w-3/4 bg-slate-800 rounded-full" />
+              </div>
+              <div className="mt-3 h-8 w-28 rounded-xl bg-gradient-to-r from-sky-500 to-sky-700" />
+              <p className="text-[10px] text-slate-500 mt-2 font-semibold">Dark mode</p>
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }

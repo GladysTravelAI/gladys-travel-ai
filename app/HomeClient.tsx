@@ -400,55 +400,62 @@ export default function HomeClient() {
       <Navbar />
 
       {/* ════════════ HERO ═══════════════════════════════════════════════════ */}
+      {/*
+        MOBILE-FIRST: removed min-h-[100svh], tighter spacing/fonts on mobile,
+        smaller orbs, h-12 CTA, hidden scroll indicator, hidden badge on tiny screens
+      */}
       <section
-        className="min-h-[100svh] flex flex-col justify-center px-4 sm:px-5 pt-20 md:pt-24 pb-10 relative overflow-hidden"
+        className="flex flex-col justify-center px-4 sm:px-5 pt-16 sm:pt-20 md:pt-24 pb-5 sm:pb-8 md:pb-12 relative overflow-hidden"
         style={{ background: 'white' }}
       >
+        {/* Orbs — smaller on mobile */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-          <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-[0.12]"
+          <div className="absolute -top-16 -left-16 w-[220px] h-[220px] sm:w-[400px] sm:h-[400px] rounded-full opacity-[0.10]"
             style={{ background: 'radial-gradient(circle, #38BDF8, #0284C7)' }} />
-          <div className="absolute -bottom-24 -right-24 w-[420px] h-[420px] rounded-full opacity-[0.09]"
+          <div className="absolute -bottom-12 -right-12 w-[180px] h-[180px] sm:w-[340px] sm:h-[340px] rounded-full opacity-[0.08]"
             style={{ background: 'radial-gradient(circle, #0EA5E9, #38BDF8)' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] rounded-full opacity-[0.06]"
-            style={{ background: 'radial-gradient(circle, #BAE6FD, #0EA5E9)' }} />
         </div>
-        <div className="relative z-10 max-w-2xl mx-auto w-full space-y-7 md:space-y-10">
 
+        <div className="relative z-10 max-w-2xl mx-auto w-full space-y-3 sm:space-y-5 md:space-y-8">
+
+          {/* Live badge — hidden on very small screens to save vertical space */}
           <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: SKY }} />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: SKY }} />
               Live Event Intelligence · 13 AI Tools Active
             </div>
           </div>
 
+          {/* Headline */}
           <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] text-slate-900 mb-4 md:mb-5">
+            <h1 className="text-[26px] leading-[1.1] xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 mb-1.5 sm:mb-3">
               You pick the event.<br />
               <span style={{ color: SKY }}>We build the trip.</span>
             </h1>
-            <p className="text-base sm:text-lg md:text-xl text-slate-500 max-w-lg mx-auto leading-relaxed">
+            <p className="text-xs sm:text-base md:text-lg text-slate-500 max-w-lg mx-auto leading-snug sm:leading-relaxed px-1">
               One search finds your tickets, flights, hotels, and complete itinerary. Or just ask Gladys.
             </p>
           </div>
 
+          {/* Event type pills */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 text-center mb-3 md:mb-4">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-slate-400 text-center mb-2 sm:mb-3">
               What are you going to?
             </p>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
               {(Object.entries(EVENT_CFG) as [EventType, typeof EVENT_CFG['sports']][]).map(([key, c]) => {
                 const Icon = c.Icon; const selected = eventType === key;
                 return (
                   <button key={key}
                     onClick={() => { setEventType(key); setQuery(''); setResponse(null); setItineraryData(null); }}
-                    className="flex flex-col items-center gap-2 sm:gap-2.5 p-3 sm:p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97]"
+                    className="flex flex-col items-center gap-1 sm:gap-2 p-2 sm:p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97]"
                     style={{ borderColor: selected ? c.accent : '#E2E8F0', background: selected ? c.bg : 'white' }}
                   >
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-all"
+                    <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all"
                       style={{ background: selected ? c.accent : '#F1F5F9' }}>
-                      <Icon size={20} style={{ color: selected ? 'white' : '#94A3B8' }} />
+                      <Icon size={15} style={{ color: selected ? 'white' : '#94A3B8' }} />
                     </div>
-                    <span className="font-bold text-xs sm:text-sm" style={{ color: selected ? c.accent : '#64748B' }}>
+                    <span className="font-bold text-[11px] sm:text-sm" style={{ color: selected ? c.accent : '#64748B' }}>
                       {c.label}
                     </span>
                   </button>
@@ -457,7 +464,8 @@ export default function HomeClient() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          {/* Search + CTA */}
+          <div className="space-y-2 sm:space-y-3">
             <SearchBar
               value={query}
               onChange={v => setQuery(v)}
@@ -483,38 +491,41 @@ export default function HomeClient() {
               />
             )}
 
+            {/* CTA button — h-12 on mobile, h-14 on sm+ */}
             <button
               onClick={() => handleSearch()}
               disabled={!query.trim() || !eventType || loading}
-              className="w-full h-14 sm:h-16 font-black rounded-2xl text-base sm:text-lg transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80"
+              className="w-full h-12 sm:h-14 font-black rounded-2xl text-sm sm:text-base transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80 shadow-md"
               style={{ background: cfg?.accent || SKY }}
             >
               {loading
-                ? <><Loader2 size={18} className="animate-spin" />Searching...</>
-                : <><Sparkles size={18} />Find {cfg?.label || 'Event'} Travel</>
+                ? <><Loader2 size={16} className="animate-spin" />Searching...</>
+                : <><Sparkles size={16} />Find {cfg?.label || 'Event'} Travel</>
               }
             </button>
 
-            <div className="grid grid-cols-3 gap-2">
+            {/* Secondary actions */}
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               <button onClick={() => openGladysVoice()}
-                className="h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all active:scale-[0.97]">
-                <Mic size={14} />Ask Gladys
+                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
+                <Mic size={13} />Ask Gladys
               </button>
               <button onClick={() => router.push('/trips')}
-                className="h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all active:scale-[0.97]">
-                <Users size={14} />Group Trip
+                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
+                <Users size={13} />Group Trip
               </button>
               <button onClick={() => setShowSaved(true)}
-                className="h-11 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 text-slate-500 border-2 border-slate-200 hover:border-slate-300 bg-white transition-all active:scale-[0.97]">
-                <Bookmark size={14} />{totalSaved > 0 ? `Saved (${totalSaved})` : 'Saved'}
+                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
+                <Bookmark size={13} />{totalSaved > 0 ? `Saved (${totalSaved})` : 'Saved'}
               </button>
             </div>
           </div>
 
-          <div className="flex justify-center">
+          {/* Scroll indicator — hidden on mobile to recover 36px */}
+          <div className="hidden sm:flex justify-center">
             <div className="flex flex-col items-center gap-1 text-slate-300">
               <p className="text-xs font-medium">Scroll to explore</p>
-              <ChevronDown size={20} className="animate-bounce" />
+              <ChevronDown size={18} className="animate-bounce" />
             </div>
           </div>
         </div>

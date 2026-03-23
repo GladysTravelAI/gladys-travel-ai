@@ -34,8 +34,8 @@ type Mode = 'voice' | 'chat';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-const IconMic = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconMic = ({ size = 20, className, color }: { size?: number; className?: string; color?: string }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
     <line x1="12" y1="19" x2="12" y2="22"/>
@@ -954,46 +954,126 @@ function ToolCardRenderer({ card, onTripPlan }: { card: ToolCard; onTripPlan?: (
 function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string }) {
   const isActive     = status === 'active';
   const isConnecting = status === 'connecting';
-  const scale        = isActive ? 1 + volumeLevel * 0.35 : 1;
+
+  // 7 bars for the waveform — heights driven by volume + sine offsets
+  const BAR_COUNT = 7;
+  const getBarHeight = (i: number) => {
+    if (!isActive) return 8;
+    const wave = Math.sin(Date.now() / 200 + i * 0.8) * 0.5 + 0.5;
+    const base = 8 + volumeLevel * 32;
+    return Math.max(6, Math.min(40, base * wave + 8));
+  };
 
   return (
-    <div className="flex flex-col items-center gap-6 py-8">
+    <div className="flex flex-col items-center gap-5 pt-8 pb-4">
+
+      {/* ── Orb ── */}
       <div className="relative flex items-center justify-center">
+
+        {/* Pulse rings when active */}
         {isActive && (
           <>
-            <div className="absolute rounded-full border border-black/5 transition-all duration-100"
-              style={{ width: `${120 + volumeLevel * 60}px`, height: `${120 + volumeLevel * 60}px` }} />
-            <div className="absolute rounded-full border border-black/5 transition-all duration-150"
-              style={{ width: `${100 + volumeLevel * 40}px`, height: `${100 + volumeLevel * 40}px` }} />
+            <motion.div
+              animate={{ scale: [1, 1.4, 1], opacity: [0.15, 0, 0.15] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute w-28 h-28 rounded-full"
+              style={{ background: 'radial-gradient(circle, #0EA5E9 0%, transparent 70%)' }}
+            />
+            <motion.div
+              animate={{ scale: [1, 1.25, 1], opacity: [0.2, 0, 0.2] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
+              className="absolute w-24 h-24 rounded-full"
+              style={{ background: 'radial-gradient(circle, #38BDF8 0%, transparent 70%)' }}
+            />
           </>
         )}
+
+        {/* Connecting ring */}
         {isConnecting && (
-          <div className="absolute w-24 h-24 rounded-full border-2 border-black/10 animate-ping" />
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
+            className="absolute w-24 h-24 rounded-full border-2 border-transparent"
+            style={{ borderTopColor: '#0EA5E9', borderRightColor: '#BAE6FD' }}
+          />
         )}
-        <div
-          className="w-20 h-20 rounded-full bg-black flex items-center justify-center shadow-xl transition-transform duration-100"
-          style={{ transform: `scale(${scale})` }}
+
+        {/* Main orb */}
+        <motion.div
+          animate={isActive
+            ? { scale: [1, 1 + volumeLevel * 0.12, 1] }
+            : { scale: 1 }
+          }
+          transition={{ duration: 0.15, repeat: isActive ? Infinity : 0 }}
+          className="w-20 h-20 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
+          style={{
+            background: isActive
+              ? 'linear-gradient(135deg, #38BDF8, #0284C7)'
+              : isConnecting
+              ? 'linear-gradient(135deg, #BAE6FD, #0EA5E9)'
+              : 'linear-gradient(135deg, #1E293B, #0F172A)',
+          }}
         >
-          {isActive ? (
-            <div className="flex gap-1 items-center">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="w-0.5 bg-white rounded-full animate-pulse"
-                  style={{ height: `${8 + (i % 3) * 6}px`, animationDelay: `${i * 0.1}s`, animationDuration: '0.6s' }} />
-              ))}
-            </div>
-          ) : isConnecting ? (
+          {/* Shine overlay */}
+          <div className="absolute inset-0 rounded-full"
+            style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 60%)' }} />
+
+          {isConnecting ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <IconMic size={24} />
+            <IconMic size={22} color="white" />
           )}
-        </div>
+        </motion.div>
       </div>
+
+      {/* ── Animated waveform bars (shown when active) ── */}
+      <div className="h-12 flex items-center justify-center gap-1">
+        {isActive ? (
+          Array.from({ length: BAR_COUNT }).map((_, i) => (
+            <motion.div
+              key={i}
+              animate={{
+                height: [
+                  `${8 + Math.sin(i * 1.1) * 6}px`,
+                  `${20 + volumeLevel * 28 + Math.sin(i * 0.9) * 12}px`,
+                  `${8 + Math.sin(i * 1.3) * 6}px`,
+                ],
+                opacity: [0.6, 1, 0.6],
+              }}
+              transition={{
+                duration: 0.5 + i * 0.07,
+                repeat: Infinity,
+                ease: 'easeInOut',
+                delay: i * 0.05,
+              }}
+              className="w-1 rounded-full"
+              style={{
+                background: `linear-gradient(to top, #0284C7, #7DD3FC)`,
+                minHeight: '6px',
+              }}
+            />
+          ))
+        ) : (
+          /* Static flat bars when idle */
+          Array.from({ length: BAR_COUNT }).map((_, i) => (
+            <div
+              key={i}
+              className="w-1 rounded-full bg-slate-200"
+              style={{ height: `${i === 3 ? 12 : i % 2 === 0 ? 8 : 6}px` }}
+            />
+          ))
+        )}
+      </div>
+
+      {/* ── Status text ── */}
       <div className="text-center">
-        <p className="text-sm font-medium text-gray-900">
-          {isActive ? 'Gladys is listening' : isConnecting ? 'Connecting...' : 'Tap to speak'}
+        <p className="text-sm font-bold text-slate-900 tracking-tight">
+          {isActive ? 'Gladys is listening…' : isConnecting ? 'Connecting…' : 'Tap to speak'}
         </p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          {isActive ? 'Ask anything — events, weather, packing, flights' : 'Your AI travel companion'}
+        <p className="text-xs text-slate-400 mt-0.5">
+          {isActive
+            ? 'Ask about events, flights, hotels or anything'
+            : 'Your AI travel companion'}
         </p>
       </div>
     </div>
@@ -1059,12 +1139,12 @@ function TypingIndicator() {
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
 const VOICE_PROMPTS = [
-  { text: 'Plan my World Cup 2026 trip',           emoji: '⚽' },
-  { text: "What's the weather in Madrid?",          emoji: '🌤' },
-  { text: 'What should I pack for Barcelona?',      emoji: '🧳' },
-  { text: 'Check flight BA123',                     emoji: '✈️' },
-  { text: "What's on near me tonight?",             emoji: '📍' },
-  { text: 'Build a trip to Coachella',              emoji: '🎵' },
+  { text: 'Plan my World Cup 2026 trip',            emoji: '⚽', tag: 'Popular' },
+  { text: 'Build me a trip to Coachella 2026',      emoji: '🎵', tag: 'Music'   },
+  { text: 'Find events near me this weekend',       emoji: '📍', tag: 'Local'   },
+  { text: 'Best hotels near MetLife Stadium',       emoji: '🏨', tag: 'Stay'    },
+  { text: 'What flights go to Miami in June?',      emoji: '✈️', tag: 'Flights' },
+  { text: 'Surprise me with a festival trip',       emoji: '🎪', tag: 'Fun'     },
 ];
 
 // Grouped prompts — shown on empty chat state
@@ -1580,7 +1660,7 @@ export default function GladysCompanion({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 16 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            className="fixed bottom-24 sm:bottom-8 right-4 sm:right-6 z-50 flex flex-col items-end gap-2"
+            className="fixed bottom-20 sm:bottom-8 right-4 sm:right-6 z-50 flex flex-col items-end gap-2"
           >
             {/* Label pill */}
             <motion.div
@@ -1639,7 +1719,7 @@ export default function GladysCompanion({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              className="fixed bottom-6 right-6 z-50 w-[400px] max-h-[680px] flex flex-col bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+              className="fixed bottom-0 right-0 left-0 sm:bottom-6 sm:right-6 sm:left-auto z-50 w-full sm:w-[400px] max-h-[80svh] sm:max-h-[680px] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden border border-gray-100"
               style={{ maxWidth: 'calc(100vw - 24px)' }}
             >
               {/* ── Header ─────────────────────────────────────── */}
@@ -1694,49 +1774,75 @@ export default function GladysCompanion({
                       transition={{ duration: 0.18 }}
                       className="flex-1 overflow-y-auto"
                     >
+                      {/* ── Orb + waveform ── */}
                       <VoiceOrb volumeLevel={vapi.volumeLevel} status={vapi.status} />
 
-                      <div className="flex items-center justify-center gap-3 pb-6 px-5">
+                      {/* ── Controls ── */}
+                      <div className="flex items-center justify-center gap-3 pb-5 px-5">
                         {isVoiceActive && (
                           <button onClick={vapi.toggleMute}
-                            className={`w-11 h-11 rounded-full flex items-center justify-center border transition-all ${
+                            className={`w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all ${
                               vapi.isMuted
                                 ? 'bg-red-50 border-red-200 text-red-500'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
                             }`}>
-                            {vapi.isMuted ? <IconMicOff size={18} /> : <IconMic size={18} />}
+                            {vapi.isMuted ? <IconMicOff size={17} /> : <IconMic size={17} />}
                           </button>
                         )}
 
-                        <button
+                        <motion.button
+                          whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                           onClick={handleVoiceToggle}
                           disabled={isVoiceConnecting || vapi.status === 'ending'}
-                          className={`flex items-center gap-2 px-6 py-3 rounded-full font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                            isVoiceActive ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-black hover:bg-gray-800 text-white'
+                          className={`flex items-center gap-2 px-7 py-3 rounded-full font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg ${
+                            isVoiceActive
+                              ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-200'
+                              : 'text-white shadow-sky-200'
                           }`}
+                          style={!isVoiceActive ? { background: 'linear-gradient(135deg, #38BDF8, #0284C7)' } : {}}
                         >
                           {isVoiceConnecting ? (
-                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Connecting...</>
+                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Connecting…</>
                           ) : isVoiceActive ? (
                             <><IconStop size={14} />End Call</>
                           ) : (
-                            <><IconMic size={16} />Start Voice</>
+                            <><IconMic size={15} />Start Voice</>
                           )}
-                        </button>
+                        </motion.button>
                       </div>
 
+                      {/* ── Try Saying ── only when idle ── */}
                       {vapi.status === 'idle' && (
-                        <div className="px-5 pb-6 space-y-2">
-                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Try saying</p>
-                          {VOICE_PROMPTS.map((p, i) => (
-                            <button key={i}
-                              onClick={() => vapi.startCall(`User wants: ${p.text}`)}
-                              className="w-full text-left text-sm text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-3 transition-colors border border-transparent hover:border-gray-200 flex items-center gap-3"
-                            >
-                              <span>{p.emoji}</span>
-                              <span>"{p.text}"</span>
-                            </button>
-                          ))}
+                        <div className="px-4 pb-5">
+                          {/* Header */}
+                          <div className="flex items-center gap-2 mb-3 px-1">
+                            <div className="h-px flex-1 bg-slate-100" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Try saying</p>
+                            <div className="h-px flex-1 bg-slate-100" />
+                          </div>
+
+                          {/* 2-col grid of prompt chips */}
+                          <div className="grid grid-cols-2 gap-2">
+                            {VOICE_PROMPTS.map((p, i) => (
+                              <motion.button
+                                key={i}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.97 }}
+                                onClick={() => vapi.startCall(`User wants: ${p.text}`)}
+                                className="text-left rounded-2xl px-3 py-3 transition-all border border-slate-100 hover:border-sky-200 hover:bg-sky-50 bg-slate-50 group"
+                              >
+                                <div className="flex items-center gap-1.5 mb-1.5">
+                                  <span className="text-base leading-none">{p.emoji}</span>
+                                  <span className="text-[9px] font-black uppercase tracking-wider text-sky-500 bg-sky-100 px-1.5 py-0.5 rounded-full">
+                                    {p.tag}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-600 font-semibold leading-snug group-hover:text-sky-700">
+                                  "{p.text}"
+                                </p>
+                              </motion.button>
+                            ))}
+                          </div>
                         </div>
                       )}
 

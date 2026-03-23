@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
 import { AuthProvider } from "@/lib/AuthContext";
+import { ThemeProvider } from "@/lib/ThemeProvider";
 import { Toaster } from "sonner";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -147,6 +148,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         className={`${inter.variable} font-sans antialiased bg-white text-gray-900`}
         suppressHydrationWarning
       >
+        <ThemeProvider>
         <AuthProvider>
           <Providers>
             <VapiProvider>
@@ -182,6 +184,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </a>
           </Providers>
         </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
