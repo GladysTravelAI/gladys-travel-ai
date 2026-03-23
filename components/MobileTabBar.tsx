@@ -29,14 +29,14 @@ export default function MobileTabBar() {
         paddingBottom: 'env(safe-area-inset-bottom)',
       }}
     >
-      <div className="flex items-stretch justify-around h-16 px-1">
+      <div className="flex items-stretch justify-evenly h-16">
         {TABS.map(({ label, href, Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href));
           return (
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 relative"
+              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 relative min-w-0"
             >
               {/* Active indicator line */}
               {active && (
