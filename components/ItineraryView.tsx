@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 
 import type { ItineraryData, TimeBlock, EventBlock, DayPlan } from "@/lib/mock-itinerary";
-import TripUpsells       from "@/components/TripUpsells";
 import VenueDirections   from "@/components/VenueDirections";
 import SeatMapViewer     from "@/components/SeatMapViewer";
 import LiveMatchTracker  from "@/components/LiveMatchTracker";
@@ -186,9 +185,10 @@ function WeatherBadge({ weather, date }: { weather: WeatherDay[]; date: string }
 
 // ── EXPLORE CITY STRIP ────────────────────────────────────────────────────────
 function NearbyStrip({ city }: { city: string }) {
-  const [show,      setShow]      = useState(false);
+  // show=true by default — data loads AND renders immediately, no click required
+  const [show,      setShow]      = useState(true);
   const [activeTab, setActiveTab] = useState(0);
-  const { categories, loading, error } = useExploreCity(city, show);
+  const { categories, loading, error } = useExploreCity(city, true);
 
   return (
     <div className="rounded-3xl border-2 border-slate-100 overflow-hidden bg-white shadow-sm">
@@ -764,17 +764,7 @@ export default function ItineraryView({
         </motion.div>
       </AnimatePresence>
 
-      {/* ═══════════════════════ UPSELLS ═══════════════════════════════════ */}
-      {data.eventAnchor && (
-        <TripUpsells
-          city={data.eventAnchor.city || data.eventAnchor.venue || 'the destination'}
-          country={data.eventAnchor.country || data.eventAnchor.city || 'the destination'}
-          arrivalDate={data.days[0]?.date || data.eventAnchor.eventDate}
-          departureDate={data.days[data.days.length - 1]?.date || data.eventAnchor.eventDate}
-          eventName={data.eventAnchor.eventName}
-          accentColor={cfg.accent}
-        />
-      )}
+      {/* Affiliate booking links moved to Hotels/Flights/Activities tabs */}
     </div>
   );
 }

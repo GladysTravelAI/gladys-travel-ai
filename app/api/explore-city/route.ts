@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge'
+// Node runtime — more reliable env var access than edge on Vercel
+export const runtime = 'nodejs'
 
 interface Place {
   id:       string
@@ -35,8 +36,13 @@ export async function GET(req: NextRequest) {
   const key  = process.env.FOURSQUARE_API_KEY
   const city = req.nextUrl.searchParams.get('city')?.trim()
 
-  if (!key)  return NextResponse.json({ error: 'Places not configured' }, { status: 500 })
-  if (!city) return NextResponse.json({ error: 'City required' },         { status: 400 })
+  if (!key) {
+    console.error('[explore-city] FOURSQUARE_API_KEY is not set in environment variables')
+    return NextResponse.json({ error: 'Places not configured' }, { status: 500 })
+  }
+  if (!city) return NextResponse.json({ error: 'City required' }, { status: 400 })
+
+  console.log(`[explore-city] Fetching places for: ${city}`)
 
   try {
     // Step 1: Geocode the city
@@ -68,7 +74,11 @@ export async function GET(req: NextRequest) {
             signal:  AbortSignal.timeout(6000),
           }
         )
-        if (!res.ok) return { ...cat, places: [] } as CategoryResult
+        if (!res.ok) {
+          const errText = await res.text()
+          console.error(`[explore-city] Foursquare ${cat.label} error ${res.status}:`, errText)
+          return { ...cat, places: [] } as CategoryResult
+        }
 
         const data = await res.json()
         const places: Place[] = (data.results ?? []).map((p: any) => ({
@@ -96,6 +106,12 @@ export async function GET(req: NextRequest) {
       .filter((r): r is PromiseFulfilledResult<CategoryResult> => r.status === 'fulfilled')
       .map(r => r.value)
       .filter(c => c.places.length > 0)
+
+    console.log(`[explore-city] ${city}: ${categories.length} categories, ${categories.reduce((s,c) => s + c.places.length, 0)} places`)
+
+    if (categories.length === 0) {
+      return NextResponse.json({ success: false, error: 'No places found for this city' }, { status: 200 })
+    }
 
     return NextResponse.json({
       success: true,

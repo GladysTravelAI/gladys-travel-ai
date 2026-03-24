@@ -34,8 +34,8 @@ type Mode = 'voice' | 'chat';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-const IconMic = ({ size = 20, className, color }: { size?: number; className?: string; color?: string }) => (
-  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconMic = ({ size = 20, className }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
     <line x1="12" y1="19" x2="12" y2="22"/>
@@ -1021,7 +1021,9 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
           {isConnecting ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <IconMic size={22} color="white" />
+            <div className="text-white">
+              <IconMic size={22} />
+            </div>
           )}
         </motion.div>
       </div>
@@ -1139,12 +1141,12 @@ function TypingIndicator() {
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 
 const VOICE_PROMPTS = [
-  { text: 'Plan my World Cup 2026 trip',            emoji: '⚽', tag: 'Popular' },
-  { text: 'Build me a trip to Coachella 2026',      emoji: '🎵', tag: 'Music'   },
-  { text: 'Find events near me this weekend',       emoji: '📍', tag: 'Local'   },
-  { text: 'Best hotels near MetLife Stadium',       emoji: '🏨', tag: 'Stay'    },
-  { text: 'What flights go to Miami in June?',      emoji: '✈️', tag: 'Flights' },
-  { text: 'Surprise me with a festival trip',       emoji: '🎪', tag: 'Fun'     },
+  { text: 'Plan my 2026 football championship trip', emoji: '⚽', tag: 'Popular' },
+  { text: 'Build me a music festival trip',          emoji: '🎵', tag: 'Music'   },
+  { text: 'Find events near me this weekend',        emoji: '📍', tag: 'Local'   },
+  { text: 'Best hotels near MetLife Stadium',        emoji: '🏨', tag: 'Stay'    },
+  { text: 'What flights go to Miami in June?',       emoji: '✈️', tag: 'Flights' },
+  { text: 'Surprise me with a festival trip',        emoji: '🎪', tag: 'Fun'     },
 ];
 
 // Grouped prompts — shown on empty chat state
@@ -1152,10 +1154,10 @@ const CHAT_PROMPT_GROUPS = [
   {
     label: 'Plan a trip',
     prompts: [
-      { text: 'Plan a trip to the Champions League Final', emoji: '🏆' },
-      { text: 'I want to go to Coachella 2026',           emoji: '🎪' },
-      { text: 'Plan a trip to the NBA Finals',            emoji: '🏀' },
-      { text: 'Book me a trip to Formula 1 Monaco',       emoji: '🏎️' },
+      { text: 'Plan a trip to the UEFA Champions League Final', emoji: '🏆' },
+      { text: 'I want to go to a music festival in 2026',          emoji: '🎪' },
+      { text: 'Plan a trip to the NBA Finals',                     emoji: '🏀' },
+      { text: 'Book me a trip to Formula 1 Monaco',                emoji: '🏎️' },
     ],
   },
   {

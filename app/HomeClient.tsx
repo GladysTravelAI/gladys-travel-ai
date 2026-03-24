@@ -30,6 +30,7 @@ import { ItineraryData }  from "@/lib/mock-itinerary";
 import { profileManager } from "@/lib/userProfile";
 import { useAuth }        from "@/lib/AuthContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import AffiliateTab from "@/components/AffiliateTab";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -637,21 +638,25 @@ export default function HomeClient() {
                       </div>
 
                       <Tabs value={tab} onValueChange={setTab}>
-                        <TabsList className="w-full mb-6 p-1 rounded-2xl bg-slate-200">
-                          <TabsTrigger value="itinerary"
-                            className="flex items-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                            <Sparkles size={13} />Itinerary
-                          </TabsTrigger>
-                          <TabsTrigger value="hotels"
-                            className="flex items-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                            <Hotel size={13} />Hotels <span className="opacity-40 text-[10px]">Soon</span>
-                          </TabsTrigger>
-                          <TabsTrigger value="flights"
-                            className="flex items-center gap-1.5 sm:gap-2 rounded-xl text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                            <Plane size={13} />Flights <span className="opacity-40 text-[10px]">Soon</span>
-                          </TabsTrigger>
-                        </TabsList>
+                        {/* ── Scrollable tab bar — fits all 5 tabs on mobile ── */}
+                        <div className="overflow-x-auto pb-1 mb-5 -mx-1 px-1">
+                          <TabsList className="inline-flex w-max min-w-full p-1 rounded-2xl bg-slate-100 gap-0.5">
+                            {[
+                              { value: 'itinerary',  icon: <Sparkles size={13} />, label: 'Itinerary'  },
+                              { value: 'hotels',     icon: <Hotel    size={13} />, label: 'Hotels'     },
+                              { value: 'flights',    icon: <Plane    size={13} />, label: 'Flights'    },
+                              { value: 'activities', icon: <Globe    size={13} />, label: 'Activities' },
+                              { value: 'more',       icon: <ExternalLink size={13} />, label: 'More'   },
+                            ].map(t => (
+                              <TabsTrigger key={t.value} value={t.value}
+                                className="flex items-center gap-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap px-3 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:font-bold font-medium text-slate-500 data-[state=active]:text-slate-900 transition-all">
+                                {t.icon}{t.label}
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </div>
 
+                        {/* ── ITINERARY ── */}
                         <TabsContent value="itinerary">
                           {itineraryLoading ? (
                             <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-4">
@@ -678,13 +683,54 @@ export default function HomeClient() {
                           )}
                         </TabsContent>
 
+                        {/* ── HOTELS ── */}
                         <TabsContent value="hotels">
-                          <HotelResults hotels={[]} onSaveItem={h => handleSave(h, 'hotel')} loading={false} comingSoon={true} />
+                          <AffiliateTab
+                            type="hotels"
+                            city={response?.destination?.city || ''}
+                            country={response?.destination?.country || ''}
+                            arrivalDate={startDate?.toISOString().split('T')[0]}
+                            departureDate={endDate?.toISOString().split('T')[0]}
+                            eventName={response?.event?.name || ''}
+                          />
                         </TabsContent>
 
+                        {/* ── FLIGHTS ── */}
                         <TabsContent value="flights">
-                          <FlightResults flights={[]} onSaveItem={f => handleSave(f, 'flight')} loading={false} comingSoon={true} />
+                          <AffiliateTab
+                            type="flights"
+                            city={response?.destination?.city || ''}
+                            country={response?.destination?.country || ''}
+                            arrivalDate={startDate?.toISOString().split('T')[0]}
+                            departureDate={endDate?.toISOString().split('T')[0]}
+                            eventName={response?.event?.name || ''}
+                          />
                         </TabsContent>
+
+                        {/* ── ACTIVITIES ── */}
+                        <TabsContent value="activities">
+                          <AffiliateTab
+                            type="activities"
+                            city={response?.destination?.city || ''}
+                            country={response?.destination?.country || ''}
+                            arrivalDate={startDate?.toISOString().split('T')[0]}
+                            departureDate={endDate?.toISOString().split('T')[0]}
+                            eventName={response?.event?.name || ''}
+                          />
+                        </TabsContent>
+
+                        {/* ── MORE TOOLS ── */}
+                        <TabsContent value="more">
+                          <AffiliateTab
+                            type="more"
+                            city={response?.destination?.city || ''}
+                            country={response?.destination?.country || ''}
+                            arrivalDate={startDate?.toISOString().split('T')[0]}
+                            departureDate={endDate?.toISOString().split('T')[0]}
+                            eventName={response?.event?.name || ''}
+                          />
+                        </TabsContent>
+
                       </Tabs>
                     </>
                   )
