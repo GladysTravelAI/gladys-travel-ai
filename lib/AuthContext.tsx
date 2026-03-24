@@ -30,7 +30,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => Promise<{ isNewUser: boolean }>;
   updateUserProfile: (updates: Partial<UserPreferences>) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
@@ -149,26 +149,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (): Promise<{ isNewUser: boolean }> => {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
       // Always use popup — works on desktop and modern mobile browsers.
-      // signInWithRedirect breaks the auth flow because the return redirect
-      // has no mechanism to push the user back to "/" after sign-in.
       const result = await signInWithPopup(auth, provider);
       console.log('✅ Google sign-in:', result.user.email);
 
-      // onAuthStateChanged will fire and load the profile automatically.
-      // No toast here — the calling page (SignIn/SignUp) handles UI feedback.
+      // Detect new vs returning user via Firebase metadata
+      // creationTime === lastSignInTime means this is the first sign-in
+      const meta      = result.user.metadata;
+      const isNewUser = meta.creationTime === meta.lastSignInTime;
+
+      return { isNewUser };
     } catch (error) {
       const authError = error as AuthError;
       // Silently ignore cancelled popups — user intentionally closed it
       if (
         authError.code === 'auth/popup-closed-by-user' ||
         authError.code === 'auth/cancelled-popup-request'
-      ) return;
+      ) return { isNewUser: false };
       throw new Error(getAuthErrorMessage(authError));
     }
   };

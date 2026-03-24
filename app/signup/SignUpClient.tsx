@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
+import { auth } from "@/lib/firebase";
 import Logo from "@/components/Logo";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -93,14 +94,24 @@ export default function SignUpClient() {
     setLoading(true); setError("");
     try {
       await loginWithGoogle();
+
+      // Get the signed-in user's real email and name from Firebase auth.
+      // The `email` state variable is always empty for Google sign-in —
+      // it only gets populated when the user types in the email/password form.
+      const firebaseUser = auth.currentUser;
+      const userEmail    = firebaseUser?.email       ?? "";
+      const userName     = firebaseUser?.displayName ?? "";
+
       toast.success("Account created with Google!");
 
-      // Send welcome email via Resend
-      fetch('/api/emails', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ type: 'welcome', to: email }),
-      }).catch(() => {});
+      // Only send welcome email for new accounts
+      if (userEmail) {
+        fetch('/api/emails', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ type: 'welcome', to: userEmail, name: userName }),
+        }).catch(() => {/* silent — email is non-critical */});
+      }
 
       setTimeout(() => { router.push("/"); router.refresh(); }, 600);
     } catch {
