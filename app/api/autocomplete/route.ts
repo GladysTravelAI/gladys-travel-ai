@@ -1,10 +1,18 @@
 // app/api/autocomplete/route.ts
-// Returns real Ticketmaster event + attraction suggestions as user types
-// Fast: single request, 300ms cache, returns in ~200ms
+// Returns Ticketmaster event + attraction suggestions as user types.
+// QUOTA PROTECTION: server-side cache (10min TTL) + minimum 3 chars.
+// Without caching: typing a 20-char query = 40 API calls.
+// With caching:    same query by any user = 1 API call per 10 minutes.
+// Ticketmaster free tier: 5,000 req/day — this keeps us well within limits.
 
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge' // Edge for lowest latency
+// Node runtime — module-level cache persists across requests on same instance
+export const runtime = 'nodejs'
+
+// ── Server-side in-memory cache ───────────────────────────────────────────────
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes per unique query
+const queryCache = new Map<string, { data: any; expiresAt: number }>()
 
 interface Suggestion {
   id:       string
@@ -31,10 +39,20 @@ export async function GET(req: NextRequest) {
   if (!key) return NextResponse.json({ suggestions: [] })
 
   const q = req.nextUrl.searchParams.get('q')?.trim() ?? ''
-  if (q.length < 2) return NextResponse.json({ suggestions: [] })
+  if (q.length < 3) return NextResponse.json({ suggestions: [] })
+
+  // ── Cache hit? ──────────────────────────────────────────────────────────────
+  const cacheKey   = q.toLowerCase()
+  const cached     = queryCache.get(cacheKey)
+  if (cached && Date.now() < cached.expiresAt) {
+    console.log(`[autocomplete] cache hit: "${q}"`)
+    return NextResponse.json(cached.data, {
+      headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=1200' }
+    })
+  }
 
   try {
-    // Run events + attractions search in parallel
+    // Run events + attractions search in parallel — only fires on cache miss
     const [eventsRes, attractionsRes] = await Promise.allSettled([
       // Events: upcoming only, top 5
       fetch(
@@ -111,10 +129,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json(
-      { suggestions: suggestions.slice(0, 8) },
-      { headers: { 'Cache-Control': 's-maxage=300, stale-while-revalidate=600' } }
-    )
+    const result = { suggestions: suggestions.slice(0, 8) }
+
+    // Store in cache — same query won't hit Ticketmaster again for 10 minutes
+    queryCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL })
+
+    // Evict old entries if cache grows too large (memory safety)
+    if (queryCache.size > 500) {
+      const now = Date.now()
+      for (const [k, v] of queryCache.entries()) {
+        if (v.expiresAt < now) queryCache.delete(k)
+      }
+    }
+
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 's-maxage=600, stale-while-revalidate=1200' }
+    })
 
   } catch (err: any) {
     console.error('[autocomplete] error:', err.message)

@@ -25,7 +25,7 @@ interface LiveEvent {
 // ── FOOTBALL LEAGUES ───────────────────────────────────────────────────────────
 // ── SERVER-SIDE CACHE ─────────────────────────────────────────────────────────
 // Football API: 100 req/day free tier — cache results for 1 hour
-// Ticketmaster: generous limits — cache for 10 minutes
+// Ticketmaster: cache for 2 hours — events don't change minute-to-minute
 
 interface CacheEntry<T> {
   data:      T;
@@ -36,7 +36,7 @@ const footballCache: { current: CacheEntry<LiveEvent[]> | null } = { current: nu
 const ticketmasterCache: { current: CacheEntry<LiveEvent[]> | null } = { current: null }
 
 const FOOTBALL_TTL    = 60 * 60 * 1000  // 1 hour  — saves ~19 req/hour
-const TICKETMASTER_TTL = 10 * 60 * 1000 // 10 mins — keeps events fresh
+const TICKETMASTER_TTL = 2 * 60 * 60 * 1000 // 2 hours — saves ~10 req/hr
 
 function getCached<T>(cache: { current: CacheEntry<T> | null }): T | null {
   if (cache.current && Date.now() < cache.current.expiresAt) {
@@ -263,7 +263,7 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
   // Store in cache for 10 minutes
   if (results.length > 0) {
     setCached(ticketmasterCache, results, TICKETMASTER_TTL)
-    console.log('[featured-events] Ticketmaster: results cached for 10 minutes')
+    console.log('[featured-events] Ticketmaster: results cached for 2 hours')
   }
 
   return results
@@ -300,15 +300,15 @@ function processEvents(events: LiveEvent[]): LiveEvent[] {
 
 export async function GET(req: NextRequest) {
   try {
-    // Run Ticketmaster + Football in parallel
-    const [tmResult, fbResult] = await Promise.allSettled([
+    // Football disabled on free plan (seasons 2025/2026 require paid subscription)
+    // Re-enable by uncommenting fetchFootballEvents() once upgraded to Pro plan
+    const [tmResult] = await Promise.allSettled([
       fetchTicketmasterEvents(),
-      fetchFootballEvents(),
+      // fetchFootballEvents(), // ← uncomment after upgrading API-Football plan
     ])
 
     const all = [
       ...(tmResult.status === 'fulfilled' ? tmResult.value : []),
-      ...(fbResult.status === 'fulfilled' ? fbResult.value : []),
     ]
 
     const events = processEvents(all)
