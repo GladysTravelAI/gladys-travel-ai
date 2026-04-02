@@ -203,7 +203,8 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
         // Fetch real events from the same API used by FeaturedEvents component
         const res  = await fetch('/api/featured-events');
         const json = await res.json();
-        if (!json.success || !json.events?.length) return;
+        // Works with both 'live' and 'curated' sources — any non-empty events array
+        if (!json.success || !Array.isArray(json.events) || json.events.length === 0) return;
 
         // Normalise LiveEvent (API shape) → eventService.Event (type shape)
         // Required by getEventHeroImage which expects eventService.Event
