@@ -179,37 +179,55 @@ async function fetchFootballEvents(): Promise<LiveEvent[]> {
 }
 
 // ── FETCH TICKETMASTER ─────────────────────────────────────────────────────────
-// Only 2 requests — sports segment + music segment
+// Fetch from multiple Ticketmaster endpoints in parallel:
+// 1. Music segment — concerts, tours
+// 2. Sports segment — basketball, tennis, motorsport etc.
+// 3. Festival genre — Coachella, Glastonbury, Tomorrowland
+// 4. Keyword: "NBA" — basketball specifically
+// 5. Keyword: next 30 days high-relevance music
 
 async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
   const key = process.env.TICKETMASTER_API_KEY
   if (!key) { console.warn('[featured-events] TICKETMASTER_API_KEY not set'); return [] }
 
-  // Return cached data if still fresh
   const cached = getCached(ticketmasterCache)
   if (cached) {
     console.log('[featured-events] Ticketmaster: serving from cache')
     return cached
   }
 
-  const segments = [
-    { id: 'KZFzniwnSyZfZ7v7nE', label: 'sports',   rank: 75 },  // Sports segment
-    { id: 'KZFzniwnSyZfZ7v7nJ', label: 'music',    rank: 75 },  // Music segment
-    // Festivals: use music segment + festival genre filter
-    // Ticketmaster festival genre ID: KnvZfZ7vAe1
+  // End date = 60 days from now — focus on near-term big events
+  const now    = new Date()
+  const start  = now.toISOString().split('.')[0] + 'Z'
+  const end60  = new Date(now.getTime() + 60 * 86400000).toISOString().split('.')[0] + 'Z'
+
+  // Segment IDs: Music = KZFzniwnSyZfZ7v7nJ, Sports = KZFzniwnSyZfZ7v7nE
+  // Festival genre ID = KnvZfZ7vAe1
+  const fetches = [
+    // Music — concerts and tours
+    { label: 'music',    params: { segmentId: 'KZFzniwnSyZfZ7v7nJ', size: '15', sort: 'relevance,desc' } },
+    // Sports — basketball, motorsport, tennis, boxing
+    { label: 'sports',   params: { segmentId: 'KZFzniwnSyZfZ7v7nE', size: '15', sort: 'relevance,desc' } },
+    // Festivals — dedicated genre fetch
+    { label: 'festival', params: { segmentId: 'KZFzniwnSyZfZ7v7nJ', genreId: 'KnvZfZ7vAe1', size: '10', sort: 'relevance,desc' } },
+    // Basketball — NBA specifically
+    { label: 'nba',      params: { segmentId: 'KZFzniwnSyZfZ7v7nE', subGenreId: 'KZazBEonSMnZfZ7vFJA', size: '10', sort: 'date,asc' } },
   ]
 
   const results: LiveEvent[] = []
 
-  await Promise.allSettled(segments.map(async seg => {
+  await Promise.allSettled(fetches.map(async ({ label, params: extraParams }) => {
     try {
-      const params = new URLSearchParams({
-        apikey:        key,
-        segmentId:     seg.id,
-        size:          '20',
-        sort:          'relevance,desc',
-        startDateTime: new Date().toISOString().split('.')[0] + 'Z',
-      })
+      const params = new URLSearchParams()
+      params.append('apikey', key)
+      params.append('startDateTime', start)
+      params.append('endDateTime', end60)
+
+      for (const [name, value] of Object.entries(extraParams)) {
+        if (value !== undefined && value !== null) {
+          params.append(name, value)
+        }
+      }
 
       const res = await fetch(
         `https://app.ticketmaster.com/discovery/v2/events.json?${params}`,
@@ -217,7 +235,7 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
       )
 
       if (!res.ok) {
-        console.warn(`[featured-events] Ticketmaster ${seg.label}: ${res.status}`)
+        console.warn(`[featured-events] Ticketmaster ${label}: ${res.status}`)
         return
       }
 
@@ -265,11 +283,11 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
           priceMin:   ev.priceRanges?.[0]?.min ? Math.round(ev.priceRanges[0].min) : undefined,
           currency:   ev.priceRanges?.[0]?.currency,
           attraction: ev._embedded?.attractions?.[0]?.name,
-          rank:       seg.rank,
+          rank:       70,
         })
       }
     } catch (err: any) {
-      console.error(`[featured-events] Ticketmaster ${seg.label} error:`, err.message)
+      console.error(`[featured-events] Ticketmaster ${label} error:`, err.message)
     }
   }))
 
@@ -283,56 +301,47 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
 }
 
 // ── DEDUPLICATE & SORT ─────────────────────────────────────────────────────────
+// No forced category balancing — show what's actually upcoming and big.
+// Priority: events within 30 days first, then 31-60 days.
+// Max 10 events total.
 
 function processEvents(events: LiveEvent[]): LiveEvent[] {
   const seen  = new Set<string>()
   const today = new Date()
+  const in30  = new Date(today.getTime() + 30 * 86400000)
 
-  // Step 1: Filter and deduplicate
+  // Step 1: Deduplicate + filter past events
   const valid = events.filter(ev => {
     if (!ev.name || !ev.date) return false
     if (new Date(ev.date) < today) return false
-    const key = ev.name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30)
+    // Deduplicate by normalised name (strips "American ", regional prefixes)
+    const key = ev.name
+      .toLowerCase()
+      .replace(/^(american|us|national|international)\s+/i, '')
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 28)
     if (seen.has(key)) return false
     seen.add(key)
     return true
   })
 
-  // Step 2: Sort by date (soonest first) within each category
-  valid.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  // Step 2: Score each event — soonness beats everything
+  const scored = valid.map(ev => {
+    const daysAway = Math.ceil(
+      (new Date(ev.date).getTime() - today.getTime()) / 86400000
+    )
+    // Events within 30 days get massive boost — they're what users need to act on now
+    const urgencyBoost = daysAway <= 7  ? 200
+                       : daysAway <= 14 ? 150
+                       : daysAway <= 30 ? 100
+                       : daysAway <= 45 ? 40
+                       : 0
+    return { ev, score: urgencyBoost + (ev.rank ?? 70) }
+  })
 
-  // Step 3: Category-balanced selection — max 40% any single category
-  // Target mix out of 20 results: ~7 sports, ~7 music, ~4 festival, ~2 other
-  const buckets: Record<string, LiveEvent[]> = {
-    sports: [], music: [], festival: [], other: []
-  }
-  for (const ev of valid) {
-    const cat = ev.category ?? 'other'
-    buckets[cat].push(ev)
-  }
-
-  const result: LiveEvent[] = []
-  const TOTAL = 20
-  const CAPS  = { sports: 8, music: 8, festival: 6, other: 4 }
-
-  // Interleave: take one from each non-empty bucket in rotation until TOTAL
-  const order: Array<keyof typeof CAPS> = ['music', 'sports', 'festival', 'sports', 'music', 'festival', 'other']
-  const taken: Record<string, number>   = { sports: 0, music: 0, festival: 0, other: 0 }
-  let   round = 0
-
-  while (result.length < TOTAL) {
-    const cat    = order[round % order.length] as string
-    const bucket = buckets[cat]
-    if (bucket.length > 0 && taken[cat] < CAPS[cat as keyof typeof CAPS]) {
-      result.push(bucket.shift()!)
-      taken[cat]++
-    }
-    round++
-    // Safety: if all buckets empty, break
-    if (Object.values(buckets).every(b => b.length === 0)) break
-  }
-
-  return result
+  // Step 3: Sort by score descending, take top 10
+  scored.sort((a, b) => b.score - a.score)
+  return scored.slice(0, 10).map(s => s.ev)
 }
 
 // ── ROUTE ──────────────────────────────────────────────────────────────────────
@@ -387,7 +396,34 @@ export async function GET(req: NextRequest) {
 function getCuratedFallback(): LiveEvent[] {
   const d = (iso: string) => iso; // dates are already absolute, not relative
 
+  // Today is ~April 2 2026. Coachella starts April 10 (8 days).
+  // Show the most urgent real events first — sorted by date.
   return [
+    // ── IMMINENT (within 30 days) ──
+    {
+      id: 'cur-f0',
+      name: 'Coachella Valley Music and Arts Festival 2026',
+      category: 'festival',
+      date: '2026-04-10',
+      venue: 'Empire Polo Club',
+      city: 'Indio',
+      country: 'USA',
+      image: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800&q=80',
+      ticketUrl: 'https://www.ticketmaster.com',
+      rank: 97,
+    },
+    {
+      id: 'cur-s0',
+      name: 'NBA Playoffs 2026',
+      category: 'sports',
+      date: '2026-04-18',
+      venue: 'Various Arenas',
+      city: 'Multiple Cities',
+      country: 'USA',
+      image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&q=80',
+      ticketUrl: 'https://www.ticketmaster.com',
+      rank: 91,
+    },
     // ── Music ──
     {
       id: 'cur-m1',
