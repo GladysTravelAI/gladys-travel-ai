@@ -24,12 +24,13 @@ interface CategoryResult {
   places: Place[]
 }
 
-// Foursquare category IDs
+// Foursquare v3 category IDs (v2 IDs like 10032 do not work in v3)
+// Full list: https://location.foursquare.com/places/docs/categories
 const CATEGORIES = [
-  { label: 'Restaurants',  emoji: '🍽', id: '13000' },
-  { label: 'Attractions',  emoji: '🏛', id: '16000' },
-  { label: 'Nightlife',    emoji: '🍸', id: '10032' },
-  { label: 'Shopping',     emoji: '🛍', id: '17000' },
+  { label: 'Restaurants', emoji: '🍽', id: '13000' }, // Dining and Drinking (parent)
+  { label: 'Attractions', emoji: '🏛', id: '16000' }, // Landmarks and Outdoors (parent)
+  { label: 'Nightlife',   emoji: '🍸', id: '13002' }, // Bar — correct v3 ID (was 10032 v2)
+  { label: 'Shopping',    emoji: '🛍', id: '17000' }, // Retail (parent)
 ]
 
 export async function GET(req: NextRequest) {
@@ -45,25 +46,14 @@ export async function GET(req: NextRequest) {
   console.log(`[explore-city] Fetching places for: ${city}`)
 
   try {
-    // Step 1: Geocode the city
-    const geoRes  = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`,
-      { signal: AbortSignal.timeout(5000) }
-    )
-    const geoData = await geoRes.json()
-    const loc     = geoData.results?.[0]
-    if (!loc) return NextResponse.json({ error: `City "${city}" not found` }, { status: 404 })
-
-    const { latitude, longitude } = loc
-
-    // Step 2: Fetch all 4 categories in parallel
+    // Use Foursquare's built-in 'near' parameter — handles geocoding internally.
+    // This is more reliable than our own geocoding step and one fewer API call.
     const results = await Promise.allSettled(
       CATEGORIES.map(async cat => {
         const params = new URLSearchParams({
-          ll:         `${latitude},${longitude}`,
-          radius:     '3000',
+          near:       city,        // Foursquare geocodes the city name directly
           limit:      '6',
-          sort:       'POPULARITY',
+          sort:       'RELEVANCE', // Valid v3 sort: RELEVANCE | RATING | DISTANCE
           categories: cat.id,
         })
 
@@ -71,7 +61,7 @@ export async function GET(req: NextRequest) {
           `https://api.foursquare.com/v3/places/search?${params}`,
           {
             headers: { Authorization: key, Accept: 'application/json' },
-            signal:  AbortSignal.timeout(6000),
+            signal:  AbortSignal.timeout(8000),
           }
         )
         if (!res.ok) {
@@ -115,8 +105,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      city:    loc.name,
-      country: loc.country,
+      city,
       categories,
     }, {
       headers: { 'Cache-Control': 'public, s-maxage=3600' }, // cache 1hr

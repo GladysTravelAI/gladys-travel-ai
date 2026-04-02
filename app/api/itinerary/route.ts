@@ -419,6 +419,127 @@ You MUST use real, specific knowledge of ${eventCity}:
 ticketUrl must be null. Return ONLY valid JSON.`;
 }
 
+// ── SMART AFFILIATE INJECTOR ─────────────────────────────────────────────────
+// Decides which Travelpayouts partners to surface based on trip context.
+// All partners here are CONNECTED via Travelpayouts (Yesim, Airalo, Kiwitaxi,
+// GetTransfer, AirHelp, EKTA). No pending partners are included.
+
+interface TripContext {
+  destinationCountry: string;
+  originCountry:      string;
+  hasFlights:         boolean;
+  days:               number;
+  eventCity:          string;
+  isInternational:    boolean;
+}
+
+interface SmartAffiliate {
+  id:          string;
+  partner:     string;
+  reason:      string;
+  headline:    string;
+  desc:        string;
+  btnLabel:    string;
+  url:         string;
+  category:    'esim' | 'insurance' | 'transfer' | 'flights';
+  triggerDay?: number;
+  priority:    number;
+}
+
+function buildSmartAffiliates(ctx: TripContext): SmartAffiliate[] {
+  const affiliates: SmartAffiliate[] = [];
+  const dest = ctx.destinationCountry || ctx.eventCity || 'your destination';
+
+  // ── eSIM: Yesim + Airalo — only for international trips ─────────────────────
+  if (ctx.isInternational) {
+    affiliates.push({
+      id:         'esim-yesim',
+      partner:    'Yesim',
+      reason:     `International travel to ${dest}`,
+      headline:   `Stay connected in ${dest} — no roaming fees`,
+      desc:       'Get a local eSIM instantly. Activate before you land, skip the airport SIM queue.',
+      btnLabel:   'Get Yesim eSIM',
+      url:        'https://yesim.app/?utm_source=gladystravel',
+      category:   'esim',
+      triggerDay: 1,
+      priority:   90,
+    });
+    affiliates.push({
+      id:         'esim-airalo',
+      partner:    'Airalo',
+      reason:     `International travel to ${dest}`,
+      headline:   `Compare eSIM plans for ${dest}`,
+      desc:       "World's first eSIM store — 200+ countries, compare plans side by side.",
+      btnLabel:   'Browse Airalo Plans',
+      url:        'https://www.airalo.com/?utm_source=gladystravel',
+      category:   'esim',
+      triggerDay: 1,
+      priority:   85,
+    });
+  }
+
+  // ── Travel insurance: EKTA — any multi-day trip ──────────────────────────────
+  if (ctx.days >= 3) {
+    affiliates.push({
+      id:         'insurance-ekta',
+      partner:    'EKTA',
+      reason:     `${ctx.days}-day trip to ${dest}`,
+      headline:   `Travel insurance for your ${ctx.days}-day trip`,
+      desc:       'Covers medical emergencies, flight cancellations and lost baggage. Buy in 2 minutes.',
+      btnLabel:   'Get EKTA Insurance',
+      url:        'https://ekta.one/?utm_source=gladystravel',
+      category:   'insurance',
+      triggerDay: 1,
+      priority:   80,
+    });
+  }
+
+  // ── Flight compensation: AirHelp — if user is flying ────────────────────────
+  if (ctx.hasFlights) {
+    affiliates.push({
+      id:         'flights-airhelp',
+      partner:    'AirHelp',
+      reason:     'Flying to event',
+      headline:   'Claim up to €600 if your flight is delayed',
+      desc:       'AirHelp monitors your flight and claims compensation automatically. Free to check.',
+      btnLabel:   'Check My Flight',
+      url:        'https://www.airhelp.com/?utm_source=gladystravel',
+      category:   'flights',
+      triggerDay: undefined, // show in trip overview, not day-specific
+      priority:   75,
+    });
+  }
+
+  // ── Airport transfer: Kiwitaxi (Day 1 arrival) + GetTransfer (last day) ──────
+  affiliates.push({
+    id:         'transfer-kiwitaxi-arrival',
+    partner:    'Kiwitaxi',
+    reason:     `Arriving in ${ctx.eventCity || dest}`,
+    headline:   `Pre-book your airport transfer to ${ctx.eventCity || dest}`,
+    desc:       'Fixed price, English-speaking driver. No queues, no surge pricing.',
+    btnLabel:   'Book Airport Transfer',
+    url:        `https://kiwitaxi.com/?utm_source=gladystravel`,
+    category:   'transfer',
+    triggerDay: 1,
+    priority:   70,
+  });
+  affiliates.push({
+    id:         'transfer-gettransfer-departure',
+    partner:    'GetTransfer.com',
+    reason:     'Departure day',
+    headline:   "Book your ride back to the airport",
+    desc:       "Don't leave it to chance on departure day — pre-book with GetTransfer.",
+    btnLabel:   'Book Departure Ride',
+    url:        'https://gettransfer.com/?utm_source=gladystravel',
+    category:   'transfer',
+    triggerDay: ctx.days, // last day
+    priority:   65,
+  });
+
+  // Sort by priority descending
+  return affiliates.sort((a, b) => b.priority - a.priority);
+}
+
 // ── MAIN HANDLER ──────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
@@ -431,7 +552,11 @@ export async function POST(req: Request) {
       eventType = 'sports',
       ticketUrl,
       location,
-      budget, origin, days = 3, tripType, groupSize = 1, groupType, startDate, endDate
+      budget, origin, days = 5, tripType, groupSize = 1, groupType, startDate, endDate,
+      // Smart affiliate context — passed from HomeClient
+      originCountry      = 'ZA',
+      destinationCountry = '',
+      hasFlights         = false,
     } = body;
 
     const isEventAnchored = eventName && eventDate && eventVenue;
@@ -443,8 +568,10 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!days || days < 1 || days > 14) {
-      return NextResponse.json({ error: "Days must be between 1 and 14" }, { status: 400 });
+    // Cap at 10 for quality — beyond 10 days the AI content becomes generic
+    const tripDays = Math.min(Math.max(Number(days) || 5, 1), 10);
+    if (tripDays !== Number(days) && Number(days) > 10) {
+      console.log(`[itinerary] Capped from ${days} to 10 days for quality`);
     }
 
     const startTime = Date.now();
@@ -459,11 +586,27 @@ export async function POST(req: Request) {
           eventName, eventDate, eventVenue,
           eventCity: eventCity || location || 'the destination',
           eventCountry, eventType,
-          userPreferences: { budget, tripType, groupType, groupSize, days, startDate, endDate }
+          userPreferences: { budget, tripType, groupType, groupSize, days: tripDays, startDate, endDate }
         })
       );
 
       const finalData = ticketUrl ? injectRealTicketUrl(data, ticketUrl) : data;
+
+      // ── Smart affiliate injection ────────────────────────────────────────────
+      const tripCtx: TripContext = {
+        destinationCountry: destinationCountry || eventCountry || '',
+        originCountry,
+        hasFlights,
+        days:         tripDays,
+        eventCity:    eventCity || location || '',
+        isInternational: !!(
+          (destinationCountry || eventCountry) &&
+          (destinationCountry || eventCountry)?.toUpperCase() !== originCountry?.toUpperCase()
+        ),
+      };
+      const smartAffiliates = buildSmartAffiliates(tripCtx);
+      (finalData as any).smartAffiliates = smartAffiliates;
+      console.log(`[itinerary] Injected ${smartAffiliates.length} smart affiliates`);
       const generationTime = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`✅ Done in ${generationTime}s`);
 

@@ -2,310 +2,402 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ArrowUpRight, Flame, MapPin, Calendar, Ticket } from "lucide-react";
+import { X, ArrowUpRight, Flame } from "lucide-react";
 import Link from "next/link";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface LiveEvent {
-  id:          string
-  name:        string
-  category:    'sports' | 'music' | 'festival' | 'other'
-  date:        string
-  time?:       string
-  venue:       string
-  city:        string
-  country:     string
-  image?:      string
-  ticketUrl?:  string
-  priceMin?:   number
-  currency?:   string
-  attraction?: string
-  rank?:       number
-}
-
-// ─── Trademark-safe category display ─────────────────────────────────────────
-
-function getSafeDisplay(event: LiveEvent): { tag: string; color: string; gradient: string } {
-  const name = (event.name       ?? "").toLowerCase()
-  const attr = (event.attraction ?? "").toLowerCase()
-
-  if (name.includes("world cup") || name.includes("fifa") || attr.includes("world cup"))
-    return { tag: "⚽ International Football", color: "#10B981", gradient: "linear-gradient(135deg,#064E3B,#065F46,#0F172A)" }
-  if (name.includes("champions league"))
-    return { tag: "⚽ Club Football",          color: "#3B82F6", gradient: "linear-gradient(135deg,#1E3A5F,#1E3A8A,#0F172A)" }
-  if (name.includes("super bowl"))
-    return { tag: "🏈 American Football",      color: "#EF4444", gradient: "linear-gradient(135deg,#7F1D1D,#991B1B,#0F172A)" }
-  if (name.includes("nba") || name.includes("basketball"))
-    return { tag: "🏀 Basketball",             color: "#F97316", gradient: "linear-gradient(135deg,#7C2D12,#9A3412,#0F172A)" }
-  if (name.includes("nhl") || name.includes("hockey"))
-    return { tag: "🏒 Hockey",                color: "#0EA5E9", gradient: "linear-gradient(135deg,#0C4A6E,#075985,#0F172A)" }
-  if (event.category === 'sports')
-    return { tag: "🏆 Live Sports",            color: "#0EA5E9", gradient: "linear-gradient(135deg,#0C4A6E,#075985,#0F172A)" }
-  if (event.category === 'festival')
-    return { tag: "🎪 Festival",               color: "#F59E0B", gradient: "linear-gradient(135deg,#78350F,#92400E,#1C1917)" }
-  if (event.category === 'music')
-    return { tag: "🎵 Live Music",             color: "#8B5CF6", gradient: "linear-gradient(135deg,#4C1D95,#5B21B6,#0F172A)" }
-  return   { tag: "🎫 Live Event",             color: "#6B7280", gradient: "linear-gradient(135deg,#1F2937,#374151,#0F172A)" }
-}
-
-// Never output FIFA / World Cup from our own UI text
-function getSafeName(event: LiveEvent): string {
-  const low = (event.name ?? "").toLowerCase()
-  if (low.includes("fifa world cup") || low.includes("fifa"))
-    return "North America 2026 — Football Championship"
-  if (low.includes("uefa champions league"))
-    return "UEFA Club Football Championship"
-  return event.name
-}
+import { getEventHeroImage, type EventImage } from "@/lib/eventImageSearch";
+// Import the TYPE only — gives us the correct shape for getEventHeroImage.
+// We do NOT import getAllEvents/getFeaturedEvents — those return hardcoded data.
+// Real events come from /api/featured-events below.
+import type { Event } from "@/lib/eventService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getDaysUntil(dateStr: string): number {
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / 86_400_000)
+  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-function formatDate(dateStr: string): string {
+function formatEventDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
-  })
+  });
 }
 
-const DISMISS_KEY  = (id: string) => `gladys_toast_v4_${id}`
-const DISMISS_COOL = 12 // hours before re-showing
+function getUrgency(days: number): { label: string; hot: boolean } {
+  if (days <= 7)  return { label: "This week", hot: true };
+  if (days <= 14) return { label: "Next week", hot: true };
+  if (days <= 30) return { label: "This month", hot: false };
+  if (days <= 60) return { label: `In ${days} days`, hot: false };
+  return { label: formatEventDate(""), hot: false };
+}
+
+function getCategoryLabel(event: Event): string {
+  const id   = (event.id   ?? "").toLowerCase();
+  const name = (event.name ?? "").toLowerCase();
+  const cat  = ((event as any).category ?? event.type ?? "").toLowerCase();
+
+  // Specific prestige events
+  if (id.includes("world-cup")  || name.includes("world cup")       || id.includes("fifa"))         return "FIFA World Cup";
+  if (id.includes("champions")  || name.includes("champions league"))                                 return "Champions League";
+  if (id.includes("super-bowl") || name.includes("super bowl"))                                       return "Super Bowl";
+  if (id.includes("coachella")  || name.includes("coachella"))                                        return "Coachella";
+  if (name.includes("glastonbury"))                                                                     return "Glastonbury";
+  if (name.includes("tomorrowland"))                                                                    return "Tomorrowland";
+  if (name.includes("rock in rio"))                                                                     return "Rock in Rio";
+  if (name.includes("lollapalooza"))                                                                    return "Lollapalooza";
+  if (name.includes("formula 1") || name.includes("grand prix") || name.includes("f1 "))              return "Formula 1";
+  // Generic categories
+  const festKeywords = ['festival', 'fest ', ' fest', 'carnival', 'bonnaroo', 'burning man', 'primavera'];
+  if (cat === 'festival' || festKeywords.some(k => name.includes(k)))                                   return "Festival";
+  if (cat.includes("sport") || cat.includes("football") || cat.includes("basketball"))                 return "Sports";
+  if (cat === 'music' || cat.includes("concert"))                                                       return "Music";
+  return "Live Event";
+}
+
+function getCategoryEmoji(label: string): string {
+  if (label.includes("FIFA") || label.includes("Champions") || label.includes("Super Bowl")) return "🏆";
+  if (label === "Formula 1")   return "🏎️";
+  if (label === "Sports")      return "⚽";
+  if (label === "Coachella")   return "🌵";
+  if (label === "Glastonbury") return "🎪";
+  if (label === "Tomorrowland")return "🎆";
+  if (label === "Rock in Rio") return "🎸";
+  if (label === "Lollapalooza")return "🎡";
+  if (label === "Festival")    return "🎉";
+  if (label === "Music")       return "🎵";
+  return "🎫";
+}
+
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  "FIFA World Cup":    "from-emerald-950 via-green-900 to-slate-900",
+  "Champions League":  "from-indigo-950 via-blue-900 to-slate-900",
+  "Super Bowl":        "from-red-950 via-slate-900 to-slate-900",
+  "Formula 1":         "from-red-950 via-gray-900 to-slate-900",
+  "Sports":            "from-blue-950 via-slate-900 to-slate-900",
+  "Music":             "from-violet-950 via-purple-900 to-slate-900",
+  "Coachella":         "from-amber-950 via-orange-900 to-slate-900",
+  "Glastonbury":       "from-green-950 via-emerald-900 to-slate-900",
+  "Tomorrowland":      "from-purple-950 via-violet-900 to-slate-900",
+  "Rock in Rio":       "from-yellow-950 via-orange-900 to-slate-900",
+  "Lollapalooza":      "from-pink-950 via-rose-900 to-slate-900",
+  "Festival":          "from-orange-950 via-amber-900 to-slate-900",
+  "Live Event":        "from-gray-900 to-slate-950",
+};
+
+// ─── Image attribution ────────────────────────────────────────────────────────
+
+function imageAttribution(image: EventImage): string | null {
+  if (image.source === "ticketmaster") return null; // official — no credit needed
+  if (image.source === "unsplash" && image.photographer) return `${image.photographer} · Unsplash`;
+  if (image.source === "pexels"   && image.photographer) return `${image.photographer} · Pexels`;
+  return null;
+}
+
+// ─── Dismiss helpers ──────────────────────────────────────────────────────────
+
+const KEY  = (id: string) => `gladys_notif_v2_${id}`;
+const COOL = 12; // hours
 
 function wasDismissed(id: string): boolean {
   try {
-    const ts = localStorage.getItem(DISMISS_KEY(id))
-    return !!ts && (Date.now() - parseInt(ts)) / 3_600_000 < DISMISS_COOL
-  } catch { return false }
+    const ts = localStorage.getItem(KEY(id));
+    return !!ts && (Date.now() - parseInt(ts)) / 3_600_000 < COOL;
+  } catch { return false; }
 }
 
-function markDismissed(id: string) {
-  try { localStorage.setItem(DISMISS_KEY(id), Date.now().toString()) } catch {}
+function setDismissed(id: string) {
+  try { localStorage.setItem(KEY(id), Date.now().toString()); } catch {}
 }
 
-// Pick the best event — highest rank, has image, not dismissed, in future
-function pickBestEvent(events: LiveEvent[]): LiveEvent | null {
-  const today = new Date().toISOString().split("T")[0]
-  return events
-    .filter(e => e.date >= today)
-    .filter(e => !wasDismissed(e.id))
-    .filter(e => !!e.image) // only real images from Ticketmaster / API-Football
-    .sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0))[0] ?? null
+// ─── Event scoring ────────────────────────────────────────────────────────────
+
+function selectBestEvent(events: Event[], userLocation?: string): Event | null {
+  const future = events.filter(e => new Date(e.startDate) > new Date());
+  if (!future.length) return null;
+
+  const scored = future.map(e => {
+    if (wasDismissed(e.id)) return { e, score: -999 };
+
+    let s = 0;
+    const days  = getDaysUntil(e.startDate);
+    const label = getCategoryLabel(e);
+
+    // Urgency
+    if (days <= 7)       s += 100;
+    else if (days <= 30) s += 50;
+    else if (days <= 90) s += 20;
+
+    // Prestige — equalised across categories so music/festival surfaces as often as sports
+    if (label.includes("FIFA") || label.includes("Champions") || label.includes("Super Bowl")) s += 60;
+    if (label === "Sports")                                      s += 40;
+    if (label === "Coachella" || label.includes("Festival"))     s += 55; // major festivals rank near top events
+    if (label === "Music")                                       s += 45;
+
+    // Data quality bonuses
+    if (e.priceRange?.min)                           s += 20;
+    if ((e as any).images?.length)                   s += 15; // Has Ticketmaster images
+    if ((e as any).imageUrl || (e as any).image)     s += 10;
+
+    // Location match
+    if (userLocation) {
+      const loc = `${e.location?.city ?? ""} ${e.location?.country ?? ""}`.toLowerCase();
+      if (loc.includes(userLocation.toLowerCase()))  s += 60;
+    }
+
+    return { e, score: s };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  const top = scored[0];
+  return top.score > -999 ? top.e : null;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Hero image component ─────────────────────────────────────────────────────
+
+function HeroImage({ event, image }: { event: Event; image: EventImage | null }) {
+  const [err, setErr] = useState(false);
+  const category = getCategoryLabel(event);
+  const gradient = CATEGORY_GRADIENTS[category] ?? CATEGORY_GRADIENTS["Live Event"];
+  const src = image?.url ?? "";
+
+  if (!src || err) {
+    return (
+      <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+        <div className="text-center">
+          <span className="text-5xl opacity-70 block">{getCategoryEmoji(category)}</span>
+          <span className="text-white/40 text-xs mt-2 block font-medium tracking-widest uppercase">
+            {category}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={image?.alt ?? event.name}
+      className="w-full h-full object-cover"
+      onError={() => setErr(true)}
+    />
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  userLocation?: string
-  onDismiss?:    () => void
+  userLocation?: string;
+  onDismiss?: () => void;
 }
 
 export default function EventNotificationToast({ userLocation, onDismiss }: Props) {
-  const [visible,  setVisible]  = useState(false)
-  const [event,    setEvent]    = useState<LiveEvent | null>(null)
-  const [imgError, setImgError] = useState(false)
+  const [visible,      setVisible]      = useState(false);
+  const [event,        setEvent]        = useState<Event | null>(null);
+  const [heroImage,    setHeroImage]    = useState<EventImage | null>(null);
+  const [imageLoading, setImageLoading] = useState(true);
 
   useEffect(() => {
-    let dead = false
+    let dead = false;
 
-    async function load() {
+    async function init() {
       try {
-        const res  = await fetch("/api/featured-events", { signal: AbortSignal.timeout(8000) })
-        const data = await res.json()
-        if (dead || !data.success) return
+        // Fetch real events from the same API used by FeaturedEvents component
+        const res  = await fetch('/api/featured-events');
+        const json = await res.json();
+        if (!json.success || !json.events?.length) return;
 
-        const best = pickBestEvent(data.events ?? [])
-        if (!best || dead) return
+        // Normalise LiveEvent (API shape) → eventService.Event (type shape)
+        // Required by getEventHeroImage which expects eventService.Event
+        const events: Event[] = json.events.map((ev: any) => ({
+          ...ev,
+          // Date fields — API has 'date' only, eventService.Event needs startDate + endDate
+          startDate: ev.date ?? ev.startDate ?? '',
+          endDate:   ev.date ?? ev.endDate   ?? '',   // single-day events: endDate = date
+          // Category → type (API uses 'category', eventService.Event uses 'type')
+          type: (ev.category === 'festival' ? 'festival'
+               : ev.category === 'music'   ? 'music'
+               : 'sports') as Event['type'],
+          // Location — API has flat city/country, eventService.Event uses nested location
+          location: {
+            city:    ev.city    ?? ev.location?.city    ?? '',
+            country: ev.country ?? ev.location?.country ?? '',
+            venue:   ev.venue   ?? ev.location?.venue,
+          },
+          // priceRange — eventService.Event requires both min AND max
+          priceRange: ev.priceMin != null
+            ? { min: ev.priceMin, max: ev.priceMax ?? ev.priceMin, currency: ev.currency ?? 'USD' }
+            : undefined,
+        }));
 
-        setEvent(best)
-        const t = setTimeout(() => { if (!dead) setVisible(true) }, 3500)
-        return () => clearTimeout(t)
+        const best = selectBestEvent(events, userLocation);
+        if (!best || dead) return;
+        setEvent(best);
+
+        // Fetch image — Ticketmaster first (see eventImageSearch.ts priority chain)
+        setImageLoading(true);
+        try {
+          const img = await getEventHeroImage(best);
+          if (!dead) setHeroImage(img);
+        } catch {
+          // Gradient fallback handled in HeroImage component
+        } finally {
+          if (!dead) setImageLoading(false);
+        }
+
+        const t = setTimeout(() => { if (!dead) setVisible(true); }, 4000);
+        return () => clearTimeout(t);
       } catch (err) {
-        console.warn("[EventNotificationToast]", err)
+        console.error("[EventNotificationToast]", err);
       }
     }
 
-    load()
-    return () => { dead = true }
-  }, [])
+    init();
+    return () => { dead = true; };
+  }, [userLocation]);
 
   const dismiss = useCallback(() => {
-    setVisible(false)
-    if (event) markDismissed(event.id)
-    onDismiss?.()
-  }, [event, onDismiss])
+    setVisible(false);
+    if (event) setDismissed(event.id);
+    onDismiss?.();
+  }, [event, onDismiss]);
 
-  if (!event) return null
+  if (!event) return null;
 
-  const days        = getDaysUntil(event.date)
-  const isHot       = days >= 0 && days <= 14
-  const display     = getSafeDisplay(event)
-  const safeName    = getSafeName(event)
-  const location    = [event.city, event.country].filter(Boolean).join(", ")
-  const progressPct = days > 0 && days <= 180 ? Math.max(4, 100 - (days / 180) * 100) : 0
-  const ctaUrl      = event.ticketUrl || `/events/${event.id}`
-  const isExternal  = !!event.ticketUrl
+  const days        = getDaysUntil(event.startDate);
+  const urgency     = getUrgency(days);
+  const hasPrice    = event.priceRange?.min != null;
+  const ctaUrl      = (event as any).officialUrl || `/events/${event.id}`;
+  const isExternal  = !!(event as any).officialUrl;
+  const progressPct = days > 0 && days <= 180 ? Math.max(4, 100 - (days / 180) * 100) : 0;
+  const credit      = heroImage ? imageAttribution(heroImage) : null;
 
-  const ctaBase = "flex items-center justify-between w-full px-4 py-3 rounded-2xl text-sm font-black text-white transition-all hover:opacity-90 active:scale-[0.98] group"
+  const ctaClass =
+    "flex items-center justify-between w-full px-4 py-2.5 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-95 transition-all group";
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, y: 32, scale: 0.93 }}
-          animate={{ opacity: 1, y: 0,  scale: 1    }}
-          exit={{   opacity: 0, y: 20,  scale: 0.96 }}
-          transition={{ type: "spring", stiffness: 380, damping: 30 }}
-          className="fixed bottom-24 right-5 z-40 w-[320px]"
-          style={{
-            maxWidth: "calc(100vw - 20px)",
-            fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif",
-          }}
+          initial={{ opacity: 0, y: 24, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.96 }}
+          transition={{ type: "spring", stiffness: 360, damping: 32 }}
+          className="fixed bottom-24 right-6 z-40 w-[340px]"
+          style={{ maxWidth: "calc(100vw - 24px)" }}
         >
-          <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap');`}</style>
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
 
-          <div
-            className="rounded-3xl overflow-hidden"
-            style={{ boxShadow: `0 24px 60px -12px ${display.color}50, 0 8px 32px -4px rgba(0,0,0,0.5)` }}
-          >
-            {/* ── Hero image (real from Ticketmaster/API-Football) ── */}
-            <div className="relative w-full h-[165px] overflow-hidden">
+            {/* ── Hero image ───────────────────────────────── */}
+            <div className="relative w-full h-36 overflow-hidden bg-gray-100">
 
-              {event.image && !imgError ? (
-                <img
-                  src={event.image}
-                  alt={safeName}
-                  className="w-full h-full object-cover"
-                  onError={() => setImgError(true)}
-                />
-              ) : (
-                <div
-                  className="w-full h-full flex items-center justify-center"
-                  style={{ background: display.gradient }}
-                >
-                  <span className="text-6xl opacity-25">{display.tag.split(" ")[0]}</span>
-                </div>
+              {/* Shimmer while loading */}
+              {imageLoading && (
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 animate-pulse" />
               )}
 
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-transparent" />
+              <HeroImage event={event} image={heroImage} />
+
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
               {/* Category pill */}
-              <div className="absolute top-3 left-3">
-                <span
-                  className="text-[11px] font-black px-2.5 py-1 rounded-full text-white"
-                  style={{ background: `${display.color}DD`, backdropFilter: "blur(8px)" }}
-                >
-                  {display.tag}
-                </span>
-              </div>
+              <span className="absolute top-3 left-3 text-xs font-semibold text-white bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-wide">
+                {getCategoryLabel(event)}
+              </span>
 
-              {/* Hot badge */}
-              {isHot && (
-                <div className="absolute top-3 right-9">
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring" }}
-                    className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full"
-                  >
-                    <Flame size={9} />{days <= 7 ? "This week" : "Soon"}
-                  </motion.span>
+              {/* Urgency badge */}
+              {urgency.hot && (
+                <motion.div
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="absolute top-3 right-9 flex items-center gap-1 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"
+                >
+                  <Flame size={9} />
+                  {urgency.label}
+                </motion.div>
+              )}
+
+              {/* Ticketmaster badge — shown when image is official */}
+              {heroImage?.source === "ticketmaster" && (
+                <div className="absolute bottom-10 right-3">
+                  <span className="text-[9px] text-white/50 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+                    Official image
+                  </span>
                 </div>
               )}
 
-              {/* Dismiss button */}
+              {/* Dismiss */}
               <button
                 onClick={dismiss}
-                aria-label="Dismiss notification"
-                className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                aria-label="Dismiss"
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors"
               >
-                <X size={12} />
+                <X size={11} />
               </button>
 
-              {/* Event name at bottom of image */}
-              <div className="absolute bottom-3 left-4 right-4">
-                <p className="text-white font-black text-[15px] leading-snug line-clamp-2 drop-shadow-lg">
-                  {safeName}
+              {/* Event name */}
+              <div className="absolute bottom-3 left-3 right-3">
+                <p className="text-white font-bold text-[15px] leading-snug line-clamp-2 drop-shadow">
+                  {event.name}
                 </p>
-                {event.attraction && event.attraction !== event.name && (
-                  <p className="text-white/40 text-[11px] mt-0.5 line-clamp-1">{event.attraction}</p>
+                {/* Photo credit only for Unsplash/Pexels */}
+                {credit && (
+                  <p className="text-white/40 text-[10px] mt-0.5">{credit}</p>
                 )}
               </div>
             </div>
 
-            {/* ── Info body ─────────────────────── */}
-            <div className="bg-[#0F172A] px-4 pt-3 pb-4 space-y-3">
+            {/* ── Body ─────────────────────────────────────── */}
+            <div className="p-4 space-y-3">
 
-              {/* Date + price */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1 min-w-0">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-                    <Calendar size={11} className="text-slate-500 flex-shrink-0" />
-                    {formatDate(event.date)}{event.time ? ` · ${event.time}` : ""}
+              {/* Date + Price */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">
+                    {formatEventDate(event.startDate)}
                   </p>
-                  {location && (
-                    <p className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <MapPin size={11} className="flex-shrink-0" />
-                      <span className="truncate">{location}</span>
-                    </p>
-                  )}
-                  {event.venue && event.venue !== event.city && (
-                    <p className="text-xs text-slate-600 pl-[19px] truncate">{event.venue}</p>
-                  )}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {[event.location?.city, event.location?.country].filter(Boolean).join(", ")}
+                  </p>
                 </div>
 
-                {event.priceMin && (
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-[10px] text-slate-600 uppercase tracking-wider font-bold">From</p>
-                    <p className="text-sm font-black text-white">
-                      {event.currency ?? "USD"} {event.priceMin.toLocaleString()}
+                {hasPrice && (
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider">From</p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {event.priceRange?.currency ?? "USD"}{" "}
+                      {event.priceRange!.min!.toLocaleString()}
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Countdown progress bar */}
+              {/* Proximity bar */}
               {progressPct > 0 && (
-                <div className="h-0.5 bg-slate-800 rounded-full overflow-hidden">
+                <div className="h-0.5 bg-gray-100 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${progressPct}%` }}
-                    transition={{ duration: 1.4, delay: 0.6, ease: "easeOut" }}
-                    className="h-full rounded-full"
-                    style={{ background: display.color }}
+                    transition={{ duration: 1.2, delay: 0.6, ease: "easeOut" }}
+                    className={`h-full rounded-full ${urgency.hot ? "bg-red-500" : "bg-black"}`}
                   />
                 </div>
               )}
 
               {/* CTA */}
               {isExternal ? (
-                <a
-                  href={ctaUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={dismiss}
-                  className={ctaBase}
-                  style={{ background: `linear-gradient(135deg, ${display.color}, ${display.color}88)` }}
-                >
-                  <span className="flex items-center gap-2"><Ticket size={14} />Plan Trip</span>
+                <a href={ctaUrl} target="_blank" rel="noopener noreferrer" onClick={dismiss} className={ctaClass}>
+                  <span>Plan Event Trip</span>
                   <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </a>
               ) : (
-                <Link
-                  href={ctaUrl}
-                  onClick={dismiss}
-                  className={ctaBase}
-                  style={{ background: `linear-gradient(135deg, ${display.color}, ${display.color}88)` }}
-                >
-                  <span className="flex items-center gap-2"><Ticket size={14} />Plan Trip</span>
+                <Link href={ctaUrl} onClick={dismiss} className={ctaClass}>
+                  <span>Plan Event Trip</span>
                   <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                 </Link>
               )}
 
-              <p className="text-center text-[10px] text-slate-700 tracking-widest uppercase font-semibold">
+              <p className="text-center text-[10px] text-gray-300 tracking-wide">
                 Gladys Travel AI
               </p>
             </div>
@@ -313,5 +405,5 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
         </motion.div>
       )}
     </AnimatePresence>
-  )
+  );
 }

@@ -9,7 +9,7 @@ import {
   AlertCircle, Globe, DollarSign, ChevronDown,
 } from "lucide-react";
 
-import type { ItineraryData, TimeBlock, EventBlock, DayPlan } from "@/lib/mock-itinerary";
+import type { ItineraryData, TimeBlock, EventBlock, DayPlan, SmartAffiliate } from "@/lib/mock-itinerary";
 import VenueDirections   from "@/components/VenueDirections";
 import SeatMapViewer     from "@/components/SeatMapViewer";
 import LiveMatchTracker  from "@/components/LiveMatchTracker";
@@ -184,10 +184,10 @@ function WeatherBadge({ weather, date }: { weather: WeatherDay[]; date: string }
 }
 
 // ── EXPLORE CITY STRIP ────────────────────────────────────────────────────────
-function NearbyStrip({ city }: { city: string }) {
-  // show=true by default — data loads AND renders immediately, no click required
-  const [show,      setShow]      = useState(true);
+function NearbyStrip({ city, defaultOpen = true }: { city: string; defaultOpen?: boolean }) {
+  const [show,      setShow]      = useState(defaultOpen); // collapsed on event day, open otherwise
   const [activeTab, setActiveTab] = useState(0);
+  // Always fetch regardless of show state — data is ready when user expands
   const { categories, loading, error } = useExploreCity(city, true);
 
   return (
@@ -397,6 +397,87 @@ function PackingReminder({ eventType, isEventDay }: { eventType: string; isEvent
 }
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
+// ── Smart Affiliate Card ─────────────────────────────────────────────────────
+
+const AFFILIATE_COLORS: Record<string, string> = {
+  esim:      '#6C47FF',
+  insurance: '#00B4A2',
+  transfer:  '#FFA500',
+  flights:   '#1B6CF2',
+};
+
+const AFFILIATE_ICONS: Record<string, string> = {
+  esim:      '📶',
+  insurance: '🛡️',
+  transfer:  '🚕',
+  flights:   '✈️',
+};
+
+function SmartAffiliateCard({ affiliate }: { affiliate: SmartAffiliate }) {
+  const color = AFFILIATE_COLORS[affiliate.category] ?? '#0EA5E9';
+  const icon  = AFFILIATE_ICONS[affiliate.category] ?? '🔗';
+
+  return (
+    <a
+      href={affiliate.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-start gap-3 p-4 rounded-2xl border-2 transition-all hover:shadow-md group"
+      style={{ background: `${color}08`, borderColor: `${color}30` }}
+    >
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
+        style={{ background: `${color}15` }}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-black uppercase tracking-wider mb-0.5" style={{ color }}>
+          {affiliate.partner}
+        </p>
+        <p className="text-sm font-bold text-slate-900 leading-snug mb-1">
+          {affiliate.headline}
+        </p>
+        <p className="text-xs text-slate-500 leading-relaxed">{affiliate.desc}</p>
+      </div>
+      <span
+        className="text-xs font-black px-3 py-1.5 rounded-xl text-white flex-shrink-0 mt-0.5 group-hover:opacity-90 transition-opacity"
+        style={{ background: color }}
+      >
+        {affiliate.btnLabel}
+      </span>
+    </a>
+  );
+}
+
+// ── Smart Affiliates Panel ─────────────────────────────────────────────────────
+
+function SmartAffiliatesPanel({
+  affiliates,
+  triggerDay,
+  label,
+}: {
+  affiliates: SmartAffiliate[];
+  triggerDay?: number | 'overview';
+  label?: string;
+}) {
+  const filtered = affiliates.filter(a =>
+    triggerDay === 'overview'
+      ? a.triggerDay === undefined
+      : a.triggerDay === triggerDay
+  );
+  if (!filtered.length) return null;
+
+  return (
+    <div className="space-y-2 mt-4">
+      <p className="text-xs font-black uppercase tracking-widest text-slate-400 px-1">
+        {label ?? '💡 Recommended for this trip'}
+      </p>
+      {filtered.map(a => (
+        <SmartAffiliateCard key={a.id} affiliate={a} />
+      ))}
+    </div>
+  );
+}
+
 export default function ItineraryView({
   data,
   startDate,
@@ -490,6 +571,15 @@ export default function ItineraryView({
           )}
 
           {data.budget.breakdown && <BudgetCard budget={data.budget} cfg={cfg} />}
+
+          {/* Smart affiliates — overview level (AirHelp, insurance) */}
+          {data.smartAffiliates && data.smartAffiliates.length > 0 && (
+            <SmartAffiliatesPanel
+              affiliates={data.smartAffiliates}
+              triggerDay="overview"
+              label="💡 Recommended for your trip"
+            />
+          )}
         </div>
       )}
 
@@ -725,9 +815,24 @@ export default function ItineraryView({
             </div>
           )}
 
-          {/* Explore City — non-event days */}
-          {!currentDay.isEventDay && currentDay.city && (
-            <NearbyStrip city={currentDay.city} />
+          {/* Explore City — show on all days.
+               Event day: collapsed by default (user focused on the event).
+               Other days: expanded by default. */}
+          {currentDay.city && (
+            <NearbyStrip city={currentDay.city} defaultOpen={!currentDay.isEventDay} />
+          )}
+
+          {/* Smart affiliates — day-specific (eSIM on day 1, transfer on last day) */}
+          {data.smartAffiliates && data.smartAffiliates.length > 0 && (
+            <SmartAffiliatesPanel
+              affiliates={data.smartAffiliates}
+              triggerDay={currentDay.day}
+              label={
+                currentDay.day === 1 ? '📲 Before you go'
+                : currentDay.day === data.days.length ? '🚕 Getting home'
+                : undefined
+              }
+            />
           )}
 
           {/* Tips */}

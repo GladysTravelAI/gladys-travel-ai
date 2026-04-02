@@ -203,6 +203,14 @@ export default function HomeClient() {
   const [showDates,  setShowDates]  = useState(false);
   const origin = 'Johannesburg, South Africa';
 
+  // Calculate trip duration from date picker — capped at 10 days for quality.
+  // Falls back to 5 if no dates selected.
+  const calcDays = (): number => {
+    if (!startDate || !endDate) return 5;
+    const diff = Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000);
+    return Math.min(Math.max(diff, 1), 10); // clamp 1–10
+  };
+
   const [response,         setResponse]        = useState<AgentResponse | null>(null);
   const [loading,          setLoading]          = useState(false);
   const [tab,              setTab]              = useState('itinerary');
@@ -290,9 +298,13 @@ export default function HomeClient() {
           eventCountry: agentData.destination?.country || '',
           eventType:    ev.type === 'festival' ? 'festivals' : ev.type === 'music' ? 'music' : 'sports',
           ticketUrl:    ev.ticketUrl || agentData.affiliate_links?.tickets || null,
-          days: 5, budget: 'mid', groupSize: 1,
-          startDate: agentData.travel_dates?.arrival_date,
-          endDate:   agentData.travel_dates?.departure_date,
+          days: calcDays(), budget: 'mid', groupSize: 1,
+          startDate: startDate?.toISOString().split('T')[0] || agentData.travel_dates?.arrival_date,
+          endDate:   endDate?.toISOString().split('T')[0]   || agentData.travel_dates?.departure_date,
+          // Context for smart affiliate injection
+          originCountry: 'ZA',
+          destinationCountry: agentData.destination?.country || '',
+          hasFlights: (agentData.flights?.length ?? 0) > 0,
         }),
       });
       const data = await res.json();
@@ -347,7 +359,7 @@ export default function HomeClient() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: loc,
-          context: { eventType, origin, days: 5, startDate: startDate?.toISOString(), endDate: endDate?.toISOString() },
+          context: { eventType, origin, days: calcDays(), startDate: startDate?.toISOString(), endDate: endDate?.toISOString() },
         }),
       });
       const result = await res.json();
@@ -360,15 +372,16 @@ export default function HomeClient() {
           eventName: result.data.event.name,
           eventType: result.data.event.type ?? eventType ?? 'sports',
           city:      result.data.destination?.city ?? loc,
-          days:      5,
+          days:      calcDays(),
           source:    'search',
         });
       }
+      const tripDays = calcDays();
       toast.success(
         result.data.intent === 'city_selection_required'
           ? `${result.data.event_name} — pick your city`
           : `Found: ${result.data.event?.name || loc}`,
-        { id: t, description: `${result.data.hotels?.length || 0} hotels · ${result.data.flights?.length || 0} flights` }
+        { id: t, description: `${tripDays}-day itinerary · ${result.data.hotels?.length || 0} hotels · ${result.data.flights?.length || 0} flights` }
       );
       setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 500);
       if (result.data.intent !== 'city_selection_required' && result.data.event?.name) {

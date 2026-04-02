@@ -38,7 +38,14 @@ function catColor(cat: string) {
   if (cat === 'sports')   return SKY;
   if (cat === 'music')    return '#8B5CF6';
   if (cat === 'festival') return '#F97316';
-  return '#10B981';
+  return '#64748B'; // 'other' → neutral slate
+}
+
+function catLabel(cat: string): string {
+  if (cat === 'sports')   return 'Sports';
+  if (cat === 'music')    return 'Music';
+  if (cat === 'festival') return 'Festival';
+  return 'Event'; // 'other' shown as generic 'Event' not 'other'
 }
 
 function CatIcon({ cat, size = 12 }: { cat: string; size?: number }) {
@@ -58,14 +65,14 @@ function fmtDate(d: string) {
 // Shown when input is focused but empty
 
 const TRENDING: Array<{ name: string; category: Suggestion['category']; emoji: string }> = [
-  { name: 'UEFA Champions League',            category: 'sports',   emoji: '🏆' },
-  { name: 'Coachella 2026',                   category: 'festival', emoji: '🎪' },
-  { name: 'Taylor Swift',                     category: 'music',    emoji: '🎤' },
-  { name: 'NBA Finals',                       category: 'sports',   emoji: '🏀' },
-  { name: 'Coldplay Music of the Spheres',    category: 'music',    emoji: '🎵' },
-  { name: 'Formula 1 Monaco Grand Prix',      category: 'sports',   emoji: '🏎️' },
+  { name: 'UEFA Champions League Final',      category: 'sports',   emoji: '🏆' },
+  { name: 'Taylor Swift Eras Tour',           category: 'music',    emoji: '🎤' },
   { name: 'Glastonbury Festival',             category: 'festival', emoji: '🌟' },
-  { name: 'Premier League',                  category: 'sports',   emoji: '⚽' },
+  { name: 'Formula 1 Monaco Grand Prix',      category: 'sports',   emoji: '🏎️' },
+  { name: 'Coldplay Music of the Spheres',    category: 'music',    emoji: '🎵' },
+  { name: 'Tomorrowland Belgium',             category: 'festival', emoji: '🎪' },
+  { name: 'NBA Finals',                       category: 'sports',   emoji: '🏀' },
+  { name: 'Rock in Rio',                      category: 'music',    emoji: '🎸' },
 ];
 
 // ── MAIN COMPONENT ─────────────────────────────────────────────────────────────
@@ -88,7 +95,7 @@ export default function SearchBar({
 
   // ── Fetch suggestions ──
   const fetchSuggestions = useCallback(async (q: string) => {
-    if (q.length < 2) { setSuggestions([]); return; }
+    if (q.length < 3) { setSuggestions([]); return; }
 
     // Cancel previous request
     if (abortRef.current) abortRef.current.abort();
@@ -113,7 +120,7 @@ export default function SearchBar({
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!value.trim()) { setSuggestions([]); return; }
-    debounceRef.current = setTimeout(() => fetchSuggestions(value), 280);
+    debounceRef.current = setTimeout(() => fetchSuggestions(value), 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [value, fetchSuggestions]);
 
@@ -179,7 +186,7 @@ export default function SearchBar({
   };
 
   const showTrending  = showDropdown && !value.trim();
-  const showResults   = showDropdown && value.trim().length >= 2;
+  const showResults   = showDropdown && value.trim().length >= 3;
   const dropdownOpen  = showTrending || showResults;
 
   // ── RENDER ──────────────────────────────────────────────────────────────────
@@ -257,7 +264,7 @@ export default function SearchBar({
                     </div>
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0"
                       style={{ background: catColor(t.category) }}>
-                      {t.category}
+                      {catLabel(t.category)}
                     </span>
                   </button>
                 ))}
@@ -274,12 +281,36 @@ export default function SearchBar({
                   </div>
                 )}
 
-                {!fetching && suggestions.length === 0 && (
-                  <div className="px-3 py-4 text-slate-400 text-sm text-center">
-                    <Sparkles size={20} className="mx-auto mb-2 opacity-40" />
-                    No events found — try a different search
-                  </div>
-                )}
+                {!fetching && suggestions.length === 0 && (() => {
+                  // Fix 3: detect if query looks like a city/country (geographic)
+                  // vs an event name — give different messages for each case.
+                  const looksLikePlace = /^(santiago|lima|buenos aires|bogota|chile|peru|argentina|brazil|brasil|nigeria|kenya|ghana|india|pakistan|bangladesh|cairo|jakarta|manila|bangkok|seoul|beijing|moscow|cairo|lagos)$/i.test(value.trim())
+                  return (
+                    <div className="px-3 py-5 text-center">
+                      <Sparkles size={20} className="mx-auto mb-2 text-slate-300" />
+                      {looksLikePlace ? (
+                        <>
+                          <p className="text-sm font-semibold text-slate-500 mb-1">
+                            No major events found in {value.trim()}
+                          </p>
+                          <p className="text-xs text-slate-400 max-w-[240px] mx-auto leading-relaxed">
+                            Our live database has limited coverage in this region.
+                            Try searching a specific event or festival name instead.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold text-slate-500 mb-1">
+                            No events found — try a different spelling
+                          </p>
+                          <p className="text-xs text-slate-400 max-w-[240px] mx-auto leading-relaxed">
+                            Or press Search below to explore all matching results.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {suggestions.length > 0 && (
                   <>
@@ -317,21 +348,30 @@ export default function SearchBar({
                                 <Calendar size={9} />{fmtDate(s.date)}
                               </span>
                             )}
-                            {s.city && (
+                            {(s.city || s.venue) && (
                               <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <MapPin size={9} />{s.city}
+                                <MapPin size={9} />{s.city || s.venue}
                               </span>
                             )}
                             {s.type === 'attraction' && (
-                              <span className="text-xs text-slate-400">Artist / Team</span>
+                              <span className="text-xs text-slate-400">
+                                {s.category === 'music'    ? 'Music Artist'  :
+                                 s.category === 'sports'   ? 'Sports Team'   :
+                                 s.category === 'festival' ? 'Festival'      :
+                                 'Performer / Act'}
+                              </span>
+                            )}
+                            {s.type === 'event' && !s.date && !s.city && (
+                              <span className="text-xs text-slate-400">{catLabel(s.category)}</span>
                             )}
                           </div>
                         </div>
 
-                        {/* Category pill */}
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0"
+                        {/* Category pill — 'other' shown as 'Event' not 'other' */}
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full text-white flex-shrink-0 flex items-center gap-1"
                           style={{ background: catColor(s.category) }}>
                           <CatIcon cat={s.category} size={9} />
+                          <span className="hidden sm:inline">{catLabel(s.category)}</span>
                         </span>
                       </button>
                     ))}

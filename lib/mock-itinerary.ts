@@ -57,6 +57,19 @@ export interface DayPlan {
   tips?: string[];
 }
 
+export interface SmartAffiliate {
+  id:          string;
+  partner:     string;
+  reason:      string;
+  headline:    string;
+  desc:        string;
+  btnLabel:    string;
+  url:         string;
+  category:    'esim' | 'insurance' | 'transfer' | 'flights';
+  triggerDay?: number;
+  priority:    number;
+}
+
 export interface ItineraryData {
   overview:     string;
   eventAnchor?: EventAnchor;
@@ -82,5 +95,6 @@ export interface ItineraryData {
       activities:    string;
     };
   };
-  days: DayPlan[];
+  days:             DayPlan[];
+  smartAffiliates?: SmartAffiliate[];
 }
