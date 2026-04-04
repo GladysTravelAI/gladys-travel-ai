@@ -217,6 +217,72 @@ export default function TripDashboard({ trip: initialTrip, currentUserId, curren
                 </div>
               )}
 
+              {/* ── Group Affiliates — each person books their own ── */}
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase tracking-wider text-gray-400">
+                  📲 Book your part of the trip
+                </p>
+                <p className="text-[11px] text-gray-400 leading-relaxed">
+                  Everyone books independently — click your own links below. No group payment needed.
+                </p>
+                {[
+                  {
+                    icon: '📶',
+                    partner: 'Yesim',
+                    headline: `Stay connected in ${trip.destinationCity || trip.destination}`,
+                    desc: 'Get a local eSIM before you land. No roaming fees.',
+                    btn: 'Get eSIM',
+                    url: 'https://yesim.app/?utm_source=gladystravel',
+                    color: '#6C47FF',
+                  },
+                  {
+                    icon: '🛡️',
+                    partner: 'EKTA',
+                    headline: 'Travel insurance for your trip',
+                    desc: 'Covers medical, cancellations and lost baggage. Buy in 2 min.',
+                    btn: 'Get Insured',
+                    url: 'https://ekta.one/?utm_source=gladystravel',
+                    color: '#00B4A2',
+                  },
+                  {
+                    icon: '🚕',
+                    partner: 'Kiwitaxi',
+                    headline: `Airport transfer to ${trip.destinationCity || trip.destination}`,
+                    desc: `${members.length > 2 ? `Group of ${members.length}? Book a minivan — fixed price, no surge.` : 'Pre-book your airport pickup. Fixed price, no surge.'}`,
+                    btn: 'Book Transfer',
+                    url: 'https://kiwitaxi.com/?utm_source=gladystravel',
+                    color: '#FFA500',
+                  },
+                  {
+                    icon: '✈️',
+                    partner: 'AirHelp',
+                    headline: 'Claim up to €600 if your flight is delayed',
+                    desc: 'Free to check. AirHelp monitors and claims automatically.',
+                    btn: 'Check My Flight',
+                    url: 'https://www.airhelp.com/?utm_source=gladystravel',
+                    color: '#1B6CF2',
+                  },
+                ].map((aff, i) => (
+                  <a key={i} href={aff.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-start gap-3 p-3.5 rounded-2xl border transition-all hover:shadow-md group"
+                    style={{ background: `${aff.color}08`, borderColor: `${aff.color}25` }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+                      style={{ background: `${aff.color}15` }}>
+                      {aff.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-wide mb-0.5" style={{ color: aff.color }}>{aff.partner}</p>
+                      <p className="text-xs font-bold text-gray-900 leading-snug">{aff.headline}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{aff.desc}</p>
+                    </div>
+                    <span className="text-[10px] font-black px-2.5 py-1.5 rounded-xl text-white flex-shrink-0 mt-0.5"
+                      style={{ background: aff.color }}>
+                      {aff.btn}
+                    </span>
+                  </a>
+                ))}
+              </div>
+
               {/* Ask Gladys CTA */}
               <div className="bg-gray-900 rounded-2xl p-5 text-white text-center">
                 <p className="text-sm font-bold mb-1">Ask Gladys to plan this trip</p>

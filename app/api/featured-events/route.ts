@@ -199,11 +199,15 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
   // End date = 60 days from now — focus on near-term big events
   const now    = new Date()
   const start  = now.toISOString().split('.')[0] + 'Z'
-  const end60  = new Date(now.getTime() + 60 * 86400000).toISOString().split('.')[0] + 'Z'
+  // 180 days — captures big events 2-6 months out (Glastonbury June, Tomorrowland July etc.)
+  // Urgency scoring ensures near-term events still surface first
+  const end180 = new Date(now.getTime() + 180 * 86400000).toISOString().split('.')[0] + 'Z'
+
+  type TicketmasterParams = Record<string, string>
 
   // Segment IDs: Music = KZFzniwnSyZfZ7v7nJ, Sports = KZFzniwnSyZfZ7v7nE
   // Festival genre ID = KnvZfZ7vAe1
-  const fetches = [
+  const fetches: { label: string; params: TicketmasterParams }[] = [
     // Music — concerts and tours
     { label: 'music',    params: { segmentId: 'KZFzniwnSyZfZ7v7nJ', size: '15', sort: 'relevance,desc' } },
     // Sports — basketball, motorsport, tennis, boxing
@@ -218,16 +222,12 @@ async function fetchTicketmasterEvents(): Promise<LiveEvent[]> {
 
   await Promise.allSettled(fetches.map(async ({ label, params: extraParams }) => {
     try {
-      const params = new URLSearchParams()
-      params.append('apikey', key)
-      params.append('startDateTime', start)
-      params.append('endDateTime', end60)
-
-      for (const [name, value] of Object.entries(extraParams)) {
-        if (value !== undefined && value !== null) {
-          params.append(name, value)
-        }
-      }
+      const params = new URLSearchParams({
+        apikey:        key,
+        startDateTime: start,
+        endDateTime:   end180,
+        ...extraParams,
+      })
 
       const res = await fetch(
         `https://app.ticketmaster.com/discovery/v2/events.json?${params}`,
@@ -331,10 +331,14 @@ function processEvents(events: LiveEvent[]): LiveEvent[] {
       (new Date(ev.date).getTime() - today.getTime()) / 86400000
     )
     // Events within 30 days get massive boost — they're what users need to act on now
-    const urgencyBoost = daysAway <= 7  ? 200
-                       : daysAway <= 14 ? 150
-                       : daysAway <= 30 ? 100
-                       : daysAway <= 45 ? 40
+    // Near-term events get urgency boost — but prestigious far-future events
+    // still surface via their base rank (Glastonbury rank=92, Tomorrowland rank=91)
+    const urgencyBoost = daysAway <= 7   ? 200
+                       : daysAway <= 14  ? 150
+                       : daysAway <= 30  ? 100
+                       : daysAway <= 60  ? 60
+                       : daysAway <= 90  ? 30
+                       : daysAway <= 180 ? 10
                        : 0
     return { ev, score: urgencyBoost + (ev.rank ?? 70) }
   })
@@ -423,6 +427,30 @@ function getCuratedFallback(): LiveEvent[] {
       image: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&q=80',
       ticketUrl: 'https://www.ticketmaster.com',
       rank: 91,
+    },
+    {
+      id: 'cur-s3',
+      name: 'UEFA Champions League Final 2026',
+      category: 'sports',
+      date: '2026-05-30',
+      venue: 'Wembley Stadium',
+      city: 'London',
+      country: 'UK',
+      image: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&q=80',
+      ticketUrl: 'https://www.ticketmaster.co.uk',
+      rank: 97,
+    },
+    {
+      id: 'cur-s4',
+      name: 'Formula 1 Monaco Grand Prix 2026',
+      category: 'sports',
+      date: '2026-05-24',
+      venue: 'Circuit de Monaco',
+      city: 'Monaco',
+      country: 'Monaco',
+      image: 'https://images.unsplash.com/photo-1547347298-4074fc3086f0?w=800&q=80',
+      ticketUrl: 'https://www.ticketmaster.com',
+      rank: 92,
     },
     // ── Music ──
     {

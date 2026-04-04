@@ -103,7 +103,11 @@ export default function SearchBar({
 
     setFetching(true);
     try {
-      const res  = await fetch(`/api/autocomplete?q=${encodeURIComponent(q)}`, {
+      // Pass eventType as category filter + flag short queries for fuzzy mode
+      const params = new URLSearchParams({ q })
+      if (eventType) params.set('category', eventType)
+      if (q.length <= 5) params.set('fuzzy', '1') // short query = be more lenient
+      const res  = await fetch(`/api/autocomplete?${params}`, {
         signal: abortRef.current.signal,
       });
       const data = await res.json();
@@ -242,8 +246,8 @@ export default function SearchBar({
             animate={{ opacity: 1, y: 0,  scale: 1    }}
             exit={{    opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden z-50"
-            style={{ maxHeight: '420px', overflowY: 'auto' }}
+            className="absolute top-full left-0 right-0 mt-2 bg-white rounded-3xl shadow-2xl border border-slate-100 z-[999]"
+            style={{ maxHeight: '420px', overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
           >
             {/* ── Trending (shown when input is empty) ── */}
             {showTrending && (
@@ -348,11 +352,19 @@ export default function SearchBar({
                                 <Calendar size={9} />{fmtDate(s.date)}
                               </span>
                             )}
-                            {(s.city || s.venue) && (
-                              <span className="text-xs text-slate-400 flex items-center gap-1">
-                                <MapPin size={9} />{s.city || s.venue}
-                              </span>
-                            )}
+                            {(() => {
+                              // Try city, then venue, then extract location from event name
+                              // e.g. "Lollapalooza (Sweden)" → "Sweden"
+                              // e.g. "Lollapalooza Brazil" → "Brazil"
+                              const loc = s.city || s.venue ||
+                                s.name.match(/\(([^)]+)\)$/)?.[1] ||
+                                s.name.match(/(Berlin|Paris|London|Brazil|Sweden|Chile|Mexico|Australia|Japan|India|Argentina|Colombia|Chicago|Atlanta|New York|Los Angeles|São Paulo|Sydney|Toronto)/i)?.[0];
+                              return loc ? (
+                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                  <MapPin size={9} />{loc}
+                                </span>
+                              ) : null;
+                            })()}
                             {s.type === 'attraction' && (
                               <span className="text-xs text-slate-400">
                                 {s.category === 'music'    ? 'Music Artist'  :
@@ -390,7 +402,7 @@ export default function SearchBar({
                       <p className="font-black text-sm text-slate-900">
                         Search "<span style={{ color: accent }}>{value}</span>"
                       </p>
-                      <p className="text-xs text-slate-400">Browse all matching results</p>
+                      <p className="text-xs text-slate-400">Search and plan a trip around this</p>
                     </div>
                   </button>
                 </div>

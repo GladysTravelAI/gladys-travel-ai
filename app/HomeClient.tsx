@@ -70,7 +70,7 @@ interface AgentResponse {
   }>;
 }
 
-type EventType = 'sports' | 'music' | 'festivals' | null;
+type EventType = 'sports' | 'music' | 'festivals' | undefined;
 
 // ─── TOKENS ───────────────────────────────────────────────────────────────────
 
@@ -196,7 +196,7 @@ export default function HomeClient() {
   const router   = useRouter();
   const { user } = useAuth();
 
-  const [eventType,  setEventType]  = useState<EventType>(null);
+  const [eventType,  setEventType]  = useState<EventType>(undefined);
   const [query,      setQuery]      = useState('');
   const [startDate,  setStartDate]  = useState<Date | null>(null);
   const [endDate,    setEndDate]    = useState<Date | null>(null);
@@ -348,7 +348,7 @@ export default function HomeClient() {
   const handleSearch = async (q?: string) => {
     const loc = q || query;
     if (!loc.trim()) { toast.error('Enter an event or destination'); return; }
-    if (!eventType)  { toast.error('Select Sports, Music or Festivals first'); return; }
+    // eventType defaults to null — agent handles detection, don't block search
     // Track search
     trackSearch(loc);
     trackEventSearch(loc, eventType);
@@ -386,6 +386,9 @@ export default function HomeClient() {
       setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 500);
       if (result.data.intent !== 'city_selection_required' && result.data.event?.name) {
         await generateItinerary(result.data);
+        setTab('itinerary'); // event found — show itinerary
+      } else if (result.data.intent === 'information_only') {
+        setTab('activities'); // no event found — show activities/affiliates instead
       }
     } catch (e: any) {
       toast.error('Search failed', { id: t, description: (e as Error).message });
@@ -419,11 +422,11 @@ export default function HomeClient() {
         smaller orbs, h-12 CTA, hidden scroll indicator, hidden badge on tiny screens
       */}
       <section
-        className="flex flex-col justify-center px-4 sm:px-5 pt-16 sm:pt-20 md:pt-24 pb-5 sm:pb-8 md:pb-12 relative overflow-hidden"
-        style={{ background: 'white' }}
+        className="flex flex-col justify-center px-4 sm:px-5 pt-16 sm:pt-20 md:pt-24 pb-5 sm:pb-8 md:pb-12 relative"
+        style={{ background: 'white', overflow: 'visible', zIndex: 20 }}
       >
         {/* Orbs — smaller on mobile */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-none" aria-hidden="true" style={{ zIndex: 0 }}>
           <div className="absolute -top-16 -left-16 w-[220px] h-[220px] sm:w-[400px] sm:h-[400px] rounded-full opacity-[0.10]"
             style={{ background: 'radial-gradient(circle, #38BDF8, #0284C7)' }} />
           <div className="absolute -bottom-12 -right-12 w-[180px] h-[180px] sm:w-[340px] sm:h-[340px] rounded-full opacity-[0.08]"
@@ -508,7 +511,8 @@ export default function HomeClient() {
             {/* CTA button — h-12 on mobile, h-14 on sm+ */}
             <button
               onClick={() => handleSearch()}
-              disabled={!query.trim() || !eventType || loading}
+              disabled={!query.trim() || loading}
+              title={!eventType ? 'Select Sports, Music or Festivals first' : ''}
               className="w-full h-12 sm:h-14 font-black rounded-2xl text-sm sm:text-base transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80 shadow-md"
               style={{ background: cfg?.accent || SKY }}
             >
@@ -689,9 +693,14 @@ export default function HomeClient() {
                               <ItineraryView data={itineraryData} startDate={startDate} endDate={endDate} />
                             </>
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-3 text-slate-400">
+                            <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-4 text-slate-400">
                               <Sparkles size={36} className="opacity-30" />
-                              <p className="font-semibold text-slate-500">Search for an event to see your itinerary</p>
+                              <div className="text-center">
+                                <p className="font-semibold text-slate-500 mb-1">No itinerary yet</p>
+                                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
+                                  Search for a specific event — like &ldquo;Coachella&rdquo;, &ldquo;NBA Finals&rdquo; or &ldquo;Taylor Swift&rdquo; — to generate a full trip plan.
+                                </p>
+                              </div>
                             </div>
                           )}
                         </TabsContent>

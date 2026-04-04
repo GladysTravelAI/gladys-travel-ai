@@ -119,10 +119,21 @@ export async function GET(req: NextRequest) {
   const key = process.env.TICKETMASTER_API_KEY
   if (!key) return NextResponse.json({ suggestions: [] })
 
-  const q = req.nextUrl.searchParams.get('q')?.trim() ?? ''
+  const q        = req.nextUrl.searchParams.get('q')?.trim() ?? ''
+  const category = req.nextUrl.searchParams.get('category')?.trim() ?? ''
+  const fuzzy    = req.nextUrl.searchParams.get('fuzzy') === '1'
   if (q.length < 3) return NextResponse.json({ suggestions: [] })
 
-  const cacheKey = q.toLowerCase()
+  // Map UI category → Ticketmaster segment ID for filtering
+  const SEGMENT_MAP: Record<string, string> = {
+    sports:   'KZFzniwnSyZfZ7v7nE',
+    music:    'KZFzniwnSyZfZ7v7nJ',
+    festival: 'KZFzniwnSyZfZ7v7nJ', // festivals live under music segment
+  }
+  const segmentId = SEGMENT_MAP[category] ?? ''
+
+  // Include category in cache key — filtered results differ from unfiltered
+  const cacheKey = `${q.toLowerCase()}|${category}`
   const cached   = queryCache.get(cacheKey)
   if (cached && Date.now() < cached.expiresAt) {
     return NextResponse.json(cached.data, {
@@ -140,9 +151,10 @@ export async function GET(req: NextRequest) {
         new URLSearchParams({
           apikey:        key,
           keyword:       q,
-          size:          '10',   // increased from 5
+          size:          fuzzy ? '15' : '10', // more results for short/fuzzy queries
           sort:          'relevance,desc',
           startDateTime: new Date().toISOString().split('.')[0] + 'Z',
+          ...(segmentId ? { segmentId } : {}), // apply category filter if set
         }),
         { signal: AbortSignal.timeout(4000) } as any
       ),
@@ -151,7 +163,8 @@ export async function GET(req: NextRequest) {
         new URLSearchParams({
           apikey:  key,
           keyword: q,
-          size:    '8',   // increased from 5
+          size:    fuzzy ? '12' : '8',
+          ...(segmentId ? { segmentId } : {}),
         }),
         { signal: AbortSignal.timeout(4000) } as any
       ),
@@ -172,8 +185,9 @@ export async function GET(req: NextRequest) {
         // Fix 6: skip sub-events
         if (isSubEvent(name)) continue
 
-        // Fix 7: dedup by normalised name
-        const dk = dedupKey(name)
+        // Dedup by normalised name — but keep event+attraction separate
+        // "Coachella" (attraction) and "Coachella Valley..." (event) are both valid
+        const dk = 'event:' + dedupKey(name)
         if (seen.has(dk)) continue
         seen.add(dk)
 
@@ -212,7 +226,7 @@ export async function GET(req: NextRequest) {
         if (!name) continue
         if (isSubEvent(name)) continue
 
-        const dk = dedupKey(name)
+        const dk = 'att:' + dedupKey(name)
         if (seen.has(dk)) continue
         seen.add(dk)
 
@@ -236,7 +250,17 @@ export async function GET(req: NextRequest) {
       // Don't recurse to avoid quota burn; just let user press Search.
     }
 
-    const result = { suggestions: suggestions.slice(0, 8) }
+    // Soft category sort — matching category floats to top, others follow
+    // Don't hard-filter: "Coachella" tagged as 'music' by TM should still show
+    // when user has 'festival' selected, because it IS a festival.
+    let sorted = suggestions
+    if (category && category !== 'other') {
+      const matching    = suggestions.filter(s => s.category === category)
+      const nonMatching = suggestions.filter(s => s.category !== category)
+      sorted = [...matching, ...nonMatching]
+    }
+
+    const result = { suggestions: sorted.slice(0, 8) }
 
     queryCache.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL })
 

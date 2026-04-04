@@ -174,6 +174,7 @@ EVENT DAY EVENING — should feel unmissable:
 
 RESTAURANT RECOMMENDATIONS:
 - Always name real, specific restaurants for the city (not "local restaurant")
+- CRITICAL — BUSINESS NAME ACCURACY: Only mention business names you are highly confident exist in that specific city. If you are not certain a business name is real and accurate, describe the TYPE of place instead (e.g. "a great ramen spot in Shibuya" not a made-up name). A wrong business name destroys trust. When in doubt, be descriptive rather than specific.
 - Include the neighbourhood/area
 - One line of description that makes you want to go there
 - Accurate price ranges
