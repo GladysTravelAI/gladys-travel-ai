@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Users, ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
@@ -10,7 +10,7 @@ import type { Trip } from '@/types/trip';
 
 const SKY = '#0EA5E9';
 
-export default function JoinTripPage() {
+function JoinTripInner() {
   const searchParams = useSearchParams();
   const router       = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -164,4 +164,16 @@ export default function JoinTripPage() {
       </div>
     </div>
   );
+}
+
+export default function JoinTripPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-slate-200 border-t-sky-500 rounded-full animate-spin" />
+      </div>
+    }>
+      <JoinTripInner />
+    </Suspense>
+  )
 }
