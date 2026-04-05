@@ -395,10 +395,11 @@ export default function HomeClient() {
     } finally { setLoading(false); }
   };
 
-  // Passed to FeaturedEvents — called when user clicks a card
+  // ── FIX: Don't force eventType to 'sports' ──
+  // Let the agent auto-detect the category from the event name.
+  // Previously this hardcoded sports even when clicking a music/festival card.
   const handleEventSearch = (name: string) => {
     setQuery(name);
-    if (!eventType) setEventType('sports');
     setTimeout(() => handleSearch(name), 50);
   };
 
@@ -417,10 +418,6 @@ export default function HomeClient() {
       <Navbar />
 
       {/* ════════════ HERO ═══════════════════════════════════════════════════ */}
-      {/*
-        MOBILE-FIRST: removed min-h-[100svh], tighter spacing/fonts on mobile,
-        smaller orbs, h-12 CTA, hidden scroll indicator, hidden badge on tiny screens
-      */}
       <section
         className="flex flex-col justify-center px-4 sm:px-5 pt-16 sm:pt-20 md:pt-24 pb-5 sm:pb-8 md:pb-12 relative"
         style={{ background: 'white', overflow: 'visible', zIndex: 20 }}
@@ -435,7 +432,7 @@ export default function HomeClient() {
 
         <div className="relative z-10 max-w-2xl mx-auto w-full space-y-3 sm:space-y-5 md:space-y-8">
 
-          {/* Live badge — hidden on very small screens to save vertical space */}
+          {/* Live badge */}
           <div className="flex justify-center">
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
               <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: SKY }} />
@@ -508,7 +505,7 @@ export default function HomeClient() {
               />
             )}
 
-            {/* CTA button — h-12 on mobile, h-14 on sm+ */}
+            {/* CTA button */}
             <button
               onClick={() => handleSearch()}
               disabled={!query.trim() || loading}
@@ -539,7 +536,7 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* Scroll indicator — hidden on mobile to recover 36px */}
+          {/* Scroll indicator — hidden on mobile */}
           <div className="hidden sm:flex justify-center">
             <div className="flex flex-col items-center gap-1 text-slate-300">
               <p className="text-xs font-medium">Scroll to explore</p>
@@ -655,7 +652,7 @@ export default function HomeClient() {
                       </div>
 
                       <Tabs value={tab} onValueChange={setTab}>
-                        {/* ── Scrollable tab bar — fits all 5 tabs on mobile ── */}
+                        {/* ── Scrollable tab bar ── */}
                         <div className="overflow-x-auto pb-1 mb-5 -mx-1 px-1">
                           <TabsList className="inline-flex w-max min-w-full p-1 rounded-2xl bg-slate-100 gap-0.5">
                             {[
@@ -792,14 +789,15 @@ export default function HomeClient() {
       )}
       {showSaved && <SavedTrips />}
 
+      {/* ── FIX: Don't force eventType to 'sports' ──
+          Let the agent auto-detect category from the event name.
+          Previously this hardcoded sports even when user asked about a concert. */}
       <GladysCompanion
         eventContext={gladysContext}
         onTripPlan={name => {
           setQuery(name);
-          if (!eventType) setEventType('sports');
           setShowDates(true);
           setTimeout(() => handleSearch(name), 80);
-          // Scroll to results
           setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 900);
         }}
       />
