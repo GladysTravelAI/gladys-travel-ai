@@ -37,6 +37,10 @@ export default function Navbar() {
     { label: 'How It Works',   href: '/how-it-works' },
   ];
 
+  // ── When NOT scrolled: navbar floats over the dark cinematic hero.
+  // ── When scrolled: user has passed into the warm #FAFAF8 content — go solid white.
+  const onDark = !scrolled;
+
   return (
     <motion.nav
       initial={{ y: -100 }}
@@ -45,7 +49,7 @@ export default function Navbar() {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
           ? 'bg-white/90 backdrop-blur-2xl border-b border-slate-200/60 shadow-sm'
-          : 'bg-white/70 backdrop-blur-md'
+          : 'bg-transparent backdrop-blur-md border-b border-white/[0.08]'
       }`}
       style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}
     >
@@ -54,21 +58,28 @@ export default function Navbar() {
 
           {/* ── LOGO ──────────────────────────────────────────────────── */}
           <Link href="/" className="flex items-center flex-shrink-0">
-            {/* Mobile: icon only, smaller size */}
+            {/* Mobile: icon only */}
             <div className="flex md:hidden">
-              <Logo size={34} showText={false} />
+              <Logo size={34} showText={false} variant={onDark ? 'light' : 'dark'} />
             </div>
             {/* Desktop: full wordmark */}
             <div className="hidden md:flex">
-              <Logo size={38} showText={true} variant="dark" />
+              <Logo size={38} showText={true} variant={onDark ? 'light' : 'dark'} />
             </div>
           </Link>
 
           {/* ── DESKTOP NAV LINKS ─────────────────────────────────────── */}
           <div className="hidden md:flex items-center gap-5 lg:gap-8">
             {NAV_LINKS.map(l => (
-              <Link key={l.label} href={l.href}
-                className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors whitespace-nowrap">
+              <Link
+                key={l.label}
+                href={l.href}
+                className={`text-sm font-semibold transition-colors whitespace-nowrap ${
+                  onDark
+                    ? 'text-white/60 hover:text-white'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
                 {l.label}
               </Link>
             ))}
@@ -79,8 +90,15 @@ export default function Navbar() {
 
             {/* Notifications */}
             {user && (
-              <button className="relative hidden md:flex p-2.5 hover:bg-slate-100 rounded-xl transition-colors">
-                <Bell size={20} className="text-slate-600" />
+              <button
+                className={`relative hidden md:flex p-2.5 rounded-xl transition-colors ${
+                  onDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+                }`}
+              >
+                <Bell
+                  size={20}
+                  className={onDark ? 'text-white/60' : 'text-slate-600'}
+                />
                 {notifications > 0 && (
                   <motion.span
                     initial={{ scale: 0 }} animate={{ scale: 1 }}
@@ -97,7 +115,9 @@ export default function Navbar() {
                 <motion.button
                   whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                   onClick={() => setShowMenu(!showMenu)}
-                  className="flex items-center gap-2 hover:bg-slate-100 rounded-xl px-2 md:px-3 py-2 transition-all"
+                  className={`flex items-center gap-2 rounded-xl px-2 md:px-3 py-2 transition-all ${
+                    onDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'
+                  }`}
                 >
                   {userProfile?.profileImage ? (
                     <img src={userProfile.profileImage} alt={userProfile.name || 'User'}
@@ -110,14 +130,19 @@ export default function Navbar() {
                     </div>
                   )}
                   <div className="hidden lg:block text-left">
-                    <p className="text-sm font-bold text-slate-900">{userProfile?.name || 'Traveler'}</p>
+                    <p className={`text-sm font-bold ${onDark ? 'text-white' : 'text-slate-900'}`}>
+                      {userProfile?.name || 'Traveler'}
+                    </p>
                     <div className="flex items-center gap-1">
                       <Trophy size={11} style={{ color: '#0EA5E9' }} />
-                      <p className="text-xs text-slate-400">{userProfile?.status || 'Explorer'}</p>
+                      <p className={`text-xs ${onDark ? 'text-white/40' : 'text-slate-400'}`}>
+                        {userProfile?.status || 'Explorer'}
+                      </p>
                     </div>
                   </div>
                 </motion.button>
 
+                {/* Dropdown — always light, regardless of hero state */}
                 <AnimatePresence>
                   {showMenu && (
                     <>
@@ -184,8 +209,14 @@ export default function Navbar() {
               </div>
             ) : (
               <div className="flex items-center gap-1.5 md:gap-2">
-                <Link href="/signin"
-                  className="hidden md:block text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors px-3 py-2">
+                <Link
+                  href="/signin"
+                  className={`hidden md:block text-sm font-semibold transition-colors px-3 py-2 ${
+                    onDark
+                      ? 'text-white/60 hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
                   Sign In
                 </Link>
                 <Link href="/signup"

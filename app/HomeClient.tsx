@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { trackSearch, trackEventSearch, trackTripPlanGenerated } from '@/lib/analytics';
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search, Sparkles, Trophy, Music, PartyPopper,
   Loader2, ExternalLink, TrendingUp, Calendar, MapPin,
@@ -23,7 +23,7 @@ import SavedTrips         from "@/components/SavedTrips";
 import CityPicker         from "@/components/CityPicker";
 import GladysCompanion    from "@/components/GladysCompanion";
 import FeaturedEvents     from "@/components/FeaturedEvents";
-import DateRangePicker   from "@/components/DateRangePicker";
+import DateRangePicker    from "@/components/DateRangePicker";
 import SearchBar          from "@/components/SearchBar";
 
 import { ItineraryData }  from "@/lib/mock-itinerary";
@@ -72,14 +72,70 @@ interface AgentResponse {
 
 type EventType = 'sports' | 'music' | 'festivals' | undefined;
 
-// ─── TOKENS ───────────────────────────────────────────────────────────────────
+// ─── DESIGN TOKENS (hero / dark sections) ─────────────────────────────────────
 
-const SKY = '#0EA5E9';
+const T = {
+  text:      '#ffffff',
+  textMuted: 'rgba(255,255,255,0.45)',
+  textDim:   'rgba(255,255,255,0.22)',
+  surface:   'rgba(255,255,255,0.04)',
+  border:    'rgba(255,255,255,0.08)',
+  fontDisplay: "'Bricolage Grotesque', sans-serif",
+  fontBody:    "'DM Sans', sans-serif",
+};
+
+// ─── THEME SYSTEM — hero reacts to selected category ──────────────────────────
+
+const THEMES = {
+  default: {
+    heroBg:       '#0f1117',
+    accent:       '#6ee7b7',
+    accentDim:    'rgba(110,231,183,0.10)',
+    accentBorder: 'rgba(110,231,183,0.22)',
+    ctaBg:        '#ffffff',
+    ctaColor:     '#0f1117',
+    glow:         'rgba(110,231,183,0.12)',
+    label:        'Live Event Intelligence',
+  },
+  sports: {
+    heroBg:       '#05101e',
+    accent:       '#38bdf8',
+    accentDim:    'rgba(56,189,248,0.10)',
+    accentBorder: 'rgba(56,189,248,0.28)',
+    ctaBg:        '#38bdf8',
+    ctaColor:     '#05101e',
+    glow:         'rgba(56,189,248,0.16)',
+    label:        'Sports Events',
+  },
+  music: {
+    heroBg:       '#0d0818',
+    accent:       '#c4b5fd',
+    accentDim:    'rgba(167,139,250,0.10)',
+    accentBorder: 'rgba(167,139,250,0.28)',
+    ctaBg:        '#a78bfa',
+    ctaColor:     '#0d0818',
+    glow:         'rgba(167,139,250,0.16)',
+    label:        'Music & Concerts',
+  },
+  festivals: {
+    heroBg:       '#160a02',
+    accent:       '#fb923c',
+    accentDim:    'rgba(251,146,60,0.10)',
+    accentBorder: 'rgba(251,146,60,0.28)',
+    ctaBg:        '#fb923c',
+    ctaColor:     '#160a02',
+    glow:         'rgba(251,146,60,0.16)',
+    label:        'Festivals & Culture',
+  },
+} as const;
+type ThemeKey = keyof typeof THEMES;
+
+// ─── EVENT CONFIG (category buttons) ─────────────────────────────────────────
 
 const EVENT_CFG = {
-  sports:    { accent: SKY,       bg: '#F0F9FF', border: '#BAE6FD', label: 'Sports',    Icon: Trophy,      placeholder: 'NBA Finals, World Cup, Wimbledon...'      },
-  music:     { accent: '#8B5CF6', bg: '#F5F3FF', border: '#DDD6FE', label: 'Music',     Icon: Music,       placeholder: 'Taylor Swift, Coachella, Glastonbury...'  },
-  festivals: { accent: '#F97316', bg: '#FFF7ED', border: '#FED7AA', label: 'Festivals', Icon: PartyPopper, placeholder: 'Rio Carnival, Oktoberfest, Burning Man...' },
+  sports:    { accent: '#38bdf8', glow: 'rgba(56,189,248,0.12)',  label: 'Sports',    Icon: Trophy,      placeholder: 'NBA Finals, World Cup, Wimbledon...'      },
+  music:     { accent: '#a78bfa', glow: 'rgba(167,139,250,0.12)', label: 'Music',     Icon: Music,       placeholder: 'Taylor Swift, Coachella, Glastonbury...'  },
+  festivals: { accent: '#fb923c', glow: 'rgba(251,146,60,0.12)',  label: 'Festivals', Icon: PartyPopper, placeholder: 'Rio Carnival, Oktoberfest, Burning Man...' },
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -92,14 +148,9 @@ function fmtDate(d: string) {
   catch { return d; }
 }
 function catColor(cat: string) {
-  if (cat === 'sports') return SKY;
-  if (cat === 'music' || cat === 'festival') return '#8B5CF6';
-  return '#F97316';
-}
-function catBg(cat: string) {
-  if (cat === 'sports') return '#F0F9FF';
-  if (cat === 'music' || cat === 'festival') return '#F5F3FF';
-  return '#FFF7ED';
+  if (cat === 'sports') return '#38bdf8';
+  if (cat === 'music' || cat === 'festival') return '#a78bfa';
+  return '#fb923c';
 }
 
 // ─── ANIMATED COUNTER ─────────────────────────────────────────────────────────
@@ -126,7 +177,7 @@ function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
   return <span ref={ref}>{val.toLocaleString()}{suffix}</span>;
 }
 
-// ─── EVENT HERO (result banner after search) ──────────────────────────────────
+// ─── EVENT HERO — light card, lives in warm content area ──────────────────────
 
 function EventHero({ event, budget, ticketsUrl }: {
   event: AgentResponse['event'];
@@ -135,53 +186,88 @@ function EventHero({ event, budget, ticketsUrl }: {
 }) {
   if (!event?.name) return null;
   const color   = catColor(event.type || 'other');
-  const bg      = catBg(event.type || 'other');
   const CatIcon = event.type === 'sports' ? Trophy : event.type === 'music' ? Music : PartyPopper;
 
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm mb-6">
-      <div className="h-1.5" style={{ background: color }} />
+    <div style={{
+      background: '#ffffff',
+      border: '1px solid rgba(0,0,0,0.08)',
+      borderRadius: 20,
+      overflow: 'hidden',
+      marginBottom: 24,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    }}>
+      {/* Accent bar */}
+      <div style={{ height: 3, background: color }} />
+
       {event.image && (
-        <div className="relative h-40 sm:h-56 md:h-64 overflow-hidden">
-          <img src={event.image} alt={event.name} className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div style={{ position: 'relative', height: 220, overflow: 'hidden' }}>
+          <img src={event.image} alt={event.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }} />
         </div>
       )}
-      <div className="p-4 sm:p-6 md:p-8">
-        <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full mb-3"
-          style={{ color, background: bg }}>
-          <CatIcon size={12} />
-          {(event.type || 'event').charAt(0).toUpperCase() + (event.type || 'event').slice(1)} Event
+
+      <div style={{ padding: '20px 24px 24px' }}>
+        {/* Type badge */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '5px 12px', borderRadius: 99, marginBottom: 12,
+          background: `${color}18`, border: `1px solid ${color}30`,
+        }}>
+          <CatIcon size={11} style={{ color }} />
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' as const, color }}>
+            {(event.type || 'event').charAt(0).toUpperCase() + (event.type || 'event').slice(1)} Event
+          </span>
         </div>
-        <h1 className="text-xl sm:text-3xl md:text-4xl font-black text-slate-900 mb-1 leading-tight">
+
+        <h1 style={{
+          fontFamily: T.fontDisplay, fontSize: 'clamp(22px, 4vw, 36px)',
+          fontWeight: 900, color: '#111', lineHeight: 1.05,
+          letterSpacing: '-0.025em', marginBottom: 4,
+        }}>
           {event.name}
         </h1>
+
         {event.attraction && event.attraction !== event.name && (
-          <p className="text-base font-semibold mb-3" style={{ color }}>{event.attraction}</p>
+          <p style={{ fontSize: 15, fontWeight: 600, color, marginBottom: 14 }}>{event.attraction}</p>
         )}
-        <div className="flex flex-wrap gap-3 md:gap-4 mb-5 text-slate-500 text-sm">
+
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 16, marginBottom: 20 }}>
           {event.date && (
-            <span className="flex items-center gap-1.5">
-              <Calendar size={14} />{fmtDate(event.date)}{event.time && ` · ${event.time}`}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#666' }}>
+              <Calendar size={13} />{fmtDate(event.date)}{event.time && ` · ${event.time}`}
             </span>
           )}
           {event.venue && (
-            <span className="flex items-center gap-1.5"><MapPin size={14} />{event.venue}</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#666' }}>
+              <MapPin size={13} />{event.venue}
+            </span>
           )}
         </div>
-        <div className="flex flex-wrap gap-3">
+
+        <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 10 }}>
           {(event.ticketUrl || ticketsUrl) && (
             <a href={event.ticketUrl || ticketsUrl!} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-bold px-4 sm:px-5 py-2.5 rounded-xl text-sm text-white transition-opacity hover:opacity-90"
-              style={{ background: color }}>
-              <Ticket size={15} />
-              Buy Tickets{event.priceMin && ` · From ${event.currency || 'USD'} ${event.priceMin}`}
-              <ExternalLink size={13} />
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 20px', borderRadius: 12,
+                background: color, color: '#ffffff',
+                fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 13,
+                textDecoration: 'none',
+              }}>
+              <Ticket size={14} />
+              Buy Tickets{event.priceMin ? ` · From ${event.currency || 'USD'} ${event.priceMin}` : ''}
+              <ExternalLink size={12} />
             </a>
           )}
           {budget && (
-            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm border border-slate-200 text-slate-600">
-              Full trip: <span className="font-black text-slate-900">{fmt(budget.total, budget.currency)}</span>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '10px 20px', borderRadius: 12,
+              background: '#f5f5f3', border: '1px solid rgba(0,0,0,0.08)',
+              fontSize: 13, color: '#666',
+            }}>
+              Full trip:&nbsp;<span style={{ fontFamily: T.fontDisplay, fontWeight: 800, color: '#111' }}>{fmt(budget.total, budget.currency)}</span>
             </div>
           )}
         </div>
@@ -193,7 +279,8 @@ function EventHero({ event, budget, ticketsUrl }: {
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 export default function HomeClient() {
-  const router   = useRouter();
+  const router       = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
 
   const [eventType,  setEventType]  = useState<EventType>(undefined);
@@ -204,11 +291,10 @@ export default function HomeClient() {
   const origin = 'Johannesburg, South Africa';
 
   // Calculate trip duration from date picker — capped at 10 days for quality.
-  // Falls back to 5 if no dates selected.
   const calcDays = (): number => {
     if (!startDate || !endDate) return 5;
     const diff = Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000);
-    return Math.min(Math.max(diff, 1), 10); // clamp 1–10
+    return Math.min(Math.max(diff, 1), 10);
   };
 
   const [response,         setResponse]        = useState<AgentResponse | null>(null);
@@ -227,9 +313,26 @@ export default function HomeClient() {
 
   const [gladysContext, setGladysContext] = useState<string | undefined>();
 
-  const cfg         = eventType ? EVENT_CFG[eventType] : null;
+  // Derive theme + cfg from selected category
+  const themeKey: ThemeKey = eventType ?? 'default';
+  const theme = THEMES[themeKey];
+  const cfg   = eventType ? EVENT_CFG[eventType] : null;
+
   const totalSaved  = Object.values(savedItems).reduce((s, a) => s + a.length, 0);
   const destination = response?.destination?.city || '';
+
+  // ── Read ?q param from URL (set by /events "Plan Trip" and notification toast)
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q?.trim()) {
+      setQuery(q);
+      const t = setTimeout(() => {
+        handleSearch(q);
+        setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 1200);
+      }, 150);
+      return () => clearTimeout(t);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (itineraryData) {
@@ -301,7 +404,6 @@ export default function HomeClient() {
           days: calcDays(), budget: 'mid', groupSize: 1,
           startDate: startDate?.toISOString().split('T')[0] || agentData.travel_dates?.arrival_date,
           endDate:   endDate?.toISOString().split('T')[0]   || agentData.travel_dates?.departure_date,
-          // Context for smart affiliate injection
           originCountry: 'ZA',
           destinationCountry: agentData.destination?.country || '',
           hasFlights: (agentData.flights?.length ?? 0) > 0,
@@ -348,8 +450,6 @@ export default function HomeClient() {
   const handleSearch = async (q?: string) => {
     const loc = q || query;
     if (!loc.trim()) { toast.error('Enter an event or destination'); return; }
-    // eventType defaults to null — agent handles detection, don't block search
-    // Track search
     trackSearch(loc);
     trackEventSearch(loc, eventType);
     setLoading(true); setItineraryData(null);
@@ -366,7 +466,6 @@ export default function HomeClient() {
       if (!result.success) throw new Error(result.error);
       setResponse(result.data);
       if (user) await profileManager.trackTripPlanned(user.uid, loc);
-      // GA4 — trip plan generated
       if (result.data.event?.name) {
         trackTripPlanGenerated({
           eventName: result.data.event.name,
@@ -386,18 +485,16 @@ export default function HomeClient() {
       setTimeout(() => document.getElementById('results')?.scrollIntoView({ behavior: 'smooth' }), 500);
       if (result.data.intent !== 'city_selection_required' && result.data.event?.name) {
         await generateItinerary(result.data);
-        setTab('itinerary'); // event found — show itinerary
+        setTab('itinerary');
       } else if (result.data.intent === 'information_only') {
-        setTab('activities'); // no event found — show activities/affiliates instead
+        setTab('activities');
       }
     } catch (e: any) {
       toast.error('Search failed', { id: t, description: (e as Error).message });
     } finally { setLoading(false); }
   };
 
-  // ── FIX: Don't force eventType to 'sports' ──
-  // Let the agent auto-detect the category from the event name.
-  // Previously this hardcoded sports even when clicking a music/festival card.
+  // Let agent auto-detect category — don't force eventType
   const handleEventSearch = (name: string) => {
     setQuery(name);
     setTimeout(() => handleSearch(name), 50);
@@ -411,65 +508,204 @@ export default function HomeClient() {
   // ─── RENDER ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-white"
-      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');`}</style>
+    <div style={{ minHeight: '100vh', fontFamily: T.fontBody }}>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800;12..96,900&family=DM+Sans:wght@300;400;500;600&display=swap');
+        * { box-sizing: border-box; }
+
+        /* Ghost button — dark variant (hero) */
+        .ghost-btn {
+          display: inline-flex; align-items: center; justify-content: center;
+          gap: 7px; height: 42px; padding: 0 16px;
+          border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
+          background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45);
+          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .ghost-btn:hover {
+          background: rgba(255,255,255,0.07);
+          border-color: rgba(255,255,255,0.14);
+          color: rgba(255,255,255,0.7);
+        }
+        .ghost-btn:active { transform: scale(0.97); }
+
+        /* Ghost button — light variant (warm content area) */
+        .ghost-btn-light {
+          display: inline-flex; align-items: center; justify-content: center;
+          gap: 7px; height: 42px; padding: 0 16px;
+          border-radius: 12px; border: 1px solid rgba(0,0,0,0.10);
+          background: transparent; color: #555;
+          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+          cursor: pointer; transition: all 0.15s; white-space: nowrap;
+        }
+        .ghost-btn-light:hover {
+          background: rgba(0,0,0,0.04);
+          border-color: rgba(0,0,0,0.16);
+          color: #333;
+        }
+        .ghost-btn-light:active { transform: scale(0.97); }
+
+        /* Tab trigger — light mode (results on warm bg) */
+        .tab-trigger-light {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 8px 16px; border-radius: 10px;
+          font-size: 13px; font-weight: 600; white-space: nowrap;
+          color: #888; cursor: pointer;
+          border: none; background: transparent;
+          transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+        }
+        .tab-trigger-light[data-state="active"] {
+          background: white;
+          color: #111;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+        }
+        .tab-trigger-light:hover:not([data-state="active"]) {
+          color: #444;
+          background: rgba(0,0,0,0.04);
+        }
+
+        .gladys-btn { transition: opacity 0.15s, transform 0.15s; }
+        .gladys-btn:hover { opacity: 0.85; }
+        .gladys-btn:active { transform: scale(0.97); }
+
+        @keyframes gradientShift {
+          0%   { background-position: 0% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.4; }
+        }
+        @keyframes heroGlow {
+          0%, 100% { opacity: 0.7; }
+          50%       { opacity: 1; }
+        }
+      `}</style>
 
       <Navbar />
 
-      {/* ════════════ HERO ═══════════════════════════════════════════════════ */}
-      <section
-        className="flex flex-col justify-center px-4 sm:px-5 pt-16 sm:pt-20 md:pt-24 pb-5 sm:pb-8 md:pb-12 relative"
-        style={{ background: 'white', overflow: 'visible', zIndex: 20 }}
-      >
-        {/* Orbs — smaller on mobile */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-none" aria-hidden="true" style={{ zIndex: 0 }}>
-          <div className="absolute -top-16 -left-16 w-[220px] h-[220px] sm:w-[400px] sm:h-[400px] rounded-full opacity-[0.10]"
-            style={{ background: 'radial-gradient(circle, #38BDF8, #0284C7)' }} />
-          <div className="absolute -bottom-12 -right-12 w-[180px] h-[180px] sm:w-[340px] sm:h-[340px] rounded-full opacity-[0.08]"
-            style={{ background: 'radial-gradient(circle, #0EA5E9, #38BDF8)' }} />
-        </div>
+      {/* ════════════ CINEMATIC HERO ═════════════════════════════════════════
+          Background colour transitions smoothly when user picks a category.
+          Everything else (logic, SearchBar, DateRangePicker) is unchanged.
+      ══════════════════════════════════════════════════════════════════════ */}
+      <section style={{
+        position: 'relative', overflow: 'hidden',
+        background: theme.heroBg,
+        transition: 'background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1)',
+        paddingTop: 'clamp(80px, 12vw, 120px)',
+        paddingBottom: 'clamp(48px, 8vw, 80px)',
+        paddingLeft: 20, paddingRight: 20,
+      }}>
+        {/* Ambient glow — reacts to category */}
+        <div style={{
+          position: 'absolute', top: '-15%', left: '50%', transform: 'translateX(-50%)',
+          width: 800, height: 500, borderRadius: '50%',
+          background: theme.glow,
+          filter: 'blur(100px)',
+          transition: 'background 0.55s ease',
+          pointerEvents: 'none',
+          animation: 'heroGlow 5s ease-in-out infinite',
+        }} />
+        {/* Subtle grid */}
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.028, pointerEvents: 'none',
+          backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+          backgroundSize: '72px 72px',
+        }} />
 
-        <div className="relative z-10 max-w-2xl mx-auto w-full space-y-3 sm:space-y-5 md:space-y-8">
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 560, margin: '0 auto' }}>
 
-          {/* Live badge */}
-          <div className="flex justify-center">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold border border-slate-200 text-slate-500 bg-white shadow-sm">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse flex-shrink-0" style={{ background: SKY }} />
-              Live Event Intelligence · 13 AI Tools Active
+          {/* Live pill — accent reacts to category */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 28 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '7px 16px', borderRadius: 99,
+              border: `1px solid ${theme.accentBorder}`,
+              background: theme.accentDim,
+              transition: 'all 0.4s ease',
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: theme.accent, flexShrink: 0,
+                transition: 'background 0.4s',
+                animation: 'pulseGlow 2s ease-in-out infinite',
+              }} />
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+                textTransform: 'uppercase' as const,
+                color: theme.accent,
+                transition: 'color 0.4s',
+                fontFamily: T.fontBody,
+              }}>
+                {theme.label}
+              </span>
             </div>
           </div>
 
           {/* Headline */}
-          <div className="text-center">
-            <h1 className="text-[26px] leading-[1.1] xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 mb-1.5 sm:mb-3">
-              You pick the event.<br />
-              <span style={{ color: SKY }}>We build the trip.</span>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <h1 style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 'clamp(36px, 8vw, 64px)',
+              fontWeight: 900, lineHeight: 0.92,
+              letterSpacing: '-0.035em',
+              color: T.text, marginBottom: 16,
+            }}>
+              You pick the event.
+              <br />
+              <span style={{
+                color: theme.accent,
+                transition: 'color 0.45s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}>
+                We build the trip.
+              </span>
             </h1>
-            <p className="text-xs sm:text-base md:text-lg text-slate-500 max-w-lg mx-auto leading-snug sm:leading-relaxed px-1">
+            <p style={{
+              fontFamily: T.fontBody,
+              fontSize: 'clamp(14px, 2vw, 17px)',
+              color: T.textMuted, lineHeight: 1.65,
+              maxWidth: 400, margin: '0 auto', fontWeight: 400,
+            }}>
               One search finds your tickets, flights, hotels, and complete itinerary. Or just ask Gladys.
             </p>
           </div>
 
-          {/* Event type pills */}
-          <div>
-            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.18em] text-slate-400 text-center mb-2 sm:mb-3">
+          {/* Category selector — unchanged logic */}
+          <div style={{ marginBottom: 20 }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+              textTransform: 'uppercase' as const, color: T.textDim,
+              textAlign: 'center', marginBottom: 12, fontFamily: T.fontBody,
+            }}>
               What are you going to?
             </p>
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
               {(Object.entries(EVENT_CFG) as [EventType, typeof EVENT_CFG['sports']][]).map(([key, c]) => {
-                const Icon = c.Icon; const selected = eventType === key;
+                const Icon = c.Icon;
+                const selected = eventType === key;
                 return (
-                  <button key={key}
+                  <button
+                    key={key}
                     onClick={() => { setEventType(key); setQuery(''); setResponse(null); setItineraryData(null); }}
-                    className="flex flex-col items-center gap-1 sm:gap-2 p-2 sm:p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.97]"
-                    style={{ borderColor: selected ? c.accent : '#E2E8F0', background: selected ? c.bg : 'white' }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      gap: 10, padding: '16px 12px', borderRadius: 16,
+                      border: `1.5px solid ${selected ? c.accent + '60' : T.border}`,
+                      background: selected ? `${c.accent}10` : T.surface,
+                      cursor: 'pointer', transition: 'all 0.2s',
+                    }}
+                    className="gladys-btn"
                   >
-                    <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center transition-all"
-                      style={{ background: selected ? c.accent : '#F1F5F9' }}>
-                      <Icon size={15} style={{ color: selected ? 'white' : '#94A3B8' }} />
+                    <div style={{
+                      width: 42, height: 42, borderRadius: 12,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: selected ? c.accent : 'rgba(255,255,255,0.06)',
+                      transition: 'all 0.2s',
+                    }}>
+                      <Icon size={17} style={{ color: selected ? '#050505' : T.textMuted }} />
                     </div>
-                    <span className="font-bold text-[11px] sm:text-sm" style={{ color: selected ? c.accent : '#64748B' }}>
+                    <span style={{ fontFamily: T.fontDisplay, fontSize: 13, fontWeight: 700, color: selected ? c.accent : T.textMuted }}>
                       {c.label}
                     </span>
                   </button>
@@ -478,289 +714,351 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* Search + CTA */}
-          <div className="space-y-2 sm:space-y-3">
+          {/* Search bar — unchanged */}
+          <div style={{ marginBottom: 10 }}>
             <SearchBar
               value={query}
               onChange={v => setQuery(v)}
               onSearch={q => { setQuery(q); handleSearch(q); }}
               onShowDates={() => setShowDates(true)}
               placeholder={cfg?.placeholder || 'Search any event worldwide...'}
-              borderColor={cfg?.border}
-              background={cfg?.bg}
-              accentColor={cfg?.accent}
+              borderColor={cfg ? `${cfg.accent}40` : T.border}
+              background="rgba(255,255,255,0.05)"
+              accentColor={cfg?.accent || theme.accent}
               loading={loading}
               eventType={eventType}
             />
+          </div>
 
-            {showDates && (
+          {showDates && (
+            <div style={{ marginBottom: 10 }}>
               <DateRangePicker
-                startDate={startDate}
-                endDate={endDate}
+                startDate={startDate} endDate={endDate}
                 onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
-                destination={query}
-                showCalendar={false}
-                minNights={1}
-                maxNights={30}
+                destination={query} showCalendar={false} minNights={1} maxNights={30}
               />
-            )}
-
-            {/* CTA button */}
-            <button
-              onClick={() => handleSearch()}
-              disabled={!query.trim() || loading}
-              title={!eventType ? 'Select Sports, Music or Festivals first' : ''}
-              className="w-full h-12 sm:h-14 font-black rounded-2xl text-sm sm:text-base transition-all flex items-center justify-center gap-2 text-white disabled:opacity-40 active:opacity-80 shadow-md"
-              style={{ background: cfg?.accent || SKY }}
-            >
-              {loading
-                ? <><Loader2 size={16} className="animate-spin" />Searching...</>
-                : <><Sparkles size={16} />Find {cfg?.label || 'Event'} Travel</>
-              }
-            </button>
-
-            {/* Secondary actions */}
-            <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-              <button onClick={() => openGladysVoice()}
-                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
-                <Mic size={13} />Ask Gladys
-              </button>
-              <button onClick={() => router.push('/trips')}
-                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
-                <Users size={13} />Group Trip
-              </button>
-              <button onClick={() => setShowSaved(true)}
-                className="h-10 sm:h-11 text-[11px] sm:text-xs font-semibold rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 text-slate-500 border-2 border-slate-200 bg-white transition-all active:scale-[0.97]">
-                <Bookmark size={13} />{totalSaved > 0 ? `Saved (${totalSaved})` : 'Saved'}
-              </button>
             </div>
+          )}
+
+          {/* Primary CTA — bg/color react to theme */}
+          <button
+            onClick={() => handleSearch()}
+            disabled={!query.trim() || loading}
+            style={{
+              width: '100%', height: 54, borderRadius: 16, border: 'none',
+              background: theme.ctaBg,
+              color: theme.ctaColor,
+              fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 15,
+              letterSpacing: '-0.01em',
+              cursor: query.trim() && !loading ? 'pointer' : 'not-allowed',
+              opacity: !query.trim() || loading ? 0.35 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              marginBottom: 10,
+              transition: 'background-color 0.35s ease, color 0.35s ease, box-shadow 0.35s ease',
+              boxShadow: cfg && query.trim() ? `0 0 32px ${theme.glow}` : 'none',
+            }}
+            className="gladys-btn"
+          >
+            {loading
+              ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />Searching...</>
+              : <><Sparkles size={16} />Find {cfg?.label || 'Event'} Travel</>
+            }
+          </button>
+
+          {/* Secondary actions — ghost-btn (dark variant, on hero) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <button onClick={() => openGladysVoice()} className="ghost-btn">
+              <Mic size={13} />Ask Gladys
+            </button>
+            <button onClick={() => router.push('/trips')} className="ghost-btn">
+              <Users size={13} />Group Trip
+            </button>
+            <button onClick={() => setShowSaved(true)} className="ghost-btn">
+              <Bookmark size={13} />{totalSaved > 0 ? `Saved (${totalSaved})` : 'Saved'}
+            </button>
           </div>
 
-          {/* Scroll indicator — hidden on mobile */}
-          <div className="hidden sm:flex justify-center">
-            <div className="flex flex-col items-center gap-1 text-slate-300">
-              <p className="text-xs font-medium">Scroll to explore</p>
-              <ChevronDown size={18} className="animate-bounce" />
-            </div>
+          {/* Scroll cue */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginTop: 40, opacity: 0.25 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase' as const, color: T.text }}>Scroll</span>
+            <div style={{ width: 1, height: 28, background: `linear-gradient(to bottom, ${T.text}, transparent)` }} />
           </div>
         </div>
       </section>
 
+      {/* ════════════ WARM CONTENT AREA ══════════════════════════════════════
+          Everything below the hero sits on #FAFAF8 — warm off-white.
+          This creates the cinematic contrast: dark hero → light editorial content.
+      ══════════════════════════════════════════════════════════════════════ */}
+      <div style={{ background: '#FAFAF8' }}>
 
-
-
-
-      {/* ════════════ GROUP TRAVEL BANNER ════════════════════════════════════ */}
-      <section className="py-10 md:py-12 px-4 sm:px-5 bg-slate-900">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
-          <div className="text-center md:text-left">
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-sky-400 mb-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
-              New · Group Travel
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">Plan with your crew</h2>
-            <p className="text-slate-400 max-w-md text-sm sm:text-base">
-              Shared trip page, group chat, split costs automatically. Everyone joins with one invite code.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-shrink-0">
-            <button onClick={() => router.push('/trips')}
-              className="flex-1 md:flex-none px-6 md:px-7 py-3.5 bg-white text-slate-900 rounded-2xl text-sm font-bold hover:bg-slate-100 transition-colors flex items-center justify-center gap-2 active:scale-[0.97]">
-              <Users size={16} />Start a group trip
-            </button>
-            <button onClick={() => openGladysVoice('Plan a group trip for me and my friends')}
-              className="flex-1 md:flex-none px-6 md:px-7 py-3.5 border border-slate-700 text-white rounded-2xl text-sm font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 active:scale-[0.97]">
-              <Mic size={16} />Ask Gladys instead
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════ FEATURED EVENTS — new editorial layout ════════════════ */}
-      <FeaturedEvents onSearch={handleEventSearch} />
-
-      {/* ════════════ CTA BAND ═══════════════════════════════════════════════ */}
-      <section className="py-16 md:py-20 px-4 sm:px-5" style={{ background: SKY }}>
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-3 md:mb-4">
-            Your next event trip starts here.
-          </h2>
-          <p className="text-sky-100 text-base md:text-lg mb-6 md:mb-8">
-            Tickets, flights, hotel and itinerary — all in one search. Or just talk to Gladys.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="inline-flex items-center justify-center gap-2 bg-white font-bold px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base transition-opacity hover:opacity-90 active:scale-[0.97]"
-              style={{ color: SKY }}>
-              <Sparkles size={18} />Plan my event trip →
-            </button>
-            <button onClick={() => openGladysVoice()}
-              className="inline-flex items-center justify-center gap-2 border-2 border-white/30 text-white font-bold px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl text-sm sm:text-base hover:bg-white/10 transition-colors active:scale-[0.97]">
-              <Mic size={18} />Talk to Gladys
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════ RESULTS ════════════════════════════════════════════════ */}
-      {(response || loading) && (
-        <section id="results" className="px-4 sm:px-5 py-12 md:py-16 bg-slate-50 border-t border-slate-200">
-          <div className="max-w-7xl mx-auto">
-            {loading && (
-              <div className="text-center py-20 md:py-24">
-                <Loader2 size={40} className="animate-spin mx-auto mb-5" style={{ color: SKY }} />
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 mb-2">Building your trip...</h3>
-                <p className="text-slate-500">Finding tickets, flights and hotels simultaneously</p>
+        {/* ════════════ GROUP TRAVEL BANNER ══════════════════════════════════ */}
+        <section style={{ padding: 'clamp(48px, 8vw, 72px) clamp(20px, 5vw, 48px)' }}>
+          <div style={{
+            maxWidth: 960, margin: '0 auto',
+            border: '1px solid rgba(0,0,0,0.07)',
+            borderRadius: 24, padding: 'clamp(28px, 5vw, 48px)',
+            background: '#ffffff',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+            display: 'flex', flexWrap: 'wrap' as const,
+            alignItems: 'center', justifyContent: 'space-between',
+            gap: 32,
+          }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: theme.accent,
+                  transition: 'background 0.4s',
+                  animation: 'pulseGlow 2s ease-in-out infinite',
+                }} />
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.16em',
+                  textTransform: 'uppercase' as const,
+                  color: theme.accent,
+                  transition: 'color 0.4s',
+                  fontFamily: T.fontBody,
+                }}>
+                  New · Group Travel
+                </span>
               </div>
-            )}
-
-            {!loading && response && (
-              <>
-                {response.intent === 'city_selection_required' && response.cities
-                  ? <CityPicker
-                      eventId={response.event_id!}
-                      eventName={response.event_name || response.event?.name || 'Event'}
-                      cities={response.cities}
-                      onSelect={handleCitySelect}
-                    />
-                  : (
-                    <>
-                      <EventHero
-                        event={response.event}
-                        budget={response.budget}
-                        ticketsUrl={response.affiliate_links?.tickets}
-                      />
-
-                      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                        <p className="text-slate-500 text-sm">
-                          {destination}
-                          {startDate && endDate && ` · ${startDate.toLocaleDateString()} – ${endDate.toLocaleDateString()}`}
-                        </p>
-                        <div className="flex gap-2">
-                          <button onClick={() => setShowMaps(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border-2 border-slate-200 text-slate-600 hover:border-sky-300 transition-all">
-                            <MapPin size={14} />Map
-                          </button>
-                          {totalSaved > 0 && (
-                            <button onClick={() => setShowSummary(true)}
-                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white"
-                              style={{ background: SKY }}>
-                              <Bookmark size={14} />Trip ({totalSaved})
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <Tabs value={tab} onValueChange={setTab}>
-                        {/* ── Scrollable tab bar ── */}
-                        <div className="overflow-x-auto pb-1 mb-5 -mx-1 px-1">
-                          <TabsList className="inline-flex w-max min-w-full p-1 rounded-2xl bg-slate-100 gap-0.5">
-                            {[
-                              { value: 'itinerary',  icon: <Sparkles size={13} />, label: 'Itinerary'  },
-                              { value: 'hotels',     icon: <Hotel    size={13} />, label: 'Hotels'     },
-                              { value: 'flights',    icon: <Plane    size={13} />, label: 'Flights'    },
-                              { value: 'activities', icon: <Globe    size={13} />, label: 'Activities' },
-                              { value: 'more',       icon: <ExternalLink size={13} />, label: 'More'   },
-                            ].map(t => (
-                              <TabsTrigger key={t.value} value={t.value}
-                                className="flex items-center gap-1.5 rounded-xl text-xs sm:text-sm whitespace-nowrap px-3 py-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:font-bold font-medium text-slate-500 data-[state=active]:text-slate-900 transition-all">
-                                {t.icon}{t.label}
-                              </TabsTrigger>
-                            ))}
-                          </TabsList>
-                        </div>
-
-                        {/* ── ITINERARY ── */}
-                        <TabsContent value="itinerary">
-                          {itineraryLoading ? (
-                            <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-4">
-                              <Loader2 size={36} className="animate-spin" style={{ color: SKY }} />
-                              <p className="text-slate-500 font-semibold">Building your day-by-day itinerary...</p>
-                              <p className="text-slate-400 text-sm">This takes ~10 seconds</p>
-                            </div>
-                          ) : itineraryData ? (
-                            <>
-                              <div className="flex justify-end mb-4">
-                                <button onClick={() => router.push('/itinerary')}
-                                  className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90"
-                                  style={{ background: 'linear-gradient(135deg,#38BDF8,#0284C7)' }}>
-                                  <Download size={15} />View & Download Itinerary
-                                </button>
-                              </div>
-                              <ItineraryView data={itineraryData} startDate={startDate} endDate={endDate} />
-                            </>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center py-20 md:py-24 gap-4 text-slate-400">
-                              <Sparkles size={36} className="opacity-30" />
-                              <div className="text-center">
-                                <p className="font-semibold text-slate-500 mb-1">No itinerary yet</p>
-                                <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                                  Search for a specific event — like &ldquo;Coachella&rdquo;, &ldquo;NBA Finals&rdquo; or &ldquo;Taylor Swift&rdquo; — to generate a full trip plan.
-                                </p>
-                              </div>
-                            </div>
-                          )}
-                        </TabsContent>
-
-                        {/* ── HOTELS ── */}
-                        <TabsContent value="hotels">
-                          <AffiliateTab
-                            type="hotels"
-                            city={response?.destination?.city || ''}
-                            country={response?.destination?.country || ''}
-                            arrivalDate={startDate?.toISOString().split('T')[0]}
-                            departureDate={endDate?.toISOString().split('T')[0]}
-                            eventName={response?.event?.name || ''}
-                          />
-                        </TabsContent>
-
-                        {/* ── FLIGHTS ── */}
-                        <TabsContent value="flights">
-                          <AffiliateTab
-                            type="flights"
-                            city={response?.destination?.city || ''}
-                            country={response?.destination?.country || ''}
-                            arrivalDate={startDate?.toISOString().split('T')[0]}
-                            departureDate={endDate?.toISOString().split('T')[0]}
-                            eventName={response?.event?.name || ''}
-                          />
-                        </TabsContent>
-
-                        {/* ── ACTIVITIES ── */}
-                        <TabsContent value="activities">
-                          <AffiliateTab
-                            type="activities"
-                            city={response?.destination?.city || ''}
-                            country={response?.destination?.country || ''}
-                            arrivalDate={startDate?.toISOString().split('T')[0]}
-                            departureDate={endDate?.toISOString().split('T')[0]}
-                            eventName={response?.event?.name || ''}
-                          />
-                        </TabsContent>
-
-                        {/* ── MORE TOOLS ── */}
-                        <TabsContent value="more">
-                          <AffiliateTab
-                            type="more"
-                            city={response?.destination?.city || ''}
-                            country={response?.destination?.country || ''}
-                            arrivalDate={startDate?.toISOString().split('T')[0]}
-                            departureDate={endDate?.toISOString().split('T')[0]}
-                            eventName={response?.event?.name || ''}
-                          />
-                        </TabsContent>
-
-                      </Tabs>
-                    </>
-                  )
-                }
-              </>
-            )}
+              <h2 style={{
+                fontFamily: T.fontDisplay, fontSize: 'clamp(22px, 4vw, 32px)',
+                fontWeight: 900, color: '#111',
+                letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 10,
+              }}>
+                Plan with your crew
+              </h2>
+              <p style={{ fontFamily: T.fontBody, fontSize: 14, color: '#777', maxWidth: 380, lineHeight: 1.65 }}>
+                Shared trip page, group chat, split costs automatically. Everyone joins with one invite code.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
+              <button
+                onClick={() => router.push('/trips')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '12px 22px', borderRadius: 14,
+                  background: '#111', color: '#fff',
+                  fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 13,
+                  border: 'none', cursor: 'pointer',
+                }}
+                className="gladys-btn"
+              >
+                <Users size={15} />Start a group trip
+              </button>
+              <button
+                onClick={() => openGladysVoice('Plan a group trip for me and my friends')}
+                className="ghost-btn-light"
+              >
+                <Mic size={14} />Ask Gladys instead
+              </button>
+            </div>
           </div>
         </section>
-      )}
 
-      <Footer />
+        {/* ════════════ FEATURED EVENTS ══════════════════════════════════════ */}
+        <FeaturedEvents onSearch={handleEventSearch} />
+
+        {/* ════════════ CTA BAND ═════════════════════════════════════════════ */}
+        <section style={{ padding: 'clamp(64px, 10vw, 96px) 20px', textAlign: 'center', background: '#111' }}>
+          <div style={{ maxWidth: 600, margin: '0 auto' }}>
+            <h2 style={{
+              fontFamily: T.fontDisplay,
+              fontSize: 'clamp(26px, 5vw, 44px)',
+              fontWeight: 900, letterSpacing: '-0.03em',
+              color: '#fff', marginBottom: 14, lineHeight: 1.05,
+            }}>
+              Your next event trip<br />starts here.
+            </h2>
+            <p style={{ fontFamily: T.fontBody, fontSize: 16, color: 'rgba(255,255,255,0.45)', marginBottom: 36, lineHeight: 1.65 }}>
+              Tickets, flights, hotel and itinerary — all in one search. Or just talk to Gladys.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' as const }}>
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '14px 28px', borderRadius: 16,
+                  background: theme.ctaBg, color: theme.ctaColor,
+                  fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 14,
+                  border: 'none', cursor: 'pointer',
+                  transition: 'background-color 0.35s ease, color 0.35s ease',
+                }}
+                className="gladys-btn"
+              >
+                <Sparkles size={16} />Plan my event trip →
+              </button>
+              <button onClick={() => openGladysVoice()} className="ghost-btn" style={{ padding: '14px 28px', height: 'auto', fontSize: 14 }}>
+                <Mic size={16} />Talk to Gladys
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* ════════════ RESULTS ══════════════════════════════════════════════ */}
+        {(response || loading) && (
+          <section id="results" style={{
+            padding: 'clamp(48px, 8vw, 72px) clamp(16px, 4vw, 40px)',
+            background: '#FAFAF8',
+            borderTop: '1px solid rgba(0,0,0,0.06)',
+          }}>
+            <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+
+              {loading && (
+                <div style={{ textAlign: 'center', padding: '80px 0' }}>
+                  <Loader2 size={36} style={{ color: theme.accent, margin: '0 auto 20px', animation: 'spin 1s linear infinite', display: 'block', transition: 'color 0.35s' }} />
+                  <h3 style={{ fontFamily: T.fontDisplay, fontSize: 22, fontWeight: 900, color: '#111', marginBottom: 8 }}>
+                    Building your trip...
+                  </h3>
+                  <p style={{ fontFamily: T.fontBody, fontSize: 14, color: '#888' }}>
+                    Finding tickets, flights and hotels simultaneously
+                  </p>
+                </div>
+              )}
+
+              {!loading && response && (
+                <>
+                  {response.intent === 'city_selection_required' && response.cities
+                    ? <CityPicker
+                        eventId={response.event_id!}
+                        eventName={response.event_name || response.event?.name || 'Event'}
+                        cities={response.cities}
+                        onSelect={handleCitySelect}
+                      />
+                    : (
+                      <>
+                        <EventHero
+                          event={response.event}
+                          budget={response.budget}
+                          ticketsUrl={response.affiliate_links?.tickets}
+                        />
+
+                        {/* Results meta row */}
+                        <div style={{
+                          display: 'flex', flexWrap: 'wrap' as const,
+                          alignItems: 'center', justifyContent: 'space-between',
+                          gap: 12, marginBottom: 16,
+                        }}>
+                          <p style={{ fontFamily: T.fontBody, fontSize: 13, color: '#888' }}>
+                            {destination}
+                            {startDate && endDate && ` · ${startDate.toLocaleDateString()} – ${endDate.toLocaleDateString()}`}
+                          </p>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => setShowMaps(true)} className="ghost-btn-light" style={{ height: 38 }}>
+                              <MapPin size={13} />Map
+                            </button>
+                            {totalSaved > 0 && (
+                              <button
+                                onClick={() => setShowSummary(true)}
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                                  padding: '8px 16px', borderRadius: 12,
+                                  background: theme.accent, color: theme.ctaColor,
+                                  fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 13,
+                                  border: 'none', cursor: 'pointer',
+                                  transition: 'background-color 0.35s ease, color 0.35s ease',
+                                }}
+                                className="gladys-btn"
+                              >
+                                <Bookmark size={13} />Trip ({totalSaved})
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <Tabs value={tab} onValueChange={setTab}>
+                          <div style={{
+                            overflowX: 'auto', marginBottom: 20, padding: '4px',
+                            background: 'rgba(0,0,0,0.04)',
+                            border: '1px solid rgba(0,0,0,0.07)',
+                            borderRadius: 14,
+                            display: 'inline-flex', width: '100%',
+                          }}>
+                            <TabsList style={{ display: 'inline-flex', width: '100%', background: 'transparent', gap: 2, padding: 0 }}>
+                              {[
+                                { value: 'itinerary',  icon: <Sparkles size={13} />, label: 'Itinerary'  },
+                                { value: 'hotels',     icon: <Hotel    size={13} />, label: 'Hotels'     },
+                                { value: 'flights',    icon: <Plane    size={13} />, label: 'Flights'    },
+                                { value: 'activities', icon: <Globe    size={13} />, label: 'Activities' },
+                                { value: 'more',       icon: <ExternalLink size={13} />, label: 'More'   },
+                              ].map(t => (
+                                <TabsTrigger key={t.value} value={t.value} className="tab-trigger-light">
+                                  {t.icon}{t.label}
+                                </TabsTrigger>
+                              ))}
+                            </TabsList>
+                          </div>
+
+                          {/* ITINERARY */}
+                          <TabsContent value="itinerary">
+                            {itineraryLoading ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 0', gap: 16 }}>
+                                <Loader2 size={32} style={{ color: theme.accent, animation: 'spin 1s linear infinite', transition: 'color 0.35s' }} />
+                                <p style={{ fontFamily: T.fontBody, fontWeight: 600, color: '#555' }}>
+                                  Building your day-by-day itinerary...
+                                </p>
+                                <p style={{ fontFamily: T.fontBody, fontSize: 13, color: '#999' }}>This takes ~10 seconds</p>
+                              </div>
+                            ) : itineraryData ? (
+                              <>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                                  <button
+                                    onClick={() => router.push('/itinerary')}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                                      padding: '10px 20px', borderRadius: 12,
+                                      background: theme.accent, color: theme.ctaColor,
+                                      fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 13,
+                                      border: 'none', cursor: 'pointer',
+                                      transition: 'background-color 0.35s ease, color 0.35s ease',
+                                    }}
+                                    className="gladys-btn"
+                                  >
+                                    <Download size={14} />View & Download Itinerary
+                                  </button>
+                                </div>
+                                <ItineraryView data={itineraryData} startDate={startDate} endDate={endDate} />
+                              </>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 0', gap: 12 }}>
+                                <Sparkles size={32} style={{ color: '#ccc' }} />
+                                <div style={{ textAlign: 'center' }}>
+                                  <p style={{ fontFamily: T.fontBody, fontWeight: 600, color: '#666', marginBottom: 6 }}>No itinerary yet</p>
+                                  <p style={{ fontFamily: T.fontBody, fontSize: 13, color: '#aaa', maxWidth: 280, lineHeight: 1.6 }}>
+                                    Search for a specific event — like &ldquo;Coachella&rdquo;, &ldquo;NBA Finals&rdquo; or &ldquo;Taylor Swift&rdquo; — to generate a full trip plan.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+                          </TabsContent>
+
+                          <TabsContent value="hotels">
+                            <AffiliateTab type="hotels" city={response?.destination?.city || ''} country={response?.destination?.country || ''} arrivalDate={startDate?.toISOString().split('T')[0]} departureDate={endDate?.toISOString().split('T')[0]} eventName={response?.event?.name || ''} />
+                          </TabsContent>
+                          <TabsContent value="flights">
+                            <AffiliateTab type="flights" city={response?.destination?.city || ''} country={response?.destination?.country || ''} arrivalDate={startDate?.toISOString().split('T')[0]} departureDate={endDate?.toISOString().split('T')[0]} eventName={response?.event?.name || ''} />
+                          </TabsContent>
+                          <TabsContent value="activities">
+                            <AffiliateTab type="activities" city={response?.destination?.city || ''} country={response?.destination?.country || ''} arrivalDate={startDate?.toISOString().split('T')[0]} departureDate={endDate?.toISOString().split('T')[0]} eventName={response?.event?.name || ''} />
+                          </TabsContent>
+                          <TabsContent value="more">
+                            <AffiliateTab type="more" city={response?.destination?.city || ''} country={response?.destination?.country || ''} arrivalDate={startDate?.toISOString().split('T')[0]} departureDate={endDate?.toISOString().split('T')[0]} eventName={response?.event?.name || ''} />
+                          </TabsContent>
+                        </Tabs>
+                      </>
+                    )
+                  }
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        <Footer />
+      </div>
+      {/* ── End warm content area ── */}
 
       {/* ── Modals ── */}
       {showSummary && (
@@ -772,26 +1070,47 @@ export default function HomeClient() {
           destination={destination}
         />
       )}
+
       {showMaps && destination && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg sm:text-xl">Map & Directions</h3>
-              <button onClick={() => setShowMaps(false)}
-                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors">✕
-              </button>
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 20,
+            width: '100%', maxWidth: 900, maxHeight: '90vh',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{
+              padding: '20px 24px', borderBottom: '1px solid rgba(0,0,0,0.07)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <h3 style={{ fontFamily: T.fontDisplay, fontWeight: 900, fontSize: 18, color: '#111' }}>
+                Map & Directions
+              </h3>
+              <button
+                onClick={() => setShowMaps(false)}
+                style={{
+                  width: 34, height: 34, borderRadius: 10,
+                  background: '#f5f5f3', border: '1px solid rgba(0,0,0,0.08)',
+                  color: '#666', cursor: 'pointer', fontSize: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >✕</button>
             </div>
-            <div className="p-4 sm:p-5 overflow-y-auto max-h-[calc(90vh-80px)]">
+            <div style={{ padding: 24, overflowY: 'auto', maxHeight: 'calc(90vh - 72px)' }}>
               <MapsDirections destination={destination} defaultOrigin={origin} />
             </div>
           </div>
         </div>
       )}
+
       {showSaved && <SavedTrips />}
 
-      {/* ── FIX: Don't force eventType to 'sports' ──
-          Let the agent auto-detect category from the event name.
-          Previously this hardcoded sports even when user asked about a concert. */}
       <GladysCompanion
         eventContext={gladysContext}
         onTripPlan={name => {

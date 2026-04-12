@@ -5,9 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowUpRight, Flame } from "lucide-react";
 import Link from "next/link";
 import { getEventHeroImage, type EventImage } from "@/lib/eventImageSearch";
-// Import the TYPE only — gives us the correct shape for getEventHeroImage.
-// We do NOT import getAllEvents/getFeaturedEvents — those return hardcoded data.
-// Real events come from /api/featured-events below.
 import type { Event } from "@/lib/eventService";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,7 +32,6 @@ function getCategoryLabel(event: Event): string {
   const name = (event.name ?? "").toLowerCase();
   const cat  = ((event as any).category ?? event.type ?? "").toLowerCase();
 
-  // Specific prestige events
   if (id.includes("world-cup")  || name.includes("world cup")       || id.includes("fifa"))         return "FIFA World Cup";
   if (id.includes("champions")  || name.includes("champions league"))                                 return "Champions League";
   if (id.includes("super-bowl") || name.includes("super bowl"))                                       return "Super Bowl";
@@ -45,7 +41,6 @@ function getCategoryLabel(event: Event): string {
   if (name.includes("rock in rio"))                                                                     return "Rock in Rio";
   if (name.includes("lollapalooza"))                                                                    return "Lollapalooza";
   if (name.includes("formula 1") || name.includes("grand prix") || name.includes("f1 "))              return "Formula 1";
-  // Generic categories
   const festKeywords = ['festival', 'fest ', ' fest', 'carnival', 'bonnaroo', 'burning man', 'primavera'];
   if (cat === 'festival' || festKeywords.some(k => name.includes(k)))                                   return "Festival";
   if (cat.includes("sport") || cat.includes("football") || cat.includes("basketball"))                 return "Sports";
@@ -83,10 +78,8 @@ const CATEGORY_GRADIENTS: Record<string, string> = {
   "Live Event":        "from-gray-900 to-slate-950",
 };
 
-// ─── Image attribution ────────────────────────────────────────────────────────
-
 function imageAttribution(image: EventImage): string | null {
-  if (image.source === "ticketmaster") return null; // official — no credit needed
+  if (image.source === "ticketmaster") return null;
   if (image.source === "unsplash" && image.photographer) return `${image.photographer} · Unsplash`;
   if (image.source === "pexels"   && image.photographer) return `${image.photographer} · Pexels`;
   return null;
@@ -95,7 +88,7 @@ function imageAttribution(image: EventImage): string | null {
 // ─── Dismiss helpers ──────────────────────────────────────────────────────────
 
 const KEY  = (id: string) => `gladys_notif_v2_${id}`;
-const COOL = 12; // hours
+const COOL = 12;
 
 function wasDismissed(id: string): boolean {
   try {
@@ -121,23 +114,19 @@ function selectBestEvent(events: Event[], userLocation?: string): Event | null {
     const days  = getDaysUntil(e.startDate);
     const label = getCategoryLabel(e);
 
-    // Urgency
     if (days <= 7)       s += 100;
     else if (days <= 30) s += 50;
     else if (days <= 90) s += 20;
 
-    // Prestige — equalised across categories so music/festival surfaces as often as sports
     if (label.includes("FIFA") || label.includes("Champions") || label.includes("Super Bowl")) s += 60;
     if (label === "Sports")                                      s += 40;
-    if (label === "Coachella" || label.includes("Festival"))     s += 55; // major festivals rank near top events
+    if (label === "Coachella" || label.includes("Festival"))     s += 55;
     if (label === "Music")                                       s += 45;
 
-    // Data quality bonuses
     if (e.priceRange?.min)                           s += 20;
-    if ((e as any).images?.length)                   s += 15; // Has Ticketmaster images
+    if ((e as any).images?.length)                   s += 15;
     if ((e as any).imageUrl || (e as any).image)     s += 10;
 
-    // Location match
     if (userLocation) {
       const loc = `${e.location?.city ?? ""} ${e.location?.country ?? ""}`.toLowerCase();
       if (loc.includes(userLocation.toLowerCase()))  s += 60;
@@ -200,30 +189,22 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
 
     async function init() {
       try {
-        // Fetch real events from the same API used by FeaturedEvents component
         const res  = await fetch('/api/featured-events');
         const json = await res.json();
-        // Works with both 'live' and 'curated' sources — any non-empty events array
         if (!json.success || !Array.isArray(json.events) || json.events.length === 0) return;
 
-        // Normalise LiveEvent (API shape) → eventService.Event (type shape)
-        // Required by getEventHeroImage which expects eventService.Event
         const events: Event[] = json.events.map((ev: any) => ({
           ...ev,
-          // Date fields — API has 'date' only, eventService.Event needs startDate + endDate
           startDate: ev.date ?? ev.startDate ?? '',
-          endDate:   ev.date ?? ev.endDate   ?? '',   // single-day events: endDate = date
-          // Category → type (API uses 'category', eventService.Event uses 'type')
+          endDate:   ev.date ?? ev.endDate   ?? '',
           type: (ev.category === 'festival' ? 'festival'
                : ev.category === 'music'   ? 'music'
                : 'sports') as Event['type'],
-          // Location — API has flat city/country, eventService.Event uses nested location
           location: {
             city:    ev.city    ?? ev.location?.city    ?? '',
             country: ev.country ?? ev.location?.country ?? '',
             venue:   ev.venue   ?? ev.location?.venue,
           },
-          // priceRange — eventService.Event requires both min AND max
           priceRange: ev.priceMin != null
             ? { min: ev.priceMin, max: ev.priceMax ?? ev.priceMin, currency: ev.currency ?? 'USD' }
             : undefined,
@@ -233,13 +214,12 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
         if (!best || dead) return;
         setEvent(best);
 
-        // Fetch image — Ticketmaster first (see eventImageSearch.ts priority chain)
         setImageLoading(true);
         try {
           const img = await getEventHeroImage(best);
           if (!dead) setHeroImage(img);
         } catch {
-          // Gradient fallback handled in HeroImage component
+          // Gradient fallback handled in HeroImage
         } finally {
           if (!dead) setImageLoading(false);
         }
@@ -266,10 +246,12 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
   const days        = getDaysUntil(event.startDate);
   const urgency     = getUrgency(days);
   const hasPrice    = event.priceRange?.min != null;
-  const ctaUrl      = (event as any).officialUrl || `/events/${event.id}`;
-  const isExternal  = !!(event as any).officialUrl;
   const progressPct = days > 0 && days <= 180 ? Math.max(4, 100 - (days / 180) * 100) : 0;
   const credit      = heroImage ? imageAttribution(heroImage) : null;
+
+  // ── FIX: Always navigate to homepage with ?q=EventName so Gladys plans the
+  // trip. Previously this used event.officialUrl which sent users to Ticketmaster.
+  const planUrl = `/?q=${encodeURIComponent(event.name)}`;
 
   const ctaClass =
     "flex items-center justify-between w-full px-4 py-2.5 bg-black text-white rounded-xl text-sm font-semibold hover:bg-gray-900 active:scale-95 transition-all group";
@@ -287,25 +269,19 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
         >
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
 
-            {/* ── Hero image ───────────────────────────────── */}
+            {/* ── Hero image ── */}
             <div className="relative w-full h-36 overflow-hidden bg-gray-100">
-
-              {/* Shimmer while loading */}
               {imageLoading && (
                 <div className="absolute inset-0 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 animate-pulse" />
               )}
 
               <HeroImage event={event} image={heroImage} />
-
-              {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-              {/* Category pill */}
               <span className="absolute top-3 left-3 text-xs font-semibold text-white bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full tracking-wide">
                 {getCategoryLabel(event)}
               </span>
 
-              {/* Urgency badge */}
               {urgency.hot && (
                 <motion.div
                   initial={{ scale: 0.7, opacity: 0 }}
@@ -313,12 +289,10 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                   transition={{ delay: 0.3 }}
                   className="absolute top-3 right-9 flex items-center gap-1 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full"
                 >
-                  <Flame size={9} />
-                  {urgency.label}
+                  <Flame size={9} />{urgency.label}
                 </motion.div>
               )}
 
-              {/* Ticketmaster badge — shown when image is official */}
               {heroImage?.source === "ticketmaster" && (
                 <div className="absolute bottom-10 right-3">
                   <span className="text-[9px] text-white/50 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
@@ -327,7 +301,6 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                 </div>
               )}
 
-              {/* Dismiss */}
               <button
                 onClick={dismiss}
                 aria-label="Dismiss"
@@ -336,22 +309,18 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                 <X size={11} />
               </button>
 
-              {/* Event name */}
               <div className="absolute bottom-3 left-3 right-3">
                 <p className="text-white font-bold text-[15px] leading-snug line-clamp-2 drop-shadow">
                   {event.name}
                 </p>
-                {/* Photo credit only for Unsplash/Pexels */}
                 {credit && (
                   <p className="text-white/40 text-[10px] mt-0.5">{credit}</p>
                 )}
               </div>
             </div>
 
-            {/* ── Body ─────────────────────────────────────── */}
+            {/* ── Body ── */}
             <div className="p-4 space-y-3">
-
-              {/* Date + Price */}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-gray-900">
@@ -361,7 +330,6 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                     {[event.location?.city, event.location?.country].filter(Boolean).join(", ")}
                   </p>
                 </div>
-
                 {hasPrice && (
                   <div className="text-right">
                     <p className="text-[10px] text-gray-400 uppercase tracking-wider">From</p>
@@ -373,7 +341,6 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                 )}
               </div>
 
-              {/* Proximity bar */}
               {progressPct > 0 && (
                 <div className="h-0.5 bg-gray-100 rounded-full overflow-hidden">
                   <motion.div
@@ -385,18 +352,11 @@ export default function EventNotificationToast({ userLocation, onDismiss }: Prop
                 </div>
               )}
 
-              {/* CTA */}
-              {isExternal ? (
-                <a href={ctaUrl} target="_blank" rel="noopener noreferrer" onClick={dismiss} className={ctaClass}>
-                  <span>Plan Event Trip</span>
-                  <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </a>
-              ) : (
-                <Link href={ctaUrl} onClick={dismiss} className={ctaClass}>
-                  <span>Plan Event Trip</span>
-                  <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                </Link>
-              )}
+              {/* ── FIX: Always go to /?q=EventName — never to officialUrl (Ticketmaster) */}
+              <Link href={planUrl} onClick={dismiss} className={ctaClass}>
+                <span>Plan Event Trip</span>
+                <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </Link>
 
               <p className="text-center text-[10px] text-gray-300 tracking-wide">
                 Gladys Travel AI
