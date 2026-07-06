@@ -99,7 +99,7 @@ async function generateItineraryWithRetry(
         system:      systemPrompt,
         user:        userPrompt,
         model:       MODELS.heavy,
-        maxTokens:   7000,
+        maxTokens:   8192,
         temperature: 0.85,
       });
 

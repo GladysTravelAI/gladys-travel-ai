@@ -31,11 +31,23 @@ export const MODELS = {
 } as const;
 
 // Drop-in analogue of the old OPENAI_CONFIG (used by app/api/agent/route.ts).
+// Note: no `temperature` here — see supportsSamplingParams() below.
 export const CLAUDE_CONFIG = {
   model: MODELS.heavy,
-  temperature: 0.3,
-  max_tokens: 4000,
+  max_tokens: 8192,
 } as const;
+
+// ==================== SAMPLING PARAMETER COMPATIBILITY ====================
+// Claude Opus 4.7/4.8 and Sonnet 5 run on mandatory adaptive thinking and
+// reject any non-default temperature/top_p/top_k with a 400 error. Haiku 4.5
+// predates that change and still accepts them normally. Centralizing this
+// check here means every call site can keep passing `temperature` freely —
+// it's silently dropped for models that don't support it, rather than
+// needing to be hunted down and removed from every individual route.
+function supportsSamplingParams(model: string): boolean {
+  const noSamplingModels: string[] = [MODELS.heavy, MODELS.standard];
+  return !noSamplingModels.includes(model);
+}
 
 // ==================== STRUCTURED JSON OUTPUT ====================
 //
@@ -63,7 +75,7 @@ export async function getJSONCompletion({
   const response = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
-    temperature,
+    ...(supportsSamplingParams(model) ? { temperature } : {}),
     system,
     messages: [{ role: 'user', content: user }],
     tools: [
@@ -75,6 +87,15 @@ export async function getJSONCompletion({
     ],
     tool_choice: { type: 'tool', name: 'output_json' },
   });
+
+  // If generation was cut off mid-tool-call, the JSON is almost certainly
+  // incomplete — surface this as an error so callers can retry with more
+  // tokens, rather than silently returning a partial/empty object.
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error(
+      `Claude hit the ${maxTokens}-token limit before finishing its response. Increase maxTokens for this call.`
+    );
+  }
 
   const block = response.content.find(
     (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
@@ -101,7 +122,7 @@ export async function getTextCompletion({
   const response = await anthropic.messages.create({
     model,
     max_tokens: maxTokens,
-    temperature,
+    ...(supportsSamplingParams(model) ? { temperature } : {}),
     system,
     messages,
   });
