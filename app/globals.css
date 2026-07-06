@@ -24,7 +24,24 @@
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
     --radius: 0.5rem;
-    
+
+    /* ── Gladys brand palette ─────────────────────────────────────────────
+       One identity, not four. Navy for depth, sky for action, gold for the
+       one luxury accent — used sparingly, never as a base color. */
+    --gladys-white:  #FFFFFF;
+    --gladys-ink:    #0B1220;   /* body text — softer than pure black */
+    --gladys-navy:   #0A3D62;   /* deep sapphire — hero / dark moments */
+    --gladys-navy-2: #082C48;   /* darker navy, for gradients/depth */
+    --gladys-sky:    #0EA5E9;   /* primary interactive blue */
+    --gladys-sky-2:  #38BDF8;   /* lighter sky, for gradients/hover */
+    --gladys-gold:   #C9A24B;   /* the one luxury accent — use sparingly */
+    --gladys-mist:   #F5F8FC;   /* pale blue-white section background */
+    --gladys-slate:  #64748B;   /* secondary/muted text */
+
+    /* ── Type ── one family, two roles ── */
+    --font-display: var(--font-inter-tight);
+    --font-body:    var(--font-inter);
+
     /* Toast Variables */
     --toast-bg: white;
     --toast-color: #1f2937;

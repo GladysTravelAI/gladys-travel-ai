@@ -1632,7 +1632,7 @@ export default function GladysCompanion({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-              className="fixed bottom-0 right-0 left-0 sm:bottom-6 sm:right-6 sm:left-auto z-50 w-full sm:w-[400px] max-h-[80svh] sm:max-h-[680px] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden border border-gray-100"
+              className="fixed bottom-[calc(64px+env(safe-area-inset-bottom))] right-0 left-0 sm:bottom-6 sm:right-6 sm:left-auto z-[60] w-full sm:w-[400px] max-h-[calc(80svh-64px)] sm:max-h-[680px] flex flex-col bg-white sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden border border-gray-100"
               style={{ maxWidth: 'calc(100vw - 24px)' }}
             >
               {/* ── Header ─────────────────────────────────────── */}

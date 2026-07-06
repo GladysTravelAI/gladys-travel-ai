@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
 import { AuthProvider } from "@/lib/AuthContext";
@@ -15,6 +15,15 @@ const inter = Inter({
   subsets: ["latin"],
   display: 'swap',
   weight: ['300', '400', '500', '600', '700', '800', '900'],
+  preload: true,
+  fallback: ['system-ui', 'arial'],
+});
+
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
+  subsets: ["latin"],
+  display: 'swap',
+  weight: ['600', '700', '800', '900'],
   preload: true,
   fallback: ['system-ui', 'arial'],
 });
@@ -145,7 +154,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <link rel="preconnect"    href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body
-        className={`${inter.variable} font-sans antialiased bg-white text-gray-900`}
+        className={`${inter.variable} ${interTight.variable} font-sans antialiased bg-white text-gray-900`}
         suppressHydrationWarning
       >
         <ThemeProvider>

@@ -40,9 +40,9 @@ function fmtDate(d: string) {
 
 function catColor(cat: string) {
   if (cat === 'sports')   return '#0EA5E9'
-  if (cat === 'music')    return '#8B5CF6'
-  if (cat === 'festival') return '#F97316'
-  return '#10B981'
+  if (cat === 'music')    return '#7DD3FC'
+  if (cat === 'festival') return '#C9A24B'
+  return '#64748B'
 }
 
 function CatIcon({ cat, size = 12 }: { cat: string; size?: number }) {
@@ -291,7 +291,7 @@ type Filter = typeof FILTERS[number]
 // ── MOBILE HERO CARD ──────────────────────────────────────────────────────────
 function MobileHeroCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string) => void }) {
   const cat   = ev.category ?? 'other'
-  const color = cat === 'sports' ? '#0EA5E9' : cat === 'music' ? '#8B5CF6' : '#F97316'
+  const color = catColor(cat)
   const daysAway = Math.ceil((new Date(ev.date).getTime() - Date.now()) / 86_400_000)
 
   return (
@@ -353,7 +353,7 @@ function MobileHeroCard({ ev, onSearch }: { ev: LiveEvent; onSearch: (n: string)
 // ── MOBILE SCROLL CARD ─────────────────────────────────────────────────────────
 function MobileCard({ ev, onSearch, index }: { ev: LiveEvent; onSearch: (n: string) => void; index: number }) {
   const cat   = ev.category ?? 'other'
-  const color = cat === 'sports' ? '#0EA5E9' : cat === 'music' ? '#8B5CF6' : '#F97316'
+  const color = catColor(cat)
   const daysAway = Math.ceil((new Date(ev.date).getTime() - Date.now()) / 86_400_000)
 
   return (
@@ -436,10 +436,9 @@ export default function FeaturedEvents({ onSearch }: FeaturedEventsProps) {
   return (
     <section
       className="py-10 md:py-20"
-      style={{ background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}
+      style={{ background: 'var(--gladys-mist)', fontFamily: 'var(--font-body)' }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
         .snap-carousel { scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; }
         .snap-card     { scroll-snap-align: start; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -468,7 +467,7 @@ export default function FeaturedEvents({ onSearch }: FeaturedEventsProps) {
                 className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold transition-all active:scale-[0.96] whitespace-nowrap flex-shrink-0"
                 style={{
                   background: filter === f
-                    ? f === 'All' ? '#0EA5E9' : f === 'Sports' ? '#0EA5E9' : f === 'Music' ? '#8B5CF6' : '#F97316'
+                    ? f === 'All' ? '#0EA5E9' : f === 'Sports' ? '#0EA5E9' : f === 'Music' ? '#7DD3FC' : '#C9A24B'
                     : '#E2E8F0',
                   color: filter === f ? 'white' : '#64748B',
                 }}

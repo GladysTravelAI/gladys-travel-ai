@@ -306,7 +306,7 @@ export default function ItineraryPageClient() {
         </div>
 
         {/* ── BOTTOM BAR (mobile only) ─────────────────────────────────────── */}
-        <div className="no-print fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-4 py-4 flex items-center justify-center gap-3 sm:hidden">
+        <div className="no-print fixed bottom-16 left-0 right-0 z-[55] bg-white border-t border-slate-100 px-4 py-4 flex items-center justify-center gap-3 sm:hidden" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
           <button onClick={handleShare}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold text-sm">
             <Share2 size={16} />Share

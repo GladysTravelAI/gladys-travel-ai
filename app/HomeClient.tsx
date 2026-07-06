@@ -76,66 +76,37 @@ type EventType = 'sports' | 'music' | 'festivals' | undefined;
 
 const T = {
   text:      '#ffffff',
-  textMuted: 'rgba(255,255,255,0.45)',
-  textDim:   'rgba(255,255,255,0.22)',
-  surface:   'rgba(255,255,255,0.04)',
-  border:    'rgba(255,255,255,0.08)',
-  fontDisplay: "'Bricolage Grotesque', sans-serif",
-  fontBody:    "'DM Sans', sans-serif",
+  textMuted: 'rgba(255,255,255,0.62)',
+  textDim:   'rgba(255,255,255,0.40)',
+  surface:   'rgba(255,255,255,0.08)',
+  border:    'rgba(255,255,255,0.20)',
+  fontDisplay: "var(--font-display)",
+  fontBody:    "var(--font-body)",
 };
 
-// ─── THEME SYSTEM — hero reacts to selected category ──────────────────────────
+// ─── ONE BRAND IDENTITY — the hero no longer repaints itself per category.
+// Category selection still gets a small, deliberate accent touch (see
+// EVENT_CFG below), but the page keeps one confident navy+sky+gold identity
+// throughout, the way a luxury brand doesn't change its whole palette
+// depending on which product page you're on. ──────────────────────────────
 
-const THEMES = {
-  default: {
-    heroBg:       '#0f1117',
-    accent:       '#6ee7b7',
-    accentDim:    'rgba(110,231,183,0.10)',
-    accentBorder: 'rgba(110,231,183,0.22)',
-    ctaBg:        '#ffffff',
-    ctaColor:     '#0f1117',
-    glow:         'rgba(110,231,183,0.12)',
-    label:        'Live Event Intelligence',
-  },
-  sports: {
-    heroBg:       '#05101e',
-    accent:       '#38bdf8',
-    accentDim:    'rgba(56,189,248,0.10)',
-    accentBorder: 'rgba(56,189,248,0.28)',
-    ctaBg:        '#38bdf8',
-    ctaColor:     '#05101e',
-    glow:         'rgba(56,189,248,0.16)',
-    label:        'Sports Events',
-  },
-  music: {
-    heroBg:       '#0d0818',
-    accent:       '#c4b5fd',
-    accentDim:    'rgba(167,139,250,0.10)',
-    accentBorder: 'rgba(167,139,250,0.28)',
-    ctaBg:        '#a78bfa',
-    ctaColor:     '#0d0818',
-    glow:         'rgba(167,139,250,0.16)',
-    label:        'Music & Concerts',
-  },
-  festivals: {
-    heroBg:       '#160a02',
-    accent:       '#fb923c',
-    accentDim:    'rgba(251,146,60,0.10)',
-    accentBorder: 'rgba(251,146,60,0.28)',
-    ctaBg:        '#fb923c',
-    ctaColor:     '#160a02',
-    glow:         'rgba(251,146,60,0.16)',
-    label:        'Festivals & Culture',
-  },
-} as const;
-type ThemeKey = keyof typeof THEMES;
+const STABLE_THEME = {
+  heroBg:       'linear-gradient(160deg, #0A3D62 0%, #082C48 100%)',
+  accent:       '#38BDF8',
+  accentDim:    'rgba(56,189,248,0.14)',
+  accentBorder: 'rgba(56,189,248,0.35)',
+  ctaBg:        '#ffffff',
+  ctaColor:     '#0A3D62',
+  glow:         'rgba(56,189,248,0.20)',
+  label:        'Live Event Intelligence',
+};
 
-// ─── EVENT CONFIG (category buttons) ─────────────────────────────────────────
+// ─── EVENT CONFIG (category buttons) — same blue-and-gold family, no purple/orange ──
 
 const EVENT_CFG = {
-  sports:    { accent: '#38bdf8', glow: 'rgba(56,189,248,0.12)',  label: 'Sports',    Icon: Trophy,      placeholder: 'NBA Finals, World Cup, Wimbledon...'      },
-  music:     { accent: '#a78bfa', glow: 'rgba(167,139,250,0.12)', label: 'Music',     Icon: Music,       placeholder: 'Taylor Swift, Coachella, Glastonbury...'  },
-  festivals: { accent: '#fb923c', glow: 'rgba(251,146,60,0.12)',  label: 'Festivals', Icon: PartyPopper, placeholder: 'Rio Carnival, Oktoberfest, Burning Man...' },
+  sports:    { accent: '#38BDF8', glow: 'rgba(56,189,248,0.16)',  label: 'Sports',    Icon: Trophy,      placeholder: 'NBA Finals, World Cup, Wimbledon...'      },
+  music:     { accent: '#7DD3FC', glow: 'rgba(125,211,252,0.16)', label: 'Music',     Icon: Music,       placeholder: 'Taylor Swift, Coachella, Glastonbury...'  },
+  festivals: { accent: '#C9A24B', glow: 'rgba(201,162,75,0.18)',  label: 'Festivals', Icon: PartyPopper, placeholder: 'Rio Carnival, Oktoberfest, Burning Man...' },
 };
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -314,8 +285,7 @@ export default function HomeClient() {
   const [gladysContext, setGladysContext] = useState<string | undefined>();
 
   // Derive theme + cfg from selected category
-  const themeKey: ThemeKey = eventType ?? 'default';
-  const theme = THEMES[themeKey];
+  const theme = STABLE_THEME;
   const cfg   = eventType ? EVENT_CFG[eventType] : null;
 
   const totalSaved  = Object.values(savedItems).reduce((s, a) => s + a.length, 0);
@@ -511,38 +481,36 @@ export default function HomeClient() {
     <div style={{ minHeight: '100vh', fontFamily: T.fontBody }}>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800;12..96,900&family=DM+Sans:wght@300;400;500;600&display=swap');
         * { box-sizing: border-box; }
 
         /* Ghost button — dark variant (hero) */
         .ghost-btn {
           display: inline-flex; align-items: center; justify-content: center;
           gap: 7px; height: 42px; padding: 0 16px;
-          border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45);
-          font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+          border-radius: 12px; border: 1px solid rgba(255,255,255,0.22);
+          background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.75);
+          font-family: var(--font-body); font-size: 12px; font-weight: 600;
           cursor: pointer; transition: all 0.15s; white-space: nowrap;
         }
         .ghost-btn:hover {
-          background: rgba(255,255,255,0.07);
-          border-color: rgba(255,255,255,0.14);
-          color: rgba(255,255,255,0.7);
+          background: rgba(255,255,255,0.14);
+          border-color: rgba(255,255,255,0.32);
+          color: rgba(255,255,255,0.95);
         }
         .ghost-btn:active { transform: scale(0.97); }
 
-        /* Ghost button — light variant (warm content area) */
+        /* Ghost button — light variant (mist content area) */
         .ghost-btn-light {
           display: inline-flex; align-items: center; justify-content: center;
           gap: 7px; height: 42px; padding: 0 16px;
-          border-radius: 12px; border: 1px solid rgba(0,0,0,0.10);
-          background: transparent; color: #555;
-          font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+          border-radius: 12px; border: 1px solid rgba(11,18,32,0.14);
+          background: transparent; color: var(--gladys-ink);
+          font-family: var(--font-body); font-size: 13px; font-weight: 600;
           cursor: pointer; transition: all 0.15s; white-space: nowrap;
         }
         .ghost-btn-light:hover {
-          background: rgba(0,0,0,0.04);
-          border-color: rgba(0,0,0,0.16);
-          color: #333;
+          background: rgba(11,18,32,0.05);
+          border-color: rgba(11,18,32,0.22);
         }
         .ghost-btn-light:active { transform: scale(0.97); }
 
@@ -553,7 +521,7 @@ export default function HomeClient() {
           font-size: 13px; font-weight: 600; white-space: nowrap;
           color: #888; cursor: pointer;
           border: none; background: transparent;
-          transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+          transition: all 0.15s; font-family: var(--font-body);
         }
         .tab-trigger-light[data-state="active"] {
           background: white;
@@ -592,9 +560,8 @@ export default function HomeClient() {
       <section style={{
         position: 'relative', overflow: 'hidden',
         background: theme.heroBg,
-        transition: 'background-color 0.55s cubic-bezier(0.4, 0, 0.2, 1)',
-        paddingTop: 'clamp(80px, 12vw, 120px)',
-        paddingBottom: 'clamp(48px, 8vw, 80px)',
+        paddingTop: 'clamp(72px, 10vw, 100px)',
+        paddingBottom: 'clamp(40px, 6vw, 64px)',
         paddingLeft: 20, paddingRight: 20,
       }}>
         {/* Ambient glow — reacts to category */}
@@ -790,10 +757,10 @@ export default function HomeClient() {
           Everything below the hero sits on #FAFAF8 — warm off-white.
           This creates the cinematic contrast: dark hero → light editorial content.
       ══════════════════════════════════════════════════════════════════════ */}
-      <div style={{ background: '#FAFAF8' }}>
+      <div style={{ background: 'var(--gladys-mist)' }}>
 
         {/* ════════════ GROUP TRAVEL BANNER ══════════════════════════════════ */}
-        <section style={{ padding: 'clamp(48px, 8vw, 72px) clamp(20px, 5vw, 48px)' }}>
+        <section style={{ padding: 'clamp(32px, 5vw, 48px) clamp(20px, 5vw, 48px)' }}>
           <div style={{
             maxWidth: 960, margin: '0 auto',
             border: '1px solid rgba(0,0,0,0.07)',
@@ -839,7 +806,7 @@ export default function HomeClient() {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   padding: '12px 22px', borderRadius: 14,
-                  background: '#111', color: '#fff',
+                  background: '#0A3D62', color: '#fff',
                   fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 13,
                   border: 'none', cursor: 'pointer',
                 }}
@@ -861,7 +828,7 @@ export default function HomeClient() {
         <FeaturedEvents onSearch={handleEventSearch} />
 
         {/* ════════════ CTA BAND ═════════════════════════════════════════════ */}
-        <section style={{ padding: 'clamp(64px, 10vw, 96px) 20px', textAlign: 'center', background: '#111' }}>
+        <section style={{ padding: 'clamp(40px, 6vw, 64px) 20px', textAlign: 'center', background: 'linear-gradient(160deg, #0A3D62 0%, #082C48 100%)' }}>
           <div style={{ maxWidth: 600, margin: '0 auto' }}>
             <h2 style={{
               fontFamily: T.fontDisplay,
@@ -900,7 +867,7 @@ export default function HomeClient() {
         {(response || loading) && (
           <section id="results" style={{
             padding: 'clamp(48px, 8vw, 72px) clamp(16px, 4vw, 40px)',
-            background: '#FAFAF8',
+            background: 'var(--gladys-mist)',
             borderTop: '1px solid rgba(0,0,0,0.06)',
           }}>
             <div style={{ maxWidth: 1200, margin: '0 auto' }}>

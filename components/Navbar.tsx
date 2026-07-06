@@ -51,7 +51,7 @@ export default function Navbar() {
           ? 'bg-white/90 backdrop-blur-2xl border-b border-slate-200/60 shadow-sm'
           : 'bg-transparent backdrop-blur-md border-b border-white/[0.08]'
       }`}
-      style={{ fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif" }}
+      style={{ fontFamily: "var(--font-body)" }}
     >
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 md:h-20 gap-2">

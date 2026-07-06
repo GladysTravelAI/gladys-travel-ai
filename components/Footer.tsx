@@ -141,13 +141,6 @@ const Footer = () => {
                 </motion.a>
               ))}
             </div>
-
-            {/* Legal mini links */}
-            <div className="flex items-center gap-5 text-xs text-slate-400">
-              <Link href="/privacy" className="hover:text-slate-700 transition-colors">Privacy</Link>
-              <Link href="/terms"   className="hover:text-slate-700 transition-colors">Terms</Link>
-              <Link href="/contact" className="hover:text-slate-700 transition-colors">Contact</Link>
-            </div>
           </div>
         </div>
       </div>
