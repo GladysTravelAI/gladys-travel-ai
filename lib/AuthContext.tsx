@@ -18,6 +18,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { UserPreferences, profileManager, createDefaultProfile } from '@/lib/userProfile';
+import { getUserMemory } from '@/lib/memory/gladysMemory';
 import { toast } from 'sonner';
 
 // ==================== TYPES ====================
@@ -87,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!profile) {
         profile = createDefaultProfile(
           firebaseUser.uid,
-          firebaseUser.email   || undefined,
-          firebaseUser.displayName || undefined
+          firebaseUser.email        || undefined,
+          firebaseUser.displayName  || undefined,
         );
         await profileManager.saveProfile(profile);
       } else {
@@ -96,14 +97,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile.lastActive = new Date().toISOString();
         await profileManager.saveProfile(profile);
       }
+
+      // ── Merge Gladys memory into profile ────────────────────────────────────
+      // Silent — never block login if memory fetch fails.
+      // Memory fields (homeCity, passportCountry, budgetPreference, etc.) are
+      // written by the memory extraction layer and read here so every component
+      // that reads userProfile automatically gets the enriched values.
+      try {
+        const memory = await getUserMemory(firebaseUser.uid);
+
+        // Only overwrite profile fields if memory has a value AND profile doesn't
+        // already have one — so the user's explicit profile settings always win.
+        if (memory.name            && !profile.name)            profile.name            = memory.name;
+        if (memory.homeCity        && !(profile as any).homeCity)        (profile as any).homeCity        = memory.homeCity;
+        if (memory.homeCityIATA    && !(profile as any).homeCityIATA)    (profile as any).homeCityIATA    = memory.homeCityIATA;
+        if (memory.passportCountry && !(profile as any).passportCountry) (profile as any).passportCountry = memory.passportCountry;
+        if (memory.budgetPreference && !(profile as any).budgetPreference) (profile as any).budgetPreference = memory.budgetPreference;
+        if (memory.interests?.length      && !(profile as any).interests?.length)      (profile as any).interests      = memory.interests;
+        if (memory.favoriteSports?.length && !(profile as any).favoriteSports?.length) (profile as any).favoriteSports = memory.favoriteSports;
+        if (memory.favoriteLeagues?.length && !(profile as any).favoriteLeagues?.length) (profile as any).favoriteLeagues = memory.favoriteLeagues;
+        if (memory.upcomingTrips?.length  && !(profile as any).upcomingTrips?.length)  (profile as any).upcomingTrips  = memory.upcomingTrips;
+      } catch {
+        // Memory fetch failed — profile still loads normally, just without memory enrichment
+      }
+
       setUserProfile(profile);
     } catch (error) {
       console.error('❌ Failed to load user profile:', error);
       setUserProfile(
         createDefaultProfile(
           firebaseUser.uid,
-          firebaseUser.email   || undefined,
-          firebaseUser.displayName || undefined
+          firebaseUser.email        || undefined,
+          firebaseUser.displayName  || undefined,
         )
       );
     } finally {
@@ -154,19 +179,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      // Always use popup — works on desktop and modern mobile browsers.
-      const result = await signInWithPopup(auth, provider);
-      console.log('✅ Google sign-in:', result.user.email);
-
-      // Detect new vs returning user via Firebase metadata
-      // creationTime === lastSignInTime means this is the first sign-in
+      const result    = await signInWithPopup(auth, provider);
       const meta      = result.user.metadata;
       const isNewUser = meta.creationTime === meta.lastSignInTime;
 
       return { isNewUser };
     } catch (error) {
       const authError = error as AuthError;
-      // Silently ignore cancelled popups — user intentionally closed it
       if (
         authError.code === 'auth/popup-closed-by-user' ||
         authError.code === 'auth/cancelled-popup-request'

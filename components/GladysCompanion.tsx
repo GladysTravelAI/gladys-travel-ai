@@ -140,8 +140,6 @@ function WeatherCard({ data }: { data: any }) {
         </div>
         <span className="text-4xl">{wmoEmoji(today?.code ?? 0)}</span>
       </div>
-
-      {/* 5-day strip */}
       <div className="flex gap-1.5 mt-3">
         {forecast.map((day: any, i: number) => (
           <div key={i} className="flex-1 bg-white/10 rounded-lg py-2 px-1 text-center">
@@ -154,8 +152,6 @@ function WeatherCard({ data }: { data: any }) {
           </div>
         ))}
       </div>
-
-      {/* Advice pill */}
       {data.summary?.advice && (
         <p className="text-xs text-white/60 mt-3 bg-white/5 rounded-lg px-3 py-2">
           💡 {data.summary.advice}
@@ -183,7 +179,6 @@ function PackingCard({ data }: { data: any }) {
         </div>
         <span className="text-lg">🧳</span>
       </div>
-
       <div className="px-4 py-3 space-y-2">
         {[...essentials, ...nonEssentials].map((cat: any) => (
           <div key={cat.category}>
@@ -198,7 +193,6 @@ function PackingCard({ data }: { data: any }) {
               </div>
               <span className="text-gray-300 text-xs">{expanded === cat.category ? '▲' : '▼'}</span>
             </button>
-
             <AnimatePresence>
               {expanded === cat.category && (
                 <motion.div
@@ -219,7 +213,6 @@ function PackingCard({ data }: { data: any }) {
           </div>
         ))}
       </div>
-
       {data.proTips?.length > 0 && (
         <div className="px-4 pb-3 border-t border-gray-50 pt-2">
           <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">Pro Tips</p>
@@ -244,7 +237,6 @@ function TipsCard({ data }: { data: any }) {
         <p className="text-xs font-semibold text-gray-900">Insider Tips · {data.city}</p>
         <span className="text-lg">🗺️</span>
       </div>
-
       <div className="px-4 py-3 space-y-3">
         {tips?.mustDo?.length > 0 && (
           <div>
@@ -256,7 +248,6 @@ function TipsCard({ data }: { data: any }) {
             ))}
           </div>
         )}
-
         {tips?.localFood?.length > 0 && (
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">Local Food</p>
@@ -265,14 +256,12 @@ function TipsCard({ data }: { data: any }) {
             ))}
           </div>
         )}
-
         {tips?.watchOut?.length > 0 && (
           <div className="bg-amber-50 rounded-lg px-3 py-2">
             <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wider mb-1">Watch Out</p>
             <p className="text-xs text-amber-800">{tips.watchOut[0]}</p>
           </div>
         )}
-
         {localEvents.length > 0 && (
           <div>
             <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1.5">Happening While You're There</p>
@@ -296,7 +285,6 @@ function TipsCard({ data }: { data: any }) {
 
 function FlightStatusCard({ data }: { data: any }) {
   const isDisrupted = ['cancelled', 'diverted'].includes(data.status);
-
   const statusConfig = {
     cancelled: { bg: 'bg-red-50',    border: 'border-red-200',   dot: 'bg-red-500',   label: 'Cancelled',   emoji: '🚫' },
     diverted:  { bg: 'bg-red-50',    border: 'border-red-200',   dot: 'bg-red-500',   label: 'Diverted',    emoji: '⚠️' },
@@ -306,7 +294,6 @@ function FlightStatusCard({ data }: { data: any }) {
     landed:    { bg: 'bg-green-50',  border: 'border-green-200', dot: 'bg-green-500', label: 'Landed',      emoji: '🛬' },
     unknown:   { bg: 'bg-gray-50',   border: 'border-gray-200',  dot: 'bg-gray-400',  label: 'Unknown',     emoji: '❓' },
   };
-
   const cfg        = statusConfig[data.status as keyof typeof statusConfig] ?? statusConfig.unknown;
   const formatTime = (iso: string) => iso
     ? new Date(iso).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })
@@ -325,7 +312,6 @@ function FlightStatusCard({ data }: { data: any }) {
           <span className="text-xs font-semibold text-gray-700">{cfg.label}</span>
         </div>
       </div>
-
       <div className="px-4 pb-3 flex items-center gap-3">
         <div className="text-center flex-1">
           <p className="text-lg font-bold text-gray-900">{data.departure?.iata}</p>
@@ -355,7 +341,6 @@ function FlightStatusCard({ data }: { data: any }) {
           </p>
         </div>
       </div>
-
       {data.recoveryOptions?.length > 0 && (
         <div className="px-4 pb-3 space-y-2 border-t border-red-100 pt-3">
           <p className="text-[10px] text-red-600 font-semibold uppercase tracking-wider">Recovery Options</p>
@@ -451,7 +436,6 @@ function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) =>
 
   return (
     <div className="rounded-2xl overflow-hidden border border-gray-100 bg-white mt-2 shadow-sm">
-      {/* Image */}
       {data.image && (
         <div className="relative h-32 overflow-hidden">
           <img src={data.image} alt={data.eventName} className="w-full h-full object-cover" />
@@ -461,12 +445,10 @@ function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) =>
           </div>
         </div>
       )}
-
       <div className="p-3">
         {!data.image && (
           <p className="font-black text-gray-900 text-sm mb-2 leading-tight">{data.eventName}</p>
         )}
-
         <div className="space-y-1 mb-3">
           {data.eventDate && (
             <p className="text-xs text-gray-500 flex items-center gap-1.5">
@@ -484,9 +466,7 @@ function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) =>
             </p>
           )}
         </div>
-
         <div className="flex gap-2">
-          {/* Plan Trip — triggers full homepage flow */}
           <button
             onClick={() => onTripPlan?.(data.query || data.eventName)}
             className="flex-1 py-2.5 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
@@ -494,8 +474,6 @@ function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) =>
           >
             ✈️ Plan Full Trip
           </button>
-
-          {/* Buy Tickets */}
           {data.ticketUrl && (
             <a
               href={data.ticketUrl}
@@ -512,8 +490,6 @@ function TripCard({ data, onTripPlan }: { data: any; onTripPlan?: (q: string) =>
     </div>
   );
 }
-
-// ─── Tool Card renderer ───────────────────────────────────────────────────────
 
 // ─── Football Fixtures Card ───────────────────────────────────────────────────
 
@@ -584,11 +560,10 @@ function AirportCard({ data }: { data: any }) {
       </div>
     );
   }
-
   const tabs = [
-    { id: 'transport',  label: '🚌 Transport' },
-    { id: 'lounges',    label: '🛋 Lounges'   },
-    { id: 'tips',       label: '💡 Tips'      },
+    { id: 'transport', label: '🚌 Transport' },
+    { id: 'lounges',   label: '🛋 Lounges'   },
+    { id: 'tips',      label: '💡 Tips'      },
   ].filter(t => data[t.id]);
 
   return (
@@ -597,8 +572,6 @@ function AirportCard({ data }: { data: any }) {
         <p className="text-xs font-semibold text-gray-900">✈️ {data.airport}</p>
         <p className="text-[10px] text-gray-400 mt-0.5">{data.city}</p>
       </div>
-
-      {/* Tab pills */}
       <div className="flex gap-1.5 px-4 pt-3 pb-2 overflow-x-auto">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id as any)}
@@ -609,7 +582,6 @@ function AirportCard({ data }: { data: any }) {
           </button>
         ))}
       </div>
-
       <div className="px-4 pb-4">
         {tab === 'transport' && data.transport && (
           <div className="space-y-2">
@@ -642,7 +614,6 @@ function AirportCard({ data }: { data: any }) {
           </div>
         )}
       </div>
-
       {data.mapsLink && (
         <div className="px-4 pb-3">
           <a href={data.mapsLink} target="_blank" rel="noopener noreferrer"
@@ -655,7 +626,7 @@ function AirportCard({ data }: { data: any }) {
   );
 }
 
-// ─── Live Match Card (compact, for chat panel) ───────────────────────────────
+// ─── Live Match Card ──────────────────────────────────────────────────────────
 
 function LiveMatchCard({ data }: { data: any }) {
   const [liveData,  setLiveData]  = useState<any>(null);
@@ -691,7 +662,6 @@ function LiveMatchCard({ data }: { data: any }) {
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white mt-2 overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <span className="text-sm">{data.eventType === 'sports' ? '⚽' : '🎵'}</span>
@@ -704,8 +674,6 @@ function LiveMatchCard({ data }: { data: any }) {
           {loading ? '...' : 'Refresh'}
         </button>
       </div>
-
-      {/* Not fetched yet */}
       {!liveData && !loading && (
         <div className="text-center py-5">
           <p className="text-xs text-gray-400 mb-2">
@@ -720,16 +688,11 @@ function LiveMatchCard({ data }: { data: any }) {
           )}
         </div>
       )}
-
-      {/* Football scoreboard */}
       {liveData?.type === 'football' && (
         <div className="p-3 space-y-3">
-          {/* Score */}
           <div className="flex items-center gap-2 justify-between">
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              {liveData.teams?.home?.logo && (
-                <img src={liveData.teams.home.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
-              )}
+              {liveData.teams?.home?.logo && <img src={liveData.teams.home.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
               <p className="text-xs font-black text-gray-900 truncate">{liveData.teams?.home?.name}</p>
             </div>
             <div className="text-center flex-shrink-0 px-3">
@@ -744,13 +707,9 @@ function LiveMatchCard({ data }: { data: any }) {
             </div>
             <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
               <p className="text-xs font-black text-gray-900 truncate text-right">{liveData.teams?.away?.name}</p>
-              {liveData.teams?.away?.logo && (
-                <img src={liveData.teams.away.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />
-              )}
+              {liveData.teams?.away?.logo && <img src={liveData.teams.away.logo} alt="" className="w-5 h-5 object-contain flex-shrink-0" />}
             </div>
           </div>
-
-          {/* Tab pills */}
           <div className="flex gap-1.5">
             {[{ id: 'score', label: '⚡ Events' }, { id: 'events', label: '👥 Lineups' }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id as any)}
@@ -760,8 +719,6 @@ function LiveMatchCard({ data }: { data: any }) {
               </button>
             ))}
           </div>
-
-          {/* Goals */}
           {tab === 'score' && (
             <div className="space-y-1.5 max-h-36 overflow-y-auto">
               {(liveData.goals ?? []).map((g: any, i: number) => (
@@ -774,20 +731,11 @@ function LiveMatchCard({ data }: { data: any }) {
                   <span className="text-[10px] font-black text-gray-400 flex-shrink-0">{g.minute}'</span>
                 </div>
               ))}
-              {(liveData.cards ?? []).map((c: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200">
-                  <span className="text-sm">{c.type?.includes('Red') ? '🟥' : '🟨'}</span>
-                  <p className="text-[11px] font-black text-gray-900 flex-1 truncate">{c.player}</p>
-                  <span className="text-[10px] font-black text-gray-400 flex-shrink-0">{c.minute}'</span>
-                </div>
-              ))}
               {!(liveData.goals?.length) && !(liveData.cards?.length) && (
                 <p className="text-[11px] text-gray-400 text-center py-2">No events yet</p>
               )}
             </div>
           )}
-
-          {/* Lineups */}
           {tab === 'events' && (
             <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto">
               {(liveData.lineups ?? []).map((l: any, i: number) => (
@@ -798,7 +746,6 @@ function LiveMatchCard({ data }: { data: any }) {
                       <span className="text-[9px] text-gray-400 mr-1">{p.number}</span>{p.name}
                     </p>
                   ))}
-                  {l.startingXI?.length > 5 && <p className="text-[9px] text-gray-400">+{l.startingXI.length - 5} more</p>}
                 </div>
               ))}
               {!liveData.lineups?.length && <p className="text-[11px] text-gray-400 col-span-2 text-center py-2">Lineups not announced</p>}
@@ -806,8 +753,6 @@ function LiveMatchCard({ data }: { data: any }) {
           )}
         </div>
       )}
-
-      {/* Concert setlist */}
       {liveData?.type === 'concert' && (
         <div className="p-3 space-y-2">
           {liveData.note && <p className="text-[11px] text-amber-700 bg-amber-50 rounded-xl px-3 py-2 border border-amber-200">{liveData.note}</p>}
@@ -823,10 +768,8 @@ function LiveMatchCard({ data }: { data: any }) {
           )}
         </div>
       )}
-
-      {/* Last sync */}
       {lastSync && (
-        <div className="px-4 py-2 border-t border-gray-50 flex items-center justify-between">
+        <div className="px-4 py-2 border-t border-gray-50">
           <p className="text-[9px] text-gray-300">
             Updated {lastSync.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
             {isLive && ' · auto-refreshing'}
@@ -837,7 +780,7 @@ function LiveMatchCard({ data }: { data: any }) {
   );
 }
 
-// ─── Checklist Card (compact, for chat panel) ─────────────────────────────────
+// ─── Checklist Card ───────────────────────────────────────────────────────────
 
 function ChecklistCard({ data }: { data: any }) {
   const storageKey = `gladys_checklist_${data.eventDate}`;
@@ -886,7 +829,6 @@ function ChecklistCard({ data }: { data: any }) {
           </p>
           <span className="text-[10px] font-black text-gray-400">{doneCount}/{items.length}</span>
         </div>
-        {/* Progress bar */}
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-500"
@@ -894,7 +836,6 @@ function ChecklistCard({ data }: { data: any }) {
           />
         </div>
       </div>
-
       <div className="p-3 space-y-1.5">
         {items.map(item => (
           <button key={item.id} onClick={() => toggle(item.id)}
@@ -913,7 +854,6 @@ function ChecklistCard({ data }: { data: any }) {
           </button>
         ))}
       </div>
-
       {allDone ? (
         <div className="mx-3 mb-3 px-4 py-3 rounded-xl bg-emerald-500 text-white text-center">
           <p className="text-xs font-black">🎉 You're all set for {data.eventName}!</p>
@@ -954,23 +894,11 @@ function ToolCardRenderer({ card, onTripPlan }: { card: ToolCard; onTripPlan?: (
 function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string }) {
   const isActive     = status === 'active';
   const isConnecting = status === 'connecting';
-
-  // 7 bars for the waveform — heights driven by volume + sine offsets
-  const BAR_COUNT = 7;
-  const getBarHeight = (i: number) => {
-    if (!isActive) return 8;
-    const wave = Math.sin(Date.now() / 200 + i * 0.8) * 0.5 + 0.5;
-    const base = 8 + volumeLevel * 32;
-    return Math.max(6, Math.min(40, base * wave + 8));
-  };
+  const BAR_COUNT    = 7;
 
   return (
     <div className="flex flex-col items-center gap-5 pt-8 pb-4">
-
-      {/* ── Orb ── */}
       <div className="relative flex items-center justify-center">
-
-        {/* Pulse rings when active */}
         {isActive && (
           <>
             <motion.div
@@ -987,8 +915,6 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
             />
           </>
         )}
-
-        {/* Connecting ring */}
         {isConnecting && (
           <motion.div
             animate={{ rotate: 360 }}
@@ -997,13 +923,8 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
             style={{ borderTopColor: '#0EA5E9', borderRightColor: '#BAE6FD' }}
           />
         )}
-
-        {/* Main orb */}
         <motion.div
-          animate={isActive
-            ? { scale: [1, 1 + volumeLevel * 0.12, 1] }
-            : { scale: 1 }
-          }
+          animate={isActive ? { scale: [1, 1 + volumeLevel * 0.12, 1] } : { scale: 1 }}
           transition={{ duration: 0.15, repeat: isActive ? Infinity : 0 }}
           className="w-20 h-20 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden"
           style={{
@@ -1014,21 +935,16 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
               : 'linear-gradient(135deg, #1E293B, #0F172A)',
           }}
         >
-          {/* Shine overlay */}
           <div className="absolute inset-0 rounded-full"
             style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 60%)' }} />
-
           {isConnecting ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <div className="text-white">
-              <IconMic size={22} />
-            </div>
+            <div className="text-white"><IconMic size={22} /></div>
           )}
         </motion.div>
       </div>
 
-      {/* ── Animated waveform bars (shown when active) ── */}
       <div className="h-12 flex items-center justify-center gap-1">
         {isActive ? (
           Array.from({ length: BAR_COUNT }).map((_, i) => (
@@ -1042,40 +958,25 @@ function VoiceOrb({ volumeLevel, status }: { volumeLevel: number; status: string
                 ],
                 opacity: [0.6, 1, 0.6],
               }}
-              transition={{
-                duration: 0.5 + i * 0.07,
-                repeat: Infinity,
-                ease: 'easeInOut',
-                delay: i * 0.05,
-              }}
+              transition={{ duration: 0.5 + i * 0.07, repeat: Infinity, ease: 'easeInOut', delay: i * 0.05 }}
               className="w-1 rounded-full"
-              style={{
-                background: `linear-gradient(to top, #0284C7, #7DD3FC)`,
-                minHeight: '6px',
-              }}
+              style={{ background: 'linear-gradient(to top, #0284C7, #7DD3FC)', minHeight: '6px' }}
             />
           ))
         ) : (
-          /* Static flat bars when idle */
           Array.from({ length: BAR_COUNT }).map((_, i) => (
-            <div
-              key={i}
-              className="w-1 rounded-full bg-slate-200"
-              style={{ height: `${i === 3 ? 12 : i % 2 === 0 ? 8 : 6}px` }}
-            />
+            <div key={i} className="w-1 rounded-full bg-slate-200"
+              style={{ height: `${i === 3 ? 12 : i % 2 === 0 ? 8 : 6}px` }} />
           ))
         )}
       </div>
 
-      {/* ── Status text ── */}
       <div className="text-center">
         <p className="text-sm font-bold text-slate-900 tracking-tight">
           {isActive ? 'Gladys is listening…' : isConnecting ? 'Connecting…' : 'Tap to speak'}
         </p>
         <p className="text-xs text-slate-400 mt-0.5">
-          {isActive
-            ? 'Ask about events, flights, hotels or anything'
-            : 'Your AI travel companion'}
+          {isActive ? 'Ask about events, flights, hotels or anything' : 'Your AI travel companion'}
         </p>
       </div>
     </div>
@@ -1099,19 +1000,16 @@ function ChatBubble({ message, onTripPlan, isStreaming }: {
       }`}>
         <p className="whitespace-pre-wrap">
           {message.content}
-          {/* Blinking cursor while streaming */}
           {isStreaming && (
             <span className="inline-block w-0.5 h-3.5 bg-gray-400 ml-0.5 align-middle animate-pulse" />
           )}
         </p>
       </div>
-
       {message.toolCard && (
         <div className="w-full max-w-[95%]">
           <ToolCardRenderer card={message.toolCard} onTripPlan={onTripPlan} />
         </div>
       )}
-
       {message.affiliateCards?.map((card, i) => (
         <div key={i} className="w-full max-w-[90%]">
           <AffiliateCardItem card={card} />
@@ -1149,24 +1047,23 @@ const VOICE_PROMPTS = [
   { text: 'Surprise me with a festival trip',        emoji: '🎪', tag: 'Fun'     },
 ];
 
-// Grouped prompts — shown on empty chat state
 const CHAT_PROMPT_GROUPS = [
   {
     label: 'Plan a trip',
     prompts: [
       { text: 'Plan a trip to the UEFA Champions League Final', emoji: '🏆' },
-      { text: 'I want to go to a music festival in 2026',          emoji: '🎪' },
-      { text: 'Plan a trip to the NBA Finals',                     emoji: '🏀' },
-      { text: 'Book me a trip to Formula 1 Monaco',                emoji: '🏎️' },
+      { text: 'I want to go to a music festival in 2026',       emoji: '🎪' },
+      { text: 'Plan a trip to the NBA Finals',                  emoji: '🏀' },
+      { text: 'Book me a trip to Formula 1 Monaco',             emoji: '🏎️' },
     ],
   },
   {
     label: 'Live tools',
     prompts: [
-      { text: "What's the score?",                 emoji: '🔴' },
-      { text: 'Show my event checklist',            emoji: '✅' },
-      { text: 'Check flight status for BA456',     emoji: '✈️' },
-      { text: "Weather in Dubai next week?",        emoji: '🌤' },
+      { text: "What's the score?",             emoji: '🔴' },
+      { text: 'Show my event checklist',        emoji: '✅' },
+      { text: 'Check flight status for BA456', emoji: '✈️' },
+      { text: "Weather in Dubai next week?",    emoji: '🌤' },
     ],
   },
   {
@@ -1180,7 +1077,6 @@ const CHAT_PROMPT_GROUPS = [
   },
 ];
 
-// Quick-reply chips — shown below messages during a conversation
 const CHAT_QUICK_PROMPTS = [
   "Weather somewhere?",
   "What can you help with?",
@@ -1210,20 +1106,34 @@ function getToastConfig(toolName: string, result: any): { title: string; descrip
   }
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Memory extraction — fires silently after each exchange ──────────────────
+// Never blocks the UI. Never surfaces errors to the user.
 
-// ─── Event intent detector ───────────────────────────────────────────────────
+async function extractMemoryInBackground(
+  userId:   string,
+  messages: { role: string; content: string }[]
+): Promise<void> {
+  if (!userId || messages.length < 2) return;
+  try {
+    await fetch('/api/memory/extract', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, messages: messages.slice(-8) }),
+    });
+  } catch { /* silent */ }
+}
+
+// ─── Intent detectors ────────────────────────────────────────────────────────
 
 const TRIP_PATTERNS = [
-  /plan.*trip/i, /book.*trip/i, /travel.*to/i,
-  /flights?.*to/i, /hotels?.*in/i, /itinerary/i,
-  /visit.*(for|to)/i, /go.*to/i,
-  /world cup/i, /uchampions league/i, /ucl/i,
-  /nba finals/i, /super bowl/i, /coachella/i,
-  /glaston(bury)?/i, /formula 1/i, /f1.*grand prix/i,
-  /vs\.?/i, // "Chelsea vs Arsenal" pattern
+  /plan.*trip/i, /book.*trip/i, /travel.*to/i,
+  /flights?.*to/i, /hotels?.*in/i, /itinerary/i,
+  /visit.*(for|to)/i, /go.*to/i,
+  /world cup/i, /champions league/i, /ucl/i,
+  /nba finals/i, /super bowl/i, /coachella/i,
+  /glaston(bury)?/i, /formula 1/i, /f1.*grand prix/i,
+  /vs\.?/i,
 ]
-
 function detectTripIntent(text: string): boolean {
   return TRIP_PATTERNS.some(p => p.test(text))
 }
@@ -1243,9 +1153,11 @@ const CHECKLIST_PATTERNS = [
   /pre.?event/i, /before.*event/i, /don't forget/i, /remind me/i,
   /show.*checklist/i, /my list/i, /preparation/i, /prepared/i,
 ]
-function detectChecklistIntent(text: string): boolean {
+function detectChecklistIntent(text: string): Promise<boolean> | boolean {
   return CHECKLIST_PATTERNS.some(p => p.test(text))
 }
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function GladysCompanion({
   eventContext,
@@ -1264,16 +1176,16 @@ export default function GladysCompanion({
   const [isTyping,    setIsTyping]    = useState(false);
   const [streamingId, setStreamingId] = useState<string | null>(null);
 
-  const messagesEndRef   = useRef<HTMLDivElement>(null);
-  const inputRef         = useRef<HTMLInputElement>(null);
-  const prevToolCount    = useRef(0);
-  const proactiveFired   = useRef(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
+  const prevToolCount  = useRef(0);
+  const proactiveFired = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // ── Proactive first message when panel opens with context ─────────────────
+  // ── Proactive first message ───────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen || mode !== 'chat') return;
     if (proactiveFired.current || messages.length > 0) return;
@@ -1281,13 +1193,12 @@ export default function GladysCompanion({
 
     proactiveFired.current = true;
 
-    // Build a contextual greeting based on what we know
-    const name       = userProfile?.name || user?.displayName || null;
-    const greeting   = name ? `Hey ${name.split(' ')[0]}! 👋` : 'Hey! 👋';
-    const today         = new Date().toISOString().split('T')[0];
-    const dateInCtx     = eventContext?.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
-    const isEventToday  = dateInCtx === today;
-    const cleanCtx      = eventContext
+    const name    = userProfile?.name || user?.displayName || null;
+    const greeting = name ? `Hey ${name.split(' ')[0]}! 👋` : 'Hey! 👋';
+    const today      = new Date().toISOString().split('T')[0];
+    const dateInCtx  = eventContext?.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+    const isEventToday = dateInCtx === today;
+    const cleanCtx = eventContext
       ?.replace('User is planning a trip to ', '')
       .replace('User is planning a trip for ', '') ?? '';
 
@@ -1297,26 +1208,18 @@ export default function GladysCompanion({
         : `I see you're planning a trip to **${cleanCtx}**. Want me to check the weather there, find things to do nearby, or show your event checklist?`
       : `I'm Gladys, your AI travel companion. I can check weather, find football fixtures, build packing lists, track flights, and plan full event trips. What are you thinking?`;
 
-    // Stream the proactive message word by word
     const proactiveId = `proactive-${Date.now()}`;
     const fullText    = `${greeting} ${contextual}`;
     const words       = fullText.split(' ');
 
-    setMessages([{
-      id:        proactiveId,
-      role:      'assistant',
-      content:   '',
-      timestamp: new Date(),
-    }]);
+    setMessages([{ id: proactiveId, role: 'assistant', content: '', timestamp: new Date() }]);
     setStreamingId(proactiveId);
 
     let i = 0;
     const interval = setInterval(() => {
       i++;
       setMessages(prev => prev.map(m =>
-        m.id === proactiveId
-          ? { ...m, content: words.slice(0, i).join(' ') }
-          : m
+        m.id === proactiveId ? { ...m, content: words.slice(0, i).join(' ') } : m
       ));
       if (i >= words.length) {
         clearInterval(interval);
@@ -1327,12 +1230,11 @@ export default function GladysCompanion({
     return () => clearInterval(interval);
   }, [isOpen, mode]);
 
-  // Reset proactive flag when context changes (new trip search)
   useEffect(() => {
     proactiveFired.current = false;
   }, [eventContext]);
 
-  // Handle all tool results from Vapi voice calls
+  // ── Vapi tool results ─────────────────────────────────────────────────────
   useEffect(() => {
     const results = vapi.toolResults ?? [];
     if (results.length <= prevToolCount.current) return;
@@ -1348,11 +1250,8 @@ export default function GladysCompanion({
       const isDisruption = toolName === 'check_flight_status' &&
         ['cancelled', 'diverted'].includes(data.status);
 
-      if (isDisruption) {
-        toast.error(title, { description, duration: 10000 });
-      } else {
-        toast.success(title, { description, duration: 5000 });
-      }
+      if (isDisruption) toast.error(title, { description, duration: 10000 });
+      else              toast.success(title, { description, duration: 5000 });
 
       const toolCard       = detectToolCard(toolName, data);
       const affiliateCards = data.affiliateCards ?? (data.affiliateUrl ? [{
@@ -1376,8 +1275,7 @@ export default function GladysCompanion({
     else if (vapi.status === 'idle') vapi.startCall(eventContext);
   }, [vapi, eventContext]);
 
-  // ─── handleSend ─────────────────────────────────────────────────────────────
-  // Smart routing: trip intent → /api/agent | everything else → /api/gladys-chat
+  // ─── handleSend ───────────────────────────────────────────────────────────
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isTyping) return;
@@ -1393,90 +1291,83 @@ export default function GladysCompanion({
     const isLiveQuery      = detectLiveIntent(text);
     const isChecklistQuery = detectChecklistIntent(text);
 
-    try {
-      // ── LIVE MATCH PATH ───────────────────────────────────────────────────────
-      if (isLiveQuery && eventContext) {
-        // Extract fixture context from eventContext string
-        const fixtureMatch  = eventContext.match(/fixtureId[=:](\d+)/i)
-        const fixtureId     = fixtureMatch?.[1]
-        const artistMatch   = eventContext.match(/artist[=:]([^,]+)/i)
-        const artistName    = artistMatch?.[1]?.trim()
-        const dateMatch     = eventContext.match(/(\d{4}-\d{2}-\d{2})/)
-        const eventDate     = dateMatch?.[1] ?? new Date().toISOString().split('T')[0]
-        const today         = new Date().toISOString().split('T')[0]
-        const isToday       = eventDate === today
+    // ── Current userId — passed to every API call ────────────────────────────
+    const userId = user?.uid ?? null;
 
-        const liveId = `live-${Date.now()}`
+    try {
+      // ── LIVE MATCH PATH ──────────────────────────────────────────────────────
+      if (isLiveQuery && eventContext) {
+        const fixtureMatch = eventContext.match(/fixtureId[=:](\d+)/i);
+        const fixtureId    = fixtureMatch?.[1];
+        const artistMatch  = eventContext.match(/artist[=:]([^,]+)/i);
+        const artistName   = artistMatch?.[1]?.trim();
+        const dateMatch    = eventContext.match(/(\d{4}-\d{2}-\d{2})/);
+        const eventDate    = dateMatch?.[1] ?? new Date().toISOString().split('T')[0];
+        const today        = new Date().toISOString().split('T')[0];
+        const isToday      = eventDate === today;
+
         setMessages(prev => [...prev, {
-          id: liveId, role: 'assistant', timestamp: new Date(),
+          id: `live-${Date.now()}`, role: 'assistant', timestamp: new Date(),
           content: isToday
             ? 'Here are the live updates for your event 🔴'
             : "Live updates will be available on event day. Here's what I have:",
           toolCard: {
             type: 'live_match' as const,
             data: {
-              fixtureId,
-              artistName,
-              eventDate,
-              eventName:  eventContext.replace(/fixtureId[=:]\d+/gi, '').replace(/artist[=:][^,]+/gi, '').trim() || 'Your Event',
-              eventType:  fixtureId ? 'sports' : 'music',
-              autoFetch:  isToday,
+              fixtureId, artistName, eventDate,
+              eventName: eventContext.replace(/fixtureId[=:]\d+/gi, '').replace(/artist[=:][^,]+/gi, '').trim() || 'Your Event',
+              eventType: fixtureId ? 'sports' : 'music',
+              autoFetch: isToday,
             },
           },
-        }])
-        return
+        }]);
+        return;
 
-      // ── CHECKLIST PATH ────────────────────────────────────────────────────────
+      // ── CHECKLIST PATH ───────────────────────────────────────────────────────
       } else if (isChecklistQuery && eventContext) {
-        const dateMatch  = eventContext.match(/(\d{4}-\d{2}-\d{2})/)
-        const venueMatch = eventContext.match(/venue[=:]([^,]+)/i)
-        const eventDate  = dateMatch?.[1] ?? ''
-        const venue      = venueMatch?.[1]?.trim() ?? 'the venue'
+        const dateMatch  = eventContext.match(/(\d{4}-\d{2}-\d{2})/);
+        const venueMatch = eventContext.match(/venue[=:]([^,]+)/i);
+        const eventDate  = dateMatch?.[1] ?? '';
+        const venue      = venueMatch?.[1]?.trim() ?? 'the venue';
 
-        const checkId = `checklist-${Date.now()}`
         setMessages(prev => [...prev, {
-          id: checkId, role: 'assistant', timestamp: new Date(),
+          id: `checklist-${Date.now()}`, role: 'assistant', timestamp: new Date(),
           content: "Here's your pre-event checklist 📋",
           toolCard: {
             type: 'checklist' as const,
             data: {
               eventName: eventContext.split(',')[0]?.trim() || 'Your Event',
-              eventDate,
-              venue,
+              eventDate, venue,
               city: eventContext.match(/city[=:]([^,]+)/i)?.[1]?.trim() ?? '',
             },
           },
-        }])
-        return
+        }]);
+        return;
 
       } else if (isLiveQuery && !eventContext) {
-        // No active event — ask user which event they mean
         setMessages(prev => [...prev, {
           id: `no-event-${Date.now()}`, role: 'assistant', timestamp: new Date(),
           content: "I don't have an active event loaded. Search for your event on the homepage first, then come back and I'll show you live updates!",
-        }])
-        return
+        }]);
+        return;
 
       } else if (isChecklistQuery && !eventContext) {
         setMessages(prev => [...prev, {
           id: `no-event-${Date.now()}`, role: 'assistant', timestamp: new Date(),
           content: "Search for your event on the homepage first and I'll pull up your personalised checklist!",
-        }])
-        return
+        }]);
+        return;
       }
 
       if (isTripQuery) {
         // ── TRIP PLANNING PATH ─────────────────────────────────────────────────
-        // Show "building trip" message immediately
         const thinkingId = `thinking-${Date.now()}`;
         setMessages(prev => [...prev, {
-          id:        thinkingId,
-          role:      'assistant',
-          content:   `Planning your trip for "${text}"... Give me a moment ✈️`,
+          id: thinkingId, role: 'assistant',
+          content: `Planning your trip for "${text}"... Give me a moment ✈️`,
           timestamp: new Date(),
         }]);
 
-        // If parent provided onTripPlan, use it to trigger full homepage flow
         if (onTripPlan) {
           onTripPlan(text);
           setMessages(prev => prev.map(m =>
@@ -1488,13 +1379,20 @@ export default function GladysCompanion({
           return;
         }
 
-        // Otherwise call /api/agent directly and render trip card inline
-        const res    = await fetch('/api/agent', {
+        // ── Direct agent call with userId + memory-aware origin ───────────────
+        const res = await fetch('/api/agent', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
-            message: text,
-            context: { eventType: 'sports', origin: 'Johannesburg, South Africa', days: 5 },
+            message:             text,
+            userId,
+            origin_country_code: (userProfile as any)?.passportCountry ?? 'ZA',
+            user_session:        userId ?? undefined,
+            context: {
+              eventType: 'sports',
+              origin:    (userProfile as any)?.homeCity ?? 'Johannesburg, South Africa',
+              days:      5,
+            },
           }),
         });
         const result = await res.json();
@@ -1527,7 +1425,6 @@ export default function GladysCompanion({
               : m
           ));
         } else {
-          // Agent didn't find event — fall through to chat
           setMessages(prev => prev.map(m =>
             m.id === thinkingId
               ? { ...m, content: result.data?.message || "I couldn't find that event — try searching on the homepage for the best results!" }
@@ -1536,55 +1433,67 @@ export default function GladysCompanion({
         }
 
       } else {
-        // ── CHAT PATH — STREAMING ─────────────────────────────────────────────
+        // ── CHAT PATH — STREAMING ──────────────────────────────────────────────
         const history = messages.slice(-6).map(m => ({ role: m.role, content: m.content }));
 
-        // Inject user memory into context
-        const userContext = userProfile
-          ? `User: ${userProfile.name || user?.displayName || 'Traveller'}, based in ${userProfile.homeCity || 'Johannesburg'}.`
-          : undefined;
-
+        // ── Stream request — userId sent so server fetches memory directly ──────
         const res = await fetch('/api/gladys-chat/stream', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
             message: text,
-            context: eventContext || userContext,
+            context: eventContext,
             history,
-            userContext,
+            userId,                 // ← memory injected server-side from this
           }),
         });
 
         if (!res.ok || !res.body) {
-          // Fallback to non-streaming if stream endpoint fails
+          // ── Fallback to non-streaming ────────────────────────────────────────
           const fallback = await fetch('/api/gladys-chat', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, context: eventContext, history }),
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ message: text, context: eventContext, history, userId }),
           });
-          const result = await fallback.json();
+          const result   = await fallback.json();
           const toolCard = result.toolName ? detectToolCard(result.toolName, result.toolResult) : undefined;
+
           if (result.toolName && result.toolResult) {
             const { title, description } = getToastConfig(result.toolName, result.toolResult);
-            const isDisruption = result.toolName === 'check_flight_status' && ['cancelled', 'diverted'].includes(result.toolResult?.status);
+            const isDisruption = result.toolName === 'check_flight_status' &&
+              ['cancelled', 'diverted'].includes(result.toolResult?.status);
             if (isDisruption) toast.error(title, { description, duration: 10000 });
-            else toast.success(title, { description, duration: 5000 });
+            else              toast.success(title, { description, duration: 5000 });
           }
-          setMessages(prev => [...prev, { id: `assistant-${Date.now()}`, role: 'assistant', content: result.reply ?? "I'm here to help!", toolCard: toolCard ?? undefined, timestamp: new Date() }]);
+
+          setMessages(prev => [...prev, {
+            id: `assistant-${Date.now()}`, role: 'assistant',
+            content: result.reply ?? "I'm here to help!",
+            toolCard: toolCard ?? undefined,
+            timestamp: new Date(),
+          }]);
+
+          // ── Extract memory after fallback response ────────────────────────────
+          if (userId) {
+            const fullHistory = [
+              ...messages.map(m => ({ role: m.role, content: m.content })),
+              { role: 'user',      content: text              },
+              { role: 'assistant', content: result.reply ?? '' },
+            ];
+            extractMemoryInBackground(userId, fullHistory);
+          }
           return;
         }
 
-        // ── Stream the response word by word ──
+        // ── True streaming path ──────────────────────────────────────────────
         const streamId = `stream-${Date.now()}`;
         setStreamingId(streamId);
-        setMessages(prev => [...prev, {
-          id: streamId, role: 'assistant', content: '', timestamp: new Date(),
-        }]);
+        setMessages(prev => [...prev, { id: streamId, role: 'assistant', content: '', timestamp: new Date() }]);
 
         const reader  = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer    = '';
-        let toolName: string | null   = null;
-        let toolResult: any           = null;
+        let finalAssistantContent = '';
 
         try {
           while (true) {
@@ -1604,20 +1513,18 @@ export default function GladysCompanion({
                 const parsed = JSON.parse(data);
 
                 if (parsed.type === 'text') {
-                  // Append text chunk to message
+                  finalAssistantContent += parsed.text;
                   setMessages(prev => prev.map(m =>
                     m.id === streamId ? { ...m, content: m.content + parsed.text } : m
                   ));
                 } else if (parsed.type === 'tool') {
-                  // Tool result arrived — update message with card
-                  toolName   = parsed.toolName;
-                  toolResult = parsed.toolResult;
-                  const toolCard = detectToolCard(toolName!, toolResult);
-                  if (toolName && toolResult) {
-                    const { title, description } = getToastConfig(toolName, toolResult);
-                    const isDisruption = toolName === 'check_flight_status' && ['cancelled', 'diverted'].includes(toolResult?.status);
+                  const toolCard = detectToolCard(parsed.toolName, parsed.toolResult);
+                  if (parsed.toolName && parsed.toolResult) {
+                    const { title, description } = getToastConfig(parsed.toolName, parsed.toolResult);
+                    const isDisruption = parsed.toolName === 'check_flight_status' &&
+                      ['cancelled', 'diverted'].includes(parsed.toolResult?.status);
                     if (isDisruption) toast.error(title, { description, duration: 10000 });
-                    else toast.success(title, { description, duration: 5000 });
+                    else              toast.success(title, { description, duration: 5000 });
                   }
                   setMessages(prev => prev.map(m =>
                     m.id === streamId ? { ...m, toolCard: toolCard ?? undefined } : m
@@ -1628,6 +1535,16 @@ export default function GladysCompanion({
           }
         } finally {
           setStreamingId(null);
+
+          // ── Extract memory after streaming completes ───────────────────────
+          if (userId && finalAssistantContent) {
+            const fullHistory = [
+              ...messages.map(m => ({ role: m.role, content: m.content })),
+              { role: 'user',      content: text                   },
+              { role: 'assistant', content: finalAssistantContent  },
+            ];
+            extractMemoryInBackground(userId, fullHistory);
+          }
         }
       }
     } catch {
@@ -1640,9 +1557,8 @@ export default function GladysCompanion({
     } finally {
       setIsTyping(false);
     }
-  }, [input, isTyping, eventContext, onTripPlan]);
+  }, [input, isTyping, eventContext, onTripPlan, user, userProfile, messages]);
 
-  // Clicking a prompt chip fires immediately (no extra Enter needed)
   const handlePromptClick = (text: string) => {
     if (isTyping) return;
     handleSend(text);
@@ -1664,7 +1580,6 @@ export default function GladysCompanion({
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             className="fixed bottom-20 sm:bottom-8 right-4 sm:right-6 z-50 flex flex-col items-end gap-2"
           >
-            {/* Label pill */}
             <motion.div
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
@@ -1676,16 +1591,12 @@ export default function GladysCompanion({
               Talk to Gladys
             </motion.div>
 
-            {/* Main FAB button */}
             <button
               onClick={() => { setIsOpen(true); if (eventContext) setMode('chat'); }}
               className="relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)',
-                boxShadow: '0 8px 32px rgba(14,165,233,0.45)' }}
+              style={{ background: 'linear-gradient(135deg, #38BDF8, #0284C7)', boxShadow: '0 8px 32px rgba(14,165,233,0.45)' }}
             >
-              {/* Pulse ring */}
-              <span className="absolute inset-0 rounded-full animate-ping opacity-20"
-                style={{ background: '#0EA5E9' }} />
+              <span className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: '#0EA5E9' }} />
               {hasActivity && (
                 <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white" />
               )}
@@ -1757,7 +1668,6 @@ export default function GladysCompanion({
                       </button>
                     ))}
                   </div>
-
                   <button onClick={() => setIsOpen(false)}
                     className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors">
                     <IconX size={14} />
@@ -1776,10 +1686,8 @@ export default function GladysCompanion({
                       transition={{ duration: 0.18 }}
                       className="flex-1 overflow-y-auto"
                     >
-                      {/* ── Orb + waveform ── */}
                       <VoiceOrb volumeLevel={vapi.volumeLevel} status={vapi.status} />
 
-                      {/* ── Controls ── */}
                       <div className="flex items-center justify-center gap-3 pb-5 px-5">
                         {isVoiceActive && (
                           <button onClick={vapi.toggleMute}
@@ -1791,7 +1699,6 @@ export default function GladysCompanion({
                             {vapi.isMuted ? <IconMicOff size={17} /> : <IconMic size={17} />}
                           </button>
                         )}
-
                         <motion.button
                           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                           onClick={handleVoiceToggle}
@@ -1813,23 +1720,18 @@ export default function GladysCompanion({
                         </motion.button>
                       </div>
 
-                      {/* ── Try Saying ── only when idle ── */}
                       {vapi.status === 'idle' && (
                         <div className="px-4 pb-5">
-                          {/* Header */}
                           <div className="flex items-center gap-2 mb-3 px-1">
                             <div className="h-px flex-1 bg-slate-100" />
                             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Try saying</p>
                             <div className="h-px flex-1 bg-slate-100" />
                           </div>
-
-                          {/* 2-col grid of prompt chips */}
                           <div className="grid grid-cols-2 gap-2">
                             {VOICE_PROMPTS.map((p, i) => (
                               <motion.button
                                 key={i}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.97 }}
+                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                                 onClick={() => vapi.startCall(`User wants: ${p.text}`)}
                                 className="text-left rounded-2xl px-3 py-3 transition-all border border-slate-100 hover:border-sky-200 hover:bg-sky-50 bg-slate-50 group"
                               >
@@ -1868,7 +1770,6 @@ export default function GladysCompanion({
                     >
                       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
 
-                        {/* ── Empty state: grouped prompt categories ── */}
                         {messages.length === 0 && (
                           <div className="flex flex-col gap-5 py-2">
                             <div className="text-center">
@@ -1880,7 +1781,6 @@ export default function GladysCompanion({
                                 Your AI travel companion. Say hi, ask about visa rules, plan a trip, get weather — I'm here for everything travel.
                               </p>
                             </div>
-
                             {CHAT_PROMPT_GROUPS.map(group => (
                               <div key={group.label}>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">
@@ -1902,7 +1802,6 @@ export default function GladysCompanion({
                           </div>
                         )}
 
-                        {/* ── Messages ── */}
                         {messages.map(msg => (
                           <ChatBubble
                             key={msg.id}
@@ -1913,7 +1812,6 @@ export default function GladysCompanion({
                         ))}
                         {isTyping && !streamingId && <TypingIndicator />}
 
-                        {/* ── Quick-reply chips after conversation starts ── */}
                         {messages.length > 0 && !isTyping && (
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {CHAT_QUICK_PROMPTS.map((q, i) => (

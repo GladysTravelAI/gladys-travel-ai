@@ -1,9 +1,10 @@
 // app/api/gladys-chat/stream/route.ts
-// SSE streaming endpoint for GladysCompanion chat
-// All 7 tools — same coverage as gladys-chat/route.ts
+// SSE streaming endpoint — NOW WITH MEMORY
+// Fetches user memory server-side by userId. Never trusts client to pass context.
 
 import { NextRequest } from 'next/server'
 import OpenAI from 'openai'
+import { getUserMemory, buildMemoryContext } from '@/lib/memory/gladysMemory'
 
 export const runtime = 'nodejs'
 
@@ -94,7 +95,7 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'find_football_fixtures',
-      description: "Find upcoming football/soccer matches worldwide — Premier League, Champions League, World Cup 2026, La Liga, Bundesliga, Serie A, MLS, NWSL, Women's UCL, Copa America, AFCON and more. Always use for football questions.",
+      description: "Find upcoming football/soccer matches worldwide — Premier League, Champions League, World Cup 2026, La Liga, Bundesliga, Serie A, MLS, NWSL, Women's UCL, Copa America, AFCON and more.",
       parameters: {
         type: 'object',
         properties: {
@@ -110,7 +111,7 @@ const tools: OpenAI.Chat.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_airport_info',
-      description: 'Get airport navigation help — terminals, transport to/from airport, Uber pickup zones, lounges, security tips. Use when user asks about an airport or needs directions inside one.',
+      description: 'Get airport navigation help — terminals, transport to/from airport, Uber pickup zones, lounges, security tips.',
       parameters: {
         type: 'object',
         properties: {
@@ -189,59 +190,40 @@ function executePackingList(args: { destination: string; days: number; eventType
       { category: 'Clothing',      items: clothes, essential: true  },
       { category: 'For the event', items: extras,  essential: false },
     ],
-    proTips:       ['Roll clothes to save space', 'Pack a collapsible bag for souvenirs'],
+    proTips:        ['Roll clothes to save space', 'Pack a collapsible bag for souvenirs'],
     weatherContext: { avgTemp: 20 },
   }
 }
 
 function executeGetTravelTips(args: { city: string }) {
   const tips: Record<string, any> = {
-    'London':      { mustDo: ['Tower of London', 'Borough Market', 'Tate Modern', 'Notting Hill'],          localFood: ['Fish & chips at a pub', 'Brick Lane curry', 'Borough Market street food'],   watchOut: ['Pubs close at 11pm'] },
-    'Paris':       { mustDo: ['Eiffel Tower (book online)', 'Louvre', 'Montmartre', 'Seine walk'],          localFood: ['Croissant from a boulangerie', 'Steak frites', 'French onion soup'],           watchOut: ['Book Eiffel Tower 2 months ahead'] },
-    'New York':    { mustDo: ['High Line', 'Central Park', 'Brooklyn Bridge', 'Times Square'],              localFood: ['NYC pizza slice', "Katz's Deli pastrami", 'Bagel with lox'],                  watchOut: ['Book restaurants ahead on weekends'] },
-    'Los Angeles': { mustDo: ['Griffith Observatory', 'Venice Beach', 'Santa Monica Pier'],                localFood: ['In-N-Out Burger', 'Tacos from a truck in East LA'],                           watchOut: ['Traffic is worst 7–9am and 4–7pm'] },
-    'Dubai':       { mustDo: ['Burj Khalifa', 'Desert safari', 'Gold Souk'],                               localFood: ['Shawarma from Al Safadi', 'Fresh juice from Bur Dubai'],                      watchOut: ['Dress modestly outside resorts'] },
-    'Madrid':      { mustDo: ['Prado Museum', 'Retiro Park', 'Bernabeu tour'],                             localFood: ['Bocadillo de calamares', 'Churros with chocolate'],                           watchOut: ['Dinner rarely before 9pm'] },
-    'Barcelona':   { mustDo: ['Sagrada Familia', 'Park Guell', 'Camp Nou'],                                localFood: ['Pan con tomate', 'Tapas at El Xampanyet'],                                    watchOut: ['Pickpockets on Las Ramblas'] },
-    'Munich':      { mustDo: ['Allianz Arena tour', 'Marienplatz', 'BMW Museum'],                          localFood: ['Weisswurst with pretzels', 'Beer at a Biergarten'],                           watchOut: ['Hotels book out during Oktoberfest'] },
-    'Johannesburg':{ mustDo: ['Apartheid Museum', 'Soweto tour', 'Maboneng Precinct'],                     localFood: ['Bunny chow', 'Braai', 'Kota'],                                                watchOut: ["Don't walk alone at night in the CBD"] },
+    'London':       { mustDo: ['Tower of London', 'Borough Market', 'Tate Modern', 'Notting Hill'],         localFood: ['Fish & chips at a pub', 'Brick Lane curry', 'Borough Market street food'],  watchOut: ['Pubs close at 11pm'] },
+    'Paris':        { mustDo: ['Eiffel Tower (book online)', 'Louvre', 'Montmartre', 'Seine walk'],         localFood: ['Croissant from a boulangerie', 'Steak frites', 'French onion soup'],          watchOut: ['Book Eiffel Tower 2 months ahead'] },
+    'New York':     { mustDo: ['High Line', 'Central Park', 'Brooklyn Bridge', 'Times Square'],             localFood: ['NYC pizza slice', "Katz's Deli pastrami", 'Bagel with lox'],                 watchOut: ['Book restaurants ahead on weekends'] },
+    'Los Angeles':  { mustDo: ['Griffith Observatory', 'Venice Beach', 'Santa Monica Pier'],               localFood: ['In-N-Out Burger', 'Tacos from a truck in East LA'],                          watchOut: ['Traffic is worst 7–9am and 4–7pm'] },
+    'Dubai':        { mustDo: ['Burj Khalifa', 'Desert safari', 'Gold Souk'],                              localFood: ['Shawarma from Al Safadi', 'Fresh juice from Bur Dubai'],                     watchOut: ['Dress modestly outside resorts'] },
+    'Madrid':       { mustDo: ['Prado Museum', 'Retiro Park', 'Bernabeu tour'],                            localFood: ['Bocadillo de calamares', 'Churros with chocolate'],                          watchOut: ['Dinner rarely before 9pm'] },
+    'Barcelona':    { mustDo: ['Sagrada Familia', 'Park Guell', 'Camp Nou'],                               localFood: ['Pan con tomate', 'Tapas at El Xampanyet'],                                   watchOut: ['Pickpockets on Las Ramblas'] },
+    'Munich':       { mustDo: ['Allianz Arena tour', 'Marienplatz', 'BMW Museum'],                         localFood: ['Weisswurst with pretzels', 'Beer at a Biergarten'],                          watchOut: ['Hotels book out during Oktoberfest'] },
+    'Johannesburg': { mustDo: ['Apartheid Museum', 'Soweto tour', 'Maboneng Precinct'],                    localFood: ['Bunny chow', 'Braai', 'Kota'],                                               watchOut: ["Don't walk alone at night in the CBD"] },
   }
   const key = Object.keys(tips).find(k => args.city.toLowerCase().includes(k.toLowerCase()))
   return key
     ? { city: args.city, tips: tips[key], localEvents: [] }
-    : {
-        city: args.city,
-        tips: {
-          mustDo:    ['Explore the city centre', 'Visit local markets', 'Try the local cuisine'],
-          localFood: ['Ask locals for restaurant recommendations'],
-          watchOut:  ['Keep copies of your documents'],
-        },
-        localEvents: [],
-      }
+    : { city: args.city, tips: { mustDo: ['Explore the city centre', 'Visit local markets', 'Try the local cuisine'], localFood: ['Ask locals for restaurant recommendations'], watchOut: ['Keep copies of your documents'] }, localEvents: [] }
 }
 
 async function executeFlightStatus(args: { flightNumber: string }) {
   try {
     const key = process.env.AVIATIONSTACK_API_KEY
     if (!key) return { error: 'Flight status not configured' }
-    const url  = `http://api.aviationstack.com/v1/flights?access_key=${key}&flight_iata=${args.flightNumber.toUpperCase()}&limit=1`
-    const data = await fetch(url, { signal: AbortSignal.timeout(5000) }).then(r => r.json())
+    const data = await fetch(`http://api.aviationstack.com/v1/flights?access_key=${key}&flight_iata=${args.flightNumber.toUpperCase()}&limit=1`, { signal: AbortSignal.timeout(5000) }).then(r => r.json())
     if (!data.data?.length) return { error: `No data found for flight ${args.flightNumber}` }
     const f = data.data[0]
     return {
-      flightNumber: f.flight?.iata,
-      airline:      f.airline?.name,
-      status:       f.flight_status,
-      departure: {
-        airport: f.departure?.airport, iata: f.departure?.iata,
-        scheduled: f.departure?.scheduled, estimated: f.departure?.estimated,
-        gate: f.departure?.gate, delay: f.departure?.delay,
-      },
-      arrival: {
-        airport: f.arrival?.airport, iata: f.arrival?.iata,
-        scheduled: f.arrival?.scheduled, estimated: f.arrival?.estimated,
-        gate: f.arrival?.gate,
-      },
+      flightNumber: f.flight?.iata, airline: f.airline?.name, status: f.flight_status,
+      departure: { airport: f.departure?.airport, iata: f.departure?.iata, scheduled: f.departure?.scheduled, estimated: f.departure?.estimated, gate: f.departure?.gate, delay: f.departure?.delay },
+      arrival:   { airport: f.arrival?.airport,   iata: f.arrival?.iata,   scheduled: f.arrival?.scheduled,   estimated: f.arrival?.estimated,   gate: f.arrival?.gate },
       recoveryOptions: [],
     }
   } catch { return { error: 'Flight status unavailable' } }
@@ -251,41 +233,16 @@ async function executeFindNearbyAttractions(args: { city: string; category?: str
   try {
     const key = process.env.FOURSQUARE_API_KEY
     if (!key) return { error: 'Places not configured' }
-    const categoryMap: Record<string, string> = {
-      dining: '13000', nightlife: '10032', sights: '16000',
-      outdoors: '16000', shopping: '17000', arts: '10000', all: '',
-    }
-    const geo = await fetch(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=en&format=json`
-    ).then(r => r.json())
+    const categoryMap: Record<string, string> = { dining: '13000', nightlife: '10032', sights: '16000', outdoors: '16000', shopping: '17000', arts: '10000', all: '' }
+    const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=en&format=json`).then(r => r.json())
     if (!geo.results?.length) return { error: `City not found: ${args.city}` }
     const { latitude, longitude } = geo.results[0]
     const cat        = args.category ?? 'all'
     const categoryId = categoryMap[cat] ?? ''
-    const params     = new URLSearchParams({
-      ll:     `${latitude},${longitude}`,
-      radius: '5000',
-      limit:  String(Math.min(args.limit ?? 8, 15)),
-      sort:   'POPULARITY',
-      ...(categoryId && { categories: categoryId }),
-    })
-    const fsData = await fetch(
-      `https://api.foursquare.com/v3/places/search?${params}`,
-      { headers: { Authorization: key, Accept: 'application/json' } }
-    ).then(r => r.json())
+    const params     = new URLSearchParams({ ll: `${latitude},${longitude}`, radius: '5000', limit: String(Math.min(args.limit ?? 8, 15)), sort: 'POPULARITY', ...(categoryId && { categories: categoryId }) })
+    const fsData = await fetch(`https://api.foursquare.com/v3/places/search?${params}`, { headers: { Authorization: key, Accept: 'application/json' } }).then(r => r.json())
     if (!fsData.results?.length) return { city: args.city, places: [] }
-    return {
-      city: args.city,
-      category: cat,
-      places: fsData.results.map((p: any) => ({
-        name:     p.name,
-        category: p.categories?.[0]?.name ?? 'Place',
-        address:  p.location?.formatted_address ?? '',
-        distance: p.distance ? `${(p.distance / 1000).toFixed(1)}km away` : '',
-        rating:   p.rating ? `${p.rating}/10` : null,
-        link:     `https://foursquare.com/v/${p.fsq_id}`,
-      })),
-    }
+    return { city: args.city, category: cat, places: fsData.results.map((p: any) => ({ name: p.name, category: p.categories?.[0]?.name ?? 'Place', address: p.location?.formatted_address ?? '', distance: p.distance ? `${(p.distance / 1000).toFixed(1)}km away` : '', rating: p.rating ? `${p.rating}/10` : null, link: `https://foursquare.com/v/${p.fsq_id}` })) }
   } catch { return { error: 'Places service unavailable' } }
 }
 
@@ -293,121 +250,47 @@ async function executeFindFootballFixtures(args: { league?: string; team?: strin
   try {
     const key = process.env.API_FOOTBALL_KEY
     if (!key) return { error: 'Football data not configured' }
-    const next     = Math.min(args.next ?? 5, 10)
-    let leagueId   = args.leagueId
+    const next = Math.min(args.next ?? 5, 10)
+    let leagueId = args.leagueId
     if (!leagueId && args.league) {
       const norm = args.league.toLowerCase()
-      leagueId   = Object.entries(LEAGUE_ID_MAP).find(([k]) => norm.includes(k))?.[1]
+      leagueId = Object.entries(LEAGUE_ID_MAP).find(([k]) => norm.includes(k))?.[1]
     }
     const season = leagueId ? getSeasonForLeague(leagueId) : 2024
     const params = new URLSearchParams({ next: String(next), season: String(season), status: 'NS' })
     if (leagueId) params.append('league', String(leagueId))
-    const data = await fetch(
-      `https://v3.football.api-sports.io/fixtures?${params}`,
-      { headers: { 'x-apisports-key': key } }
-    ).then(r => r.json())
+    const data = await fetch(`https://v3.football.api-sports.io/fixtures?${params}`, { headers: { 'x-apisports-key': key } }).then(r => r.json())
     if (!data.response?.length) return { league: args.league ?? 'Football', fixtures: [] }
     return {
       league: args.league ?? data.response[0]?.league?.name ?? 'Football',
       fixtures: data.response.slice(0, next).map((f: any) => ({
-        match:    `${f.teams.home.name} vs ${f.teams.away.name}`,
-        league:   f.league.name,
-        date:     new Date(f.fixture.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
-        time:     new Date(f.fixture.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        venue:    f.fixture.venue?.name ?? 'TBC',
-        city:     f.fixture.venue?.city ?? '',
-        homeTeam: f.teams.home.name,
-        awayTeam: f.teams.away.name,
-        homeLogo: f.teams.home.logo,
-        awayLogo: f.teams.away.logo,
+        match: `${f.teams.home.name} vs ${f.teams.away.name}`, league: f.league.name,
+        date:  new Date(f.fixture.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+        time:  new Date(f.fixture.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        venue: f.fixture.venue?.name ?? 'TBC', city: f.fixture.venue?.city ?? '',
+        homeTeam: f.teams.home.name, awayTeam: f.teams.away.name,
+        homeLogo: f.teams.home.logo, awayLogo: f.teams.away.logo,
       })),
     }
   } catch { return { error: 'Football fixtures unavailable' } }
 }
 
 const AIRPORTS: Record<string, any> = {
-  JFK: {
-    name: 'John F. Kennedy International Airport', city: 'New York',
-    transport: { subway: 'AirTrain JFK to Jamaica or Howard Beach (E/J/Z/A lines) · $8.25', taxi: '$52–70 flat rate to Manhattan (30–60 min)', uber: 'Follow AirTrain to designated rideshare lot' },
-    lounges: ['American Admirals Club (T8)', 'Delta Sky Club (T4)', 'JetBlue Mint Lounge (T5)'],
-    tips: ['Allow 3+ hours for international departures', 'AirTrain connects all terminals', 'Cell signal patchy in underground sections'],
-  },
-  LHR: {
-    name: 'Heathrow Airport', city: 'London',
-    transport: { tube: 'Elizabeth Line or Piccadilly Line · £6–13 · 30–45 min', heathrowExpress: 'To Paddington · £25–37 · 15 min', taxi: 'Black cab approx £50–90 to central London' },
-    lounges: ['British Airways Galleries (T5)', 'Virgin Atlantic Clubhouse (T3)', 'Plaza Premium (T2, T3)'],
-    tips: ['T5 is BA only — confirm your terminal before travel', 'Allow 45+ min for security at peak times', 'Heathrow Express is fastest to Paddington'],
-  },
-  DXB: {
-    name: 'Dubai International Airport', city: 'Dubai',
-    transport: { metro: 'Dubai Metro Red Line · AED 9–14 · 30–35 min to city', taxi: 'AED 70–120 to city center', uber: 'Pickup from designated zones at each terminal' },
-    lounges: ['Emirates First Class Lounge (T3)', 'Emirates Business Lounge (T3)', 'Marhaba Lounge (T1, T2, T3)'],
-    tips: ['T3 is one of the largest terminals — allow extra walking time', 'Duty free is exceptional', 'Prayer rooms on every concourse'],
-  },
-  ORD: {
-    name: "O'Hare International Airport", city: 'Chicago',
-    transport: { train: 'CTA Blue Line direct to Loop · $5 · 45 min', taxi: '$40–55 to downtown', uber: 'Pickup from lower level, follow rideshare signs' },
-    lounges: ['United Club (T1, T2)', 'American Admirals Club (T3)', 'Escape Lounge (T5)'],
-    tips: ['Terminals 1–3 connected airside, T5 requires exiting security', 'Blue Line train runs 24/7'],
-  },
-  JNB: {
-    name: 'O.R. Tambo International Airport', city: 'Johannesburg',
-    transport: { gautrain: 'Gautrain to Sandton · R165 · 15 min — fastest option', taxi: 'Official Airport Taxis only — use the rank inside arrivals', uber: 'Pickup from designated Uber zone on arrivals level' },
-    lounges: ['SLOW Lounge (Domestic A)', 'SLOW Lounge (International B)', 'British Airways Lounge (International)'],
-    tips: ['Use Gautrain or pre-booked transport — avoid unofficial taxis', 'Uber is available but must be booked inside the terminal', 'Allow 2.5 hours for international departures'],
-  },
-  CPT: {
-    name: 'Cape Town International Airport', city: 'Cape Town',
-    transport: { taxi: 'Taxi recommended · R300–500 to city', uber: 'Pickup from designated zones outside arrivals', shuttles: 'Airport shuttle services to major hotels' },
-    lounges: ['SLOW Lounge (Domestic)', 'SLOW Lounge (International)', 'British Airways Lounge (International)'],
-    tips: ['Domestic and international are connected', 'Uber is reliable and affordable', 'Car rental desks in arrivals hall'],
-  },
-  CDG: {
-    name: 'Charles de Gaulle Airport', city: 'Paris',
-    transport: { rer: 'RER B to Paris city center · €11.45 · 25–35 min', taxi: '€55–70 fixed rate to left bank, €50–60 to right bank' },
-    lounges: ['Air France Lounge (T2E, T2F)', 'Aspire Lounge (T1)', 'No.1 Traveller (T2E)'],
-    tips: ['Terminal 2 is massive — allow 20+ min between gates', 'RER B can be unreliable — allow extra time'],
-  },
-  BCN: {
-    name: 'Barcelona El Prat Airport', city: 'Barcelona',
-    transport: { aerobus: 'Aerobus to Placa de Catalunya · €6.75 · 35 min', metro: 'Metro L9 to city · €5.15 · 35–45 min', taxi: '€35–45 to city center' },
-    lounges: ['Sala VIP Pau Casals (T1)', 'Aspire Lounge (T1)'],
-    tips: ['T1 and T2 are 15 min apart — confirm your terminal', 'Aerobus is most convenient for the city center'],
-  },
+  JFK: { name: 'John F. Kennedy International Airport', city: 'New York',    transport: { subway: 'AirTrain JFK to Jamaica or Howard Beach (E/J/Z/A lines) · $8.25', taxi: '$52–70 flat rate to Manhattan', uber: 'Follow AirTrain to designated rideshare lot' }, lounges: ['American Admirals Club (T8)', 'Delta Sky Club (T4)', 'JetBlue Mint Lounge (T5)'], tips: ['Allow 3+ hours for international departures', 'AirTrain connects all terminals'] },
+  LHR: { name: 'Heathrow Airport',                      city: 'London',      transport: { tube: 'Elizabeth Line or Piccadilly Line · £6–13 · 30–45 min', heathrowExpress: 'To Paddington · £25–37 · 15 min', taxi: 'Black cab approx £50–90 to central London' }, lounges: ['British Airways Galleries (T5)', 'Virgin Atlantic Clubhouse (T3)'], tips: ['T5 is BA only — confirm your terminal', 'Allow 45+ min for security at peak times'] },
+  JNB: { name: 'O.R. Tambo International Airport',      city: 'Johannesburg', transport: { gautrain: 'Gautrain to Sandton · R165 · 15 min — fastest option', taxi: 'Official Airport Taxis only — use the rank inside arrivals', uber: 'Pickup from designated Uber zone on arrivals level' }, lounges: ['SLOW Lounge (Domestic A)', 'SLOW Lounge (International B)', 'British Airways Lounge'], tips: ['Use Gautrain or pre-booked transport — avoid unofficial taxis', 'Allow 2.5 hours for international departures'] },
+  DXB: { name: 'Dubai International Airport',           city: 'Dubai',       transport: { metro: 'Dubai Metro Red Line · AED 9–14 · 30–35 min to city', taxi: 'AED 70–120 to city center', uber: 'Pickup from designated zones' }, lounges: ['Emirates First Class Lounge (T3)', 'Marhaba Lounge'], tips: ['T3 is massive — allow extra walking time', 'Duty free is exceptional'] },
+  CPT: { name: 'Cape Town International Airport',       city: 'Cape Town',   transport: { taxi: 'Taxi recommended · R300–500 to city', uber: 'Pickup from designated zones outside arrivals' }, lounges: ['SLOW Lounge (Domestic)', 'SLOW Lounge (International)'], tips: ['Uber is reliable and affordable', 'Car rental desks in arrivals hall'] },
+  CDG: { name: 'Charles de Gaulle Airport',             city: 'Paris',       transport: { rer: 'RER B to Paris city center · €11.45 · 25–35 min', taxi: '€55–70 fixed rate to left bank' }, lounges: ['Air France Lounge (T2E, T2F)', 'Aspire Lounge (T1)'], tips: ['Terminal 2 is massive — allow 20+ min between gates', 'RER B can be unreliable — allow extra time'] },
+  BCN: { name: 'Barcelona El Prat Airport',             city: 'Barcelona',   transport: { aerobus: 'Aerobus to Placa de Catalunya · €6.75 · 35 min', metro: 'Metro L9 to city · €5.15 · 35–45 min', taxi: '€35–45 to city center' }, lounges: ['Sala VIP Pau Casals (T1)', 'Aspire Lounge (T1)'], tips: ['T1 and T2 are 15 min apart — confirm your terminal'] },
+  ORD: { name: "O'Hare International Airport",          city: 'Chicago',     transport: { train: 'CTA Blue Line direct to Loop · $5 · 45 min', taxi: '$40–55 to downtown', uber: 'Pickup from lower level, follow rideshare signs' }, lounges: ['United Club (T1, T2)', 'American Admirals Club (T3)'], tips: ['Blue Line train runs 24/7'] },
 }
 
 function executeGetAirportInfo(args: { airport: string; query?: string; terminal?: string }) {
   const code    = args.airport.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
   const airport = AIRPORTS[code] ?? null
-
-  if (!airport) {
-    return {
-      airport:  args.airport,
-      found:    false,
-      guidance: [
-        "Follow overhead signs — airports are well signposted by airline and terminal",
-        'Rideshare pickup is usually signposted "TNC" or "Rideshare" in arrivals',
-        'Ask any airport staff member for directions',
-        'Use the airport official app or website for live gate assignments',
-      ],
-      uber: `https://m.uber.com/ul/?action=setPickup&dropoff[formatted_address]=${encodeURIComponent(args.airport + ' Airport')}`,
-      maps: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(args.airport + ' airport')}`,
-    }
-  }
-
-  return {
-    airport:   airport.name,
-    city:      airport.city,
-    found:     true,
-    terminals: args.terminal
-      ? [args.terminal]
-      : undefined,
-    transport: airport.transport,
-    lounges:   airport.lounges,
-    tips:      airport.tips,
-    uberLink:  `https://m.uber.com/ul/?action=setPickup&dropoff[formatted_address]=${encodeURIComponent(airport.name)}`,
-    mapsLink:  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(airport.name)}`,
-  }
+  if (!airport) return { airport: args.airport, found: false, guidance: ['Follow overhead signs — airports are well signposted', 'Rideshare pickup is usually signposted "TNC" or "Rideshare" in arrivals', 'Ask any airport staff member for directions'], mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(args.airport + ' airport')}` }
+  return { airport: airport.name, city: airport.city, found: true, transport: airport.transport, lounges: airport.lounges, tips: airport.tips, uberLink: `https://m.uber.com/ul/?action=setPickup&dropoff[formatted_address]=${encodeURIComponent(airport.name)}`, mapsLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(airport.name)}` }
 }
 
 async function executeTool(name: string, args: any): Promise<any> {
@@ -423,9 +306,9 @@ async function executeTool(name: string, args: any): Promise<any> {
   }
 }
 
-// ── System prompt ─────────────────────────────────────────────────────────────
+// ── Base system prompt ────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are Gladys, an expert AI travel companion specialising in event-based travel. Warm, knowledgeable, direct.
+const BASE_SYSTEM_PROMPT = `You are Gladys, an expert AI travel companion specialising in event-based travel. Warm, knowledgeable, direct.
 
 Tools:
 - get_weather: Live 7-day forecast for any city
@@ -444,10 +327,12 @@ Rules:
 - Travel tips → call get_travel_tips
 - Flight number questions → call check_flight_status
 - Airport questions → call get_airport_info
+- When memory shows a home city, use that IATA for flight suggestions automatically
+- When memory shows passport country, proactively mention visa requirements
 
 World Cup 2026: USA, Canada, Mexico. Season = 2026.`
 
-// ── SSE helpers ───────────────────────────────────────────────────────────────
+// ── SSE helper ────────────────────────────────────────────────────────────────
 
 function sseChunk(obj: any) {
   return `data: ${JSON.stringify(obj)}\n\n`
@@ -457,12 +342,24 @@ function sseChunk(obj: any) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, history = [], context, userContext } = await req.json()
+    const { message, history = [], context, userId } = await req.json()
     if (!message?.trim()) return new Response('Message required', { status: 400 })
 
-    const systemContent = userContext
-      ? `${SYSTEM_PROMPT}\n\n${userContext}`
-      : SYSTEM_PROMPT
+    // ── Fetch memory server-side — never trust client to pass this ────────────
+    let memoryContext = ''
+    if (userId) {
+      try {
+        const memory = await getUserMemory(userId)
+        memoryContext = buildMemoryContext(memory)
+      } catch { /* silent — never block streaming for memory errors */ }
+    }
+
+    // Build personalised system prompt
+    const systemContent = [
+      BASE_SYSTEM_PROMPT,
+      memoryContext  || null,
+      context        ? `Event context: ${context}` : null,
+    ].filter(Boolean).join('\n\n')
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       { role: 'system', content: systemContent },
@@ -491,20 +388,18 @@ export async function POST(req: NextRequest) {
 
           if (msg.tool_calls?.length) {
             // ── Tool call path ──────────────────────────────────────────────
-            const tc         = msg.tool_calls[0] as any
-            const toolName   = tc.function.name as string
-            const toolArgs   = JSON.parse(tc.function.arguments as string)
+            const tc       = msg.tool_calls[0] as any
+            const toolName = tc.function.name as string
+            const toolArgs = JSON.parse(tc.function.arguments as string)
 
-            // Signal to client that a tool is running (empty text chunk)
             send({ type: 'text', text: '' })
 
-            // Execute the tool
             const toolResult = await executeTool(toolName, toolArgs)
 
-            // Send the tool result to client so it can render the card
+            // Send tool result to client for card rendering
             send({ type: 'tool', toolName, toolResult })
 
-            // Stream the final reply with tool context
+            // Stream the natural language reply with tool context
             const streamReply = await openai.chat.completions.create({
               model:      'gpt-4o-mini',
               max_tokens: 600,
