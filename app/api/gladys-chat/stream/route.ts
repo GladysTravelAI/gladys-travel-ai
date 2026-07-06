@@ -3,12 +3,11 @@
 // Fetches user memory server-side by userId. Never trusts client to pass context.
 
 import { NextRequest } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+import { anthropic, MODELS } from '@/lib/anthropic/client'
 import { getUserMemory, buildMemoryContext } from '@/lib/memory/gladysMemory'
 
 export const runtime = 'nodejs'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // ── League → Season ───────────────────────────────────────────────────────────
 
@@ -34,93 +33,72 @@ const LEAGUE_ID_MAP: Record<string, number> = {
 
 // ── Tools ─────────────────────────────────────────────────────────────────────
 
-const tools: OpenAI.Chat.ChatCompletionTool[] = [
+const tools: Anthropic.Tool[] = [
   {
-    type: 'function',
-    function: {
-      name: 'get_weather',
-      description: 'Get current weather and 7-day forecast for a city',
-      parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+    name: 'get_weather',
+    description: 'Get current weather and 7-day forecast for a city',
+    input_schema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+  },
+  {
+    name: 'get_packing_list',
+    description: 'Generate a smart packing list for a trip',
+    input_schema: {
+      type: 'object',
+      properties: {
+        destination: { type: 'string' },
+        days:        { type: 'number' },
+        eventType:   { type: 'string', description: 'sports, music, festival, beach, city, ski' },
+      },
+      required: ['destination', 'days'],
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_packing_list',
-      description: 'Generate a smart packing list for a trip',
-      parameters: {
-        type: 'object',
-        properties: {
-          destination: { type: 'string' },
-          days:        { type: 'number' },
-          eventType:   { type: 'string', description: 'sports, music, festival, beach, city, ski' },
-        },
-        required: ['destination', 'days'],
+    name: 'get_travel_tips',
+    description: 'Get insider travel tips, must-dos, local food for a destination city',
+    input_schema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+  },
+  {
+    name: 'check_flight_status',
+    description: 'Check real-time flight status for a flight number e.g. BA123, EK203',
+    input_schema: { type: 'object', properties: { flightNumber: { type: 'string' } }, required: ['flightNumber'] },
+  },
+  {
+    name: 'find_nearby_attractions',
+    description: 'Find restaurants, bars, landmarks, museums near a city',
+    input_schema: {
+      type: 'object',
+      properties: {
+        city:     { type: 'string' },
+        category: { type: 'string', enum: ['dining', 'nightlife', 'sights', 'outdoors', 'shopping', 'arts', 'all'] },
+        limit:    { type: 'number' },
+      },
+      required: ['city'],
+    },
+  },
+  {
+    name: 'find_football_fixtures',
+    description: "Find upcoming football/soccer matches worldwide — Premier League, Champions League, World Cup 2026, La Liga, Bundesliga, Serie A, MLS, NWSL, Women's UCL, Copa America, AFCON and more.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        league:   { type: 'string' },
+        team:     { type: 'string' },
+        next:     { type: 'number' },
+        leagueId: { type: 'number' },
       },
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_travel_tips',
-      description: 'Get insider travel tips, must-dos, local food for a destination city',
-      parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'check_flight_status',
-      description: 'Check real-time flight status for a flight number e.g. BA123, EK203',
-      parameters: { type: 'object', properties: { flightNumber: { type: 'string' } }, required: ['flightNumber'] },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'find_nearby_attractions',
-      description: 'Find restaurants, bars, landmarks, museums near a city',
-      parameters: {
-        type: 'object',
-        properties: {
-          city:     { type: 'string' },
-          category: { type: 'string', enum: ['dining', 'nightlife', 'sights', 'outdoors', 'shopping', 'arts', 'all'] },
-          limit:    { type: 'number' },
-        },
-        required: ['city'],
+    name: 'get_airport_info',
+    description: 'Get airport navigation help — terminals, transport to/from airport, Uber pickup zones, lounges, security tips.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        airport:  { type: 'string', description: 'Airport name or IATA code e.g. "JFK", "Heathrow", "OR Tambo"' },
+        query:    { type: 'string' },
+        terminal: { type: 'string' },
       },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'find_football_fixtures',
-      description: "Find upcoming football/soccer matches worldwide — Premier League, Champions League, World Cup 2026, La Liga, Bundesliga, Serie A, MLS, NWSL, Women's UCL, Copa America, AFCON and more.",
-      parameters: {
-        type: 'object',
-        properties: {
-          league:   { type: 'string' },
-          team:     { type: 'string' },
-          next:     { type: 'number' },
-          leagueId: { type: 'number' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'get_airport_info',
-      description: 'Get airport navigation help — terminals, transport to/from airport, Uber pickup zones, lounges, security tips.',
-      parameters: {
-        type: 'object',
-        properties: {
-          airport:  { type: 'string', description: 'Airport name or IATA code e.g. "JFK", "Heathrow", "OR Tambo"' },
-          query:    { type: 'string' },
-          terminal: { type: 'string' },
-        },
-        required: ['airport'],
-      },
+      required: ['airport'],
     },
   },
 ]
@@ -361,8 +339,7 @@ export async function POST(req: NextRequest) {
       context        ? `Event context: ${context}` : null,
     ].filter(Boolean).join('\n\n')
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemContent },
+    const messages: Anthropic.MessageParam[] = [
       ...history.slice(-6),
       { role: 'user', content: message },
     ]
@@ -376,21 +353,21 @@ export async function POST(req: NextRequest) {
 
         try {
           // Step 1: check if a tool call is needed
-          const first = await openai.chat.completions.create({
-            model:       'gpt-4o-mini',
+          const first = await anthropic.messages.create({
+            model:       MODELS.standard,
             max_tokens:  1000,
             tools,
-            tool_choice: 'auto',
+            tool_choice: { type: 'auto' },
+            system:      systemContent,
             messages,
           })
 
-          const msg = first.choices[0].message
+          const toolUse = first.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
 
-          if (msg.tool_calls?.length) {
+          if (toolUse) {
             // ── Tool call path ──────────────────────────────────────────────
-            const tc       = msg.tool_calls[0] as any
-            const toolName = tc.function.name as string
-            const toolArgs = JSON.parse(tc.function.arguments as string)
+            const toolName = toolUse.name
+            const toolArgs = toolUse.input as any
 
             send({ type: 'text', text: '' })
 
@@ -400,35 +377,31 @@ export async function POST(req: NextRequest) {
             send({ type: 'tool', toolName, toolResult })
 
             // Stream the natural language reply with tool context
-            const streamReply = await openai.chat.completions.create({
-              model:      'gpt-4o-mini',
+            const streamReply = anthropic.messages.stream({
+              model:      MODELS.standard,
               max_tokens: 600,
-              stream:     true,
+              system:     systemContent,
               messages: [
                 ...messages,
-                { role: 'assistant', content: null, tool_calls: msg.tool_calls },
-                { role: 'tool', tool_call_id: tc.id, content: JSON.stringify(toolResult) },
+                { role: 'assistant', content: first.content as unknown as Anthropic.MessageParam['content'] },
+                { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(toolResult) }] },
               ],
             })
 
-            for await (const chunk of streamReply) {
-              const text = chunk.choices[0]?.delta?.content ?? ''
-              if (text) send({ type: 'text', text })
-            }
+            streamReply.on('text', (text) => { if (text) send({ type: 'text', text }) })
+            await streamReply.finalMessage()
 
           } else {
             // ── Direct streaming reply ──────────────────────────────────────
-            const streamReply = await openai.chat.completions.create({
-              model:      'gpt-4o-mini',
+            const streamReply = anthropic.messages.stream({
+              model:      MODELS.standard,
               max_tokens: 600,
-              stream:     true,
+              system:     systemContent,
               messages,
             })
 
-            for await (const chunk of streamReply) {
-              const text = chunk.choices[0]?.delta?.content ?? ''
-              if (text) send({ type: 'text', text })
-            }
+            streamReply.on('text', (text) => { if (text) send({ type: 'text', text }) })
+            await streamReply.finalMessage()
           }
 
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))

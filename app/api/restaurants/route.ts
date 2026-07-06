@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getJSONCompletion, MODELS } from "@/lib/anthropic/client";
 
 // Fallback restaurant data for common destinations
 const FALLBACK_RESTAURANTS: Record<string, any[]> = {
@@ -124,15 +125,9 @@ async function fetchGoogleRestaurants(location: string, apiKey: string): Promise
  */
 async function fetchAIRestaurants(location: string, tripType?: string): Promise<any[]> {
   try {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      console.log("OpenAI: API key not configured");
-      return [];
-    }
+    console.log(`🤖 Claude: Generating restaurants for ${location}`);
 
-    console.log(`🤖 OpenAI: Generating restaurants for ${location}`);
-
-    const prompt = `Generate a JSON array of 8 realistic, diverse restaurants in ${location}. 
+    const prompt = `Generate a JSON object with a "restaurants" array of 8 realistic, diverse restaurants in ${location}. 
     ${tripType ? `Consider trip style: ${tripType}` : ''}
     
     Include a mix of:
@@ -143,52 +138,36 @@ async function fetchAIRestaurants(location: string, tripType?: string): Promise<
     - Different neighborhoods
     
     Format EXACTLY as:
-    [
-      {
-        "name": "Restaurant Name",
-        "cuisine": "Type of food",
-        "priceRange": "$ or $$ or $$$ or $$$$",
-        "rating": "4.5",
-        "mustTry": "Signature dish",
-        "location": "Neighborhood name",
-        "description": "One sentence about the restaurant"
-      }
-    ]
+    {
+      "restaurants": [
+        {
+          "name": "Restaurant Name",
+          "cuisine": "Type of food",
+          "priceRange": "$ or $$ or $$$ or $$$$",
+          "rating": "4.5",
+          "mustTry": "Signature dish",
+          "location": "Neighborhood name",
+          "description": "One sentence about the restaurant"
+        }
+      ]
+    }
     
-    Make them realistic with REAL restaurant names if possible. Return ONLY the JSON array.`;
+    Make them realistic with REAL restaurant names if possible.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.8,
-        max_tokens: 1500
-      }),
-      signal: AbortSignal.timeout(20000)
+    const data = await getJSONCompletion({
+      system:      "You are a local dining expert. Return only valid JSON.",
+      user:        prompt,
+      model:       MODELS.fast,
+      maxTokens:   1500,
+      temperature: 0.8,
     });
 
-    if (!response.ok) {
-      console.log(`OpenAI: Request failed (${response.status})`);
+    const restaurants = Array.isArray(data?.restaurants) ? data.restaurants : [];
+    if (!restaurants.length) {
+      console.log("Claude: No valid restaurants in response");
       return [];
     }
 
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || "[]";
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.log("OpenAI: No valid JSON in response");
-      return [];
-    }
-
-    const restaurants = JSON.parse(jsonMatch[0]);
-    
     // Add IDs and placeholder images
     const restaurantsWithExtras = restaurants.map((rest: any, index: number) => ({
       ...rest,
@@ -197,11 +176,11 @@ async function fetchAIRestaurants(location: string, tripType?: string): Promise<
       address: `${rest.location}, ${location}`
     }));
 
-    console.log(`✅ OpenAI: Generated ${restaurantsWithExtras.length} restaurants`);
+    console.log(`✅ Claude: Generated ${restaurantsWithExtras.length} restaurants`);
     return restaurantsWithExtras;
 
   } catch (error: any) {
-    console.error("OpenAI Restaurants Error:", error.message);
+    console.error("Claude Restaurants Error:", error.message);
     return [];
   }
 }
@@ -350,14 +329,14 @@ export async function POST(req: NextRequest) {
  */
 export async function GET() {
   const hasGooglePlaces = !!(process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_PLACE_API_KEY);
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
 
   return NextResponse.json({
     status: "operational",
     service: "GladysTravelAI Restaurants API",
     sources: {
       google_places: hasGooglePlaces ? "configured" : "missing (add GOOGLE_PLACES_API_KEY)",
-      ai_generated: hasOpenAI ? "available" : "unavailable",
+      ai_generated: hasClaude ? "available" : "unavailable",
       fallback: "always available"
     },
     recommendation: !hasGooglePlaces

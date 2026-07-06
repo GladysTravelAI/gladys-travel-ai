@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@paypal/react-paypal-js": "^8.9.2",
     "@prisma/client": "^6.19.0",
@@ -36,7 +37,6 @@
     "next": "^15.5.7",
     "next-auth": "^4.24.11",
     "nodemailer": "^6.10.1",
-    "openai": "^5.12.2",
     "prisma": "^6.19.0",
     "react": "^19.2.1",
     "react-date-picker": "^11.0.0",

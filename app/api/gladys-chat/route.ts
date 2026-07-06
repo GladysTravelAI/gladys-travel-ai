@@ -2,10 +2,9 @@
 // NOW WITH MEMORY — Gladys remembers you across every conversation
 
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
+import { anthropic, MODELS } from '@/lib/anthropic/client'
 import { getUserMemory, buildMemoryContext } from '@/lib/memory/gladysMemory'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // ── League → Season ───────────────────────────────────────────────────────────
 
@@ -42,42 +41,36 @@ const isConversational = (msg: string) =>
 
 // ── Tools ─────────────────────────────────────────────────────────────────────
 
-const tools: OpenAI.Chat.ChatCompletionTool[] = [
-  { type: 'function', function: { name: 'get_weather', description: 'Get current weather and 7-day forecast for a city', parameters: { type: 'object', properties: { city: { type: 'string' }, country: { type: 'string' } }, required: ['city'] } } },
-  { type: 'function', function: { name: 'get_packing_list', description: 'Generate a smart packing list for a trip', parameters: { type: 'object', properties: { destination: { type: 'string' }, days: { type: 'number' }, eventType: { type: 'string', description: 'sports, music, festival, beach, city, ski' } }, required: ['destination', 'days'] } } },
-  { type: 'function', function: { name: 'get_travel_tips', description: 'Get insider travel tips, must-dos, local food recommendations for a destination', parameters: { type: 'object', properties: { city: { type: 'string' }, country: { type: 'string' } }, required: ['city'] } } },
-  { type: 'function', function: { name: 'check_flight_status', description: 'Check real-time flight status for a flight number', parameters: { type: 'object', properties: { flightNumber: { type: 'string', description: 'e.g. BA123, EK203, SA204' } }, required: ['flightNumber'] } } },
-  { type: 'function', function: { name: 'find_nearby_attractions', description: 'Find restaurants, bars, landmarks, museums near a city', parameters: { type: 'object', properties: { city: { type: 'string' }, category: { type: 'string', enum: ['dining', 'nightlife', 'sights', 'outdoors', 'shopping', 'arts', 'all'] }, limit: { type: 'number' } }, required: ['city'] } } },
+const tools: Anthropic.Tool[] = [
+  { name: 'get_weather', description: 'Get current weather and 7-day forecast for a city', input_schema: { type: 'object', properties: { city: { type: 'string' }, country: { type: 'string' } }, required: ['city'] } },
+  { name: 'get_packing_list', description: 'Generate a smart packing list for a trip', input_schema: { type: 'object', properties: { destination: { type: 'string' }, days: { type: 'number' }, eventType: { type: 'string', description: 'sports, music, festival, beach, city, ski' } }, required: ['destination', 'days'] } },
+  { name: 'get_travel_tips', description: 'Get insider travel tips, must-dos, local food recommendations for a destination', input_schema: { type: 'object', properties: { city: { type: 'string' }, country: { type: 'string' } }, required: ['city'] } },
+  { name: 'check_flight_status', description: 'Check real-time flight status for a flight number', input_schema: { type: 'object', properties: { flightNumber: { type: 'string', description: 'e.g. BA123, EK203, SA204' } }, required: ['flightNumber'] } },
+  { name: 'find_nearby_attractions', description: 'Find restaurants, bars, landmarks, museums near a city', input_schema: { type: 'object', properties: { city: { type: 'string' }, category: { type: 'string', enum: ['dining', 'nightlife', 'sights', 'outdoors', 'shopping', 'arts', 'all'] }, limit: { type: 'number' } }, required: ['city'] } },
   {
-    type: 'function',
-    function: {
-      name: 'find_football_fixtures',
-      description: "Find upcoming football/soccer matches worldwide.",
-      parameters: {
-        type: 'object',
-        properties: {
-          league:   { type: 'string' },
-          team:     { type: 'string' },
-          next:     { type: 'number' },
-          leagueId: { type: 'number' },
-        },
+    name: 'find_football_fixtures',
+    description: "Find upcoming football/soccer matches worldwide.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        league:   { type: 'string' },
+        team:     { type: 'string' },
+        next:     { type: 'number' },
+        leagueId: { type: 'number' },
       },
     },
   },
   {
-    type: 'function',
-    function: {
-      name: 'get_airport_info',
-      description: 'Get airport navigation help — terminals, gates, lounges, transport.',
-      parameters: {
-        type: 'object',
-        properties: {
-          airport:  { type: 'string' },
-          query:    { type: 'string' },
-          terminal: { type: 'string' },
-        },
-        required: ['airport'],
+    name: 'get_airport_info',
+    description: 'Get airport navigation help — terminals, gates, lounges, transport.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        airport:  { type: 'string' },
+        query:    { type: 'string' },
+        terminal: { type: 'string' },
       },
+      required: ['airport'],
     },
   },
 ]
@@ -304,45 +297,52 @@ export async function POST(req: NextRequest) {
       : BASE_SYSTEM_PROMPT
 
     if (isConversational(message)) {
-      const quick = await openai.chat.completions.create({
-        model: 'gpt-4o-mini', max_tokens: 200,
+      const quick = await anthropic.messages.create({
+        model: MODELS.standard, max_tokens: 200,
+        system: systemPrompt,
         messages: [
-          { role: 'system', content: systemPrompt },
           ...history.slice(-4),
-          { role: 'user', content: message }
+          { role: 'user', content: message },
         ],
       })
-      return NextResponse.json({ reply: quick.choices[0].message.content ?? 'How can I help with your trip?', toolName: null, toolResult: null })
+      const quickText = quick.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+      return NextResponse.json({ reply: quickText || 'How can I help with your trip?', toolName: null, toolResult: null })
     }
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: systemPrompt },
+    const messages: Anthropic.MessageParam[] = [
       ...history.slice(-6),
       { role: 'user', content: message },
     ]
 
-    const first = await openai.chat.completions.create({ model: 'gpt-4o-mini', max_tokens: 1000, tools, tool_choice: 'auto', messages })
-    const msg   = first.choices[0].message
+    const first = await anthropic.messages.create({
+      model: MODELS.standard, max_tokens: 1000, tools, tool_choice: { type: 'auto' },
+      system: systemPrompt,
+      messages,
+    })
 
-    if (!msg.tool_calls?.length) {
-      return NextResponse.json({ reply: msg.content ?? "I'm not sure about that — try asking about a specific city or event!", toolName: null, toolResult: null })
+    const toolUse = first.content.find((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use')
+
+    if (!toolUse) {
+      const replyText = first.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+      return NextResponse.json({ reply: replyText || "I'm not sure about that — try asking about a specific city or event!", toolName: null, toolResult: null })
     }
 
-    const tc         = msg.tool_calls[0] as any
-    const toolName   = tc.function.name as string
-    const toolArgs   = JSON.parse(tc.function.arguments as string)
+    const toolName   = toolUse.name
+    const toolArgs   = toolUse.input as any
     const toolResult = await executeTool(toolName, toolArgs)
 
-    const final = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', max_tokens: 800,
+    const final = await anthropic.messages.create({
+      model: MODELS.standard, max_tokens: 800,
+      system: systemPrompt,
       messages: [
         ...messages,
-        { role: 'assistant', content: null, tool_calls: msg.tool_calls },
-        { role: 'tool', tool_call_id: tc.id, content: JSON.stringify(toolResult) }
+        { role: 'assistant', content: first.content as unknown as Anthropic.MessageParam['content'] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(toolResult) }] },
       ],
     })
 
-    return NextResponse.json({ reply: final.choices[0].message.content ?? 'Here is what I found!', toolName, toolResult })
+    const finalText = final.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map(b => b.text).join('')
+    return NextResponse.json({ reply: finalText || 'Here is what I found!', toolName, toolResult })
   } catch (err: any) {
     console.error('[gladys-chat] error:', err)
     return NextResponse.json({ error: err.message ?? 'Something went wrong' }, { status: 500 })

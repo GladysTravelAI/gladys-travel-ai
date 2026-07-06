@@ -3,7 +3,7 @@
 // Orchestrates: EventRegistry → Ticketmaster → API-Football → LogicEngine → AI Content → AffiliateWrapper
 
 import { NextRequest, NextResponse } from 'next/server';
-import { openai, OPENAI_CONFIG } from '@/lib/openai/client';
+import { getJSONCompletion, MODELS } from '@/lib/anthropic/client';
 import { buildAISystemPrompt, buildAIUserPrompt } from '@/lib/core/ai/aiOutputSchema';
 import { generateTripPlan } from '@/lib/core/engine/tripLogicEngine';
 import { buildFlightUrl, buildHotelUrl, buildESimUrl, buildInsuranceUrl, buildTransferUrl, buildAirHelpUrl } from '@/lib/core/monetization/affiliateWrapper';
@@ -14,10 +14,6 @@ import { findBestEventMatch, type NormalizedEvent } from '@/lib/services/ticketm
 
 type BudgetLevel = 'budget' | 'mid' | 'luxury';
 type DayType     = 'arrival' | 'pre_event' | 'event_day' | 'post_event' | 'departure';
-
-function safeJSONParse(content: string) {
-  try { return JSON.parse(content); } catch { return null; }
-}
 
 function mapTMCategory(category: NormalizedEvent['category']): string {
   if (category === 'sports')   return 'sports';
@@ -309,15 +305,11 @@ async function buildTicketmasterTripResponse({ tmEvent, message, budgetLevel, or
     executeFlightSearch({ origin: originIATA, destination: tmEvent.countryCode || tmEvent.country, departure_date: fmt(arrivalDate), return_date: fmt(departureDate) }).catch(() => []),
   ]);
 
-  const aiCompletion = await openai.chat.completions.create({
-    ...OPENAI_CONFIG,
-    messages: [
-      { role: 'system', content: buildAISystemPrompt() },
-      { role: 'user', content: buildAIUserPrompt({ event_name: tmEvent.name, city_name: tmEvent.city, country: tmEvent.country, event_date: tmEvent.date, event_category: tmEvent.category, budget_level: budgetLevel, day_slots: daySlots }) },
-    ],
-    response_format: { type: 'json_object' },
+  const aiContent = await getJSONCompletion({
+    system: buildAISystemPrompt(),
+    user: buildAIUserPrompt({ event_name: tmEvent.name, city_name: tmEvent.city, country: tmEvent.country, event_date: tmEvent.date, event_category: tmEvent.category, budget_level: budgetLevel, day_slots: daySlots }),
+    model: MODELS.heavy,
   });
-  const aiContent = safeJSONParse(aiCompletion.choices[0].message.content || '');
 
   return NextResponse.json({
     success: true,
@@ -345,17 +337,13 @@ async function buildTicketmasterTripResponse({ tmEvent, message, budgetLevel, or
 }
 
 async function buildAIFallbackResponse({ message, context, budgetLevel }: { message: string; context?: any; budgetLevel: BudgetLevel; }) {
-  const completion = await openai.chat.completions.create({
-    ...OPENAI_CONFIG,
-    messages: [
-      { role: 'system', content: buildAISystemPrompt() },
-      { role: 'user', content: `User message: ${message}\nContext: ${JSON.stringify(context || {})}\nReturn STRICT JSON only.` },
-    ],
-    response_format: { type: 'json_object' },
+  const content = await getJSONCompletion({
+    system: buildAISystemPrompt(),
+    user: `User message: ${message}\nContext: ${JSON.stringify(context || {})}\nReturn STRICT JSON only.`,
+    model: MODELS.heavy,
   });
-  const content = safeJSONParse(completion.choices[0].message.content || '');
   if (!content) throw new Error('Invalid JSON from AI fallback');
-  return NextResponse.json({ success: true, data: content, usage: completion.usage });
+  return NextResponse.json({ success: true, data: content });
 }
 
 async function buildRegistryTripResponse({ eventId, cityId, matchDate, budgetLevel, originCountryCode, userSession }: { eventId: string; cityId: string; matchDate: string; budgetLevel: BudgetLevel; originCountryCode?: string; userSession?: string; }) {
@@ -369,15 +357,11 @@ async function buildRegistryTripResponse({ eventId, cityId, matchDate, budgetLev
     executeHotelSearch({ city: city.name, check_in: tripPlan.travel_dates.arrival_date, check_out: tripPlan.travel_dates.departure_date, guests: 2 }).catch(() => []),
     executeFlightSearch({ origin: originCountryCode === 'ZA' ? 'JNB' : 'origin', destination: city.iata_code, departure_date: tripPlan.travel_dates.arrival_date, return_date: tripPlan.travel_dates.departure_date }).catch(() => []),
   ]);
-  const aiCompletion = await openai.chat.completions.create({
-    ...OPENAI_CONFIG,
-    messages: [
-      { role: 'system', content: buildAISystemPrompt() },
-      { role: 'user', content: buildAIUserPrompt({ trip_plan: tripPlan, event_name: event.name, city_name: city.name, country: city.country, event_date: matchDate, event_category: event.category, day_slots: tripPlan.travel_dates.day_slots, budget_level: budgetLevel }) },
-    ],
-    response_format: { type: 'json_object' },
+  const aiContent = await getJSONCompletion({
+    system: buildAISystemPrompt(),
+    user: buildAIUserPrompt({ trip_plan: tripPlan, event_name: event.name, city_name: city.name, country: city.country, event_date: matchDate, event_category: event.category, day_slots: tripPlan.travel_dates.day_slots, budget_level: budgetLevel }),
+    model: MODELS.heavy,
   });
-  const aiContent = safeJSONParse(aiCompletion.choices[0].message.content || '');
 
   return NextResponse.json({
     success: true,

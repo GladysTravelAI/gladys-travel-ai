@@ -3,9 +3,7 @@
 // v8.0: Gladys voice — warm, personal, exciting. Like a knowledgeable friend, not a spreadsheet.
 
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import { getJSONCompletion, MODELS } from "@/lib/anthropic/client";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -97,21 +95,18 @@ async function generateItineraryWithRetry(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`📝 Attempt ${attempt}/${maxRetries}…`);
-      const response = await client.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user",   content: userPrompt   }
-        ],
-        response_format: { type: "json_object" },
+      const data: any = await getJSONCompletion({
+        system:      systemPrompt,
+        user:        userPrompt,
+        model:       MODELS.heavy,
+        maxTokens:   7000,
         temperature: 0.85,
-        max_tokens: 7000,
       });
 
-      const raw = response.choices[0].message?.content || "{}";
-      let data: any;
-      try { data = JSON.parse(raw); }
-      catch (e) { if (attempt === maxRetries) throw e; continue; }
+      if (!data) {
+        if (attempt === maxRetries) throw new Error("No structured itinerary returned");
+        continue;
+      }
 
       if (!data.days || !Array.isArray(data.days) || data.days.length === 0) {
         if (attempt === maxRetries) throw new Error("Generated itinerary missing 'days' array");

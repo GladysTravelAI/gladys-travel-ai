@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  // Simulated AI response (you can replace this with OpenAI API later)
+  // Simulated AI response (you can replace this with a Claude API call later — see lib/anthropic/client.ts)
   const itinerary = {
     destination,
     startDate,

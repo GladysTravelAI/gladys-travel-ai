@@ -1,11 +1,11 @@
 // app/api/memory/extract/route.ts
 // 🧠 MEMORY EXTRACTION ENDPOINT
 // Called silently after each chat exchange.
-// Uses GPT-4o-mini to extract travel preferences from the conversation.
+// Uses Claude Haiku to extract travel preferences from the conversation.
 // Writes to Firestore. Never visible to the user.
 
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { getJSONCompletion, MODELS } from '@/lib/anthropic/client';
 import {
   getUserMemory,
   updateUserMemory,
@@ -13,8 +13,6 @@ import {
   incrementSearchCount,
   type GladysUserMemory,
 } from '@/lib/memory/gladysMemory';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ── Extraction prompt ─────────────────────────────────────────────────────────
 
@@ -74,22 +72,18 @@ export async function POST(req: NextRequest) {
       .map((m: any) => `${m.role === 'user' ? 'User' : 'Gladys'}: ${m.content}`)
       .join('\n');
 
-    // Run extraction with GPT-4o-mini (fast + cheap)
-    const completion = await openai.chat.completions.create({
-      model:           'gpt-4o-mini',
-      max_tokens:      500,
-      temperature:     0,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
-        { role: 'user',   content: `Extract travel preferences from this conversation:\n\n${conversationText}` },
-      ],
+    // Run extraction with Claude Haiku (fast + cheap)
+    const extracted = await getJSONCompletion({
+      system:      EXTRACTION_SYSTEM_PROMPT,
+      user:        `Extract travel preferences from this conversation:\n\n${conversationText}`,
+      model:       MODELS.fast,
+      maxTokens:   500,
+      temperature: 0,
     });
 
-    const raw = completion.choices[0].message.content ?? '{}';
-    let extracted: any;
-    try { extracted = JSON.parse(raw); }
-    catch { return NextResponse.json({ success: false, reason: 'JSON parse failed' }); }
+    if (!extracted) {
+      return NextResponse.json({ success: false, reason: 'JSON parse failed' });
+    }
 
     // Build memory update — only include fields that have values
     const memoryUpdate: Partial<GladysUserMemory> = {};

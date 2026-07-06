@@ -1,5 +1,6 @@
 // app/api/weather/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { getJSONCompletion, MODELS } from "@/lib/anthropic/client";
 
 interface WeatherData {
   location: string;
@@ -86,46 +87,28 @@ async function fetchOpenWeatherMap(location: string): Promise<WeatherData | null
 // Generate AI-powered weather recommendations
 async function generateAIWeatherAdvice(location: string, weatherData: WeatherData): Promise<string[]> {
   try {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) return [];
-
     const prompt = `Based on this weather forecast for ${location}:
 Current: ${weatherData.current.temp}°C, ${weatherData.current.condition}
 Next 7 days: ${weatherData.forecast.map(d => `${d.date}: ${d.temp_max}°C/${d.temp_min}°C, ${d.condition}, ${d.rain_chance}% rain`).join('; ')}
 
-Provide 5 practical travel recommendations as a JSON array of strings. Consider:
+Provide 5 practical travel recommendations. Consider:
 - Best days for outdoor activities
 - When to plan indoor activities
 - What to pack
 - Best times for sightseeing
 - Any weather warnings
 
-Return ONLY a JSON array like: ["Tip 1", "Tip 2", "Tip 3", "Tip 4", "Tip 5"]`;
+Return ONLY JSON like: {"tips": ["Tip 1", "Tip 2", "Tip 3", "Tip 4", "Tip 5"]}`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 500
-      }),
-      signal: AbortSignal.timeout(10000)
+    const data = await getJSONCompletion({
+      system:      "You are a travel weather advisor. Return only valid JSON.",
+      user:        prompt,
+      model:       MODELS.fast,
+      maxTokens:   500,
+      temperature: 0.7,
     });
 
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || "[]";
-    
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-
-    return [];
+    return Array.isArray(data?.tips) ? data.tips : [];
   } catch (error) {
     console.error("AI weather advice error:", error);
     return [];
@@ -257,7 +240,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   const hasOpenWeather = !!process.env.OPENWEATHER_API_KEY;
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
 
   return NextResponse.json({
     status: "operational",
@@ -265,12 +248,12 @@ export async function GET() {
     features: {
       current_weather: true,
       day_forecast: true,
-      ai_recommendations: hasOpenAI,
+      ai_recommendations: hasClaude,
       real_time_data: hasOpenWeather
     },
     setup: {
       openweathermap: hasOpenWeather ? "✅ configured" : "❌ Add OPENWEATHER_API_KEY (get free at https://openweathermap.org/api)",
-      ai_recommendations: hasOpenAI ? "✅ available" : "❌ OpenAI required"
+      ai_recommendations: hasClaude ? "✅ available" : "❌ ANTHROPIC_API_KEY required"
     }
   });
 }

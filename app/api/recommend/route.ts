@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getTextCompletion, MODELS } from "@/lib/anthropic/client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,25 +10,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required preferences" }, { status: 400 });
     }
 
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: "You are a smart travel planner AI. Plan detailed trips based on user input.",
-        },
-        {
-          role: "user",
-          content: userInput,
-        },
-      ],
-      model: "gpt-4o",
+    const response = await getTextCompletion({
+      system: "You are a smart travel planner AI. Plan detailed trips based on user input.",
+      messages: [{ role: "user", content: userInput }],
+      model: MODELS.heavy,
+      maxTokens: 4000,
       temperature: 0.7,
     });
 
-    const response = completion.choices[0].message.content;
     return NextResponse.json({ recommendations: response });
   } catch (error: any) {
     console.error("API Error:", error);
-    return NextResponse.json({ error: "Failed to generate recommendations" }, { status: 500 });
-  }
+    return NextResponse.json({ error: "Failed to generate recommendations" }, { status: 500 });
+  }
 }

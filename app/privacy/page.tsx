@@ -56,7 +56,7 @@ export default function PrivacyPage() {
             <p>GladysTravel.com integrates with the following third-party services. Each has its own privacy policy:</p>
             <ul>
               <li><strong>Firebase (Google)</strong> — authentication and user data storage. <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener noreferrer">Firebase Privacy</a></li>
-              <li><strong>OpenAI</strong> — powers itinerary generation and chat responses. <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI Privacy</a></li>
+              <li><strong>Anthropic (Claude)</strong> — powers itinerary generation and chat responses. <a href="https://privacy.claude.com/en/" target="_blank" rel="noopener noreferrer">Anthropic Privacy Center</a></li>
               <li><strong>Vapi</strong> — powers the Gladys voice assistant. <a href="https://vapi.ai/privacy" target="_blank" rel="noopener noreferrer">Vapi Privacy</a></li>
               <li><strong>Ticketmaster</strong> — provides event data. <a href="https://www.ticketmaster.com/h/privacy.html" target="_blank" rel="noopener noreferrer">Ticketmaster Privacy</a></li>
               <li><strong>Foursquare</strong> — provides local places data (restaurants, attractions). <a href="https://foursquare.com/legal/privacy" target="_blank" rel="noopener noreferrer">Foursquare Privacy</a></li>

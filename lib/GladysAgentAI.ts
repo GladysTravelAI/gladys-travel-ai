@@ -1,17 +1,14 @@
 // lib/GladysAgentAI.ts
-// 🧠 GLADYS AGENT AI - BRAIN / ORCHESTRATOR (OpenAI-Powered)
+// 🧠 GLADYS AGENT AI - BRAIN / ORCHESTRATOR (Claude-Powered)
 // This file is the BRAIN. It returns structured JSON ONLY.
 // It does NOT speak conversationally or render UI.
 
-import OpenAI from 'openai';
+import { getJSONCompletion, MODELS } from '@/lib/anthropic/client';
 import { searchTicketmasterEvents, type NormalizedEvent } from '@/lib/services/ticketmaster';
 import { searchEvents as registrySearch } from '@/lib/data/eventRegistry';
 
-// ==================== OPENAI CLIENT ====================
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// ==================== CLAUDE-POWERED ANALYSIS ====================
+// (Anthropic client + JSON helper imported above from lib/anthropic/client)
 
 // ==================== TYPES ====================
 
@@ -212,20 +209,15 @@ export class GladysAgentAI {
     try {
       console.log('🧠 GladysAgent analyzing:', query);
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o',
+      const aiAnalysis = await getJSONCompletion({
+        system:      GLADYS_AGENT_SYSTEM_PROMPT,
+        user:        `Analyze this travel query: "${query}"`,
+        model:       MODELS.heavy,
         temperature: 0.2,
-        messages: [
-          { role: 'system', content: GLADYS_AGENT_SYSTEM_PROMPT },
-          { role: 'user', content: `Analyze this travel query: "${query}"` }
-        ],
-        response_format: { type: 'json_object' }
+        maxTokens:   1500,
       });
 
-      const content = completion.choices[0].message.content;
-      if (!content) throw new Error('No response from OpenAI');
-
-      const aiAnalysis = JSON.parse(content);
+      if (!aiAnalysis) throw new Error('No response from Claude');
 
       const analysis: AgentAnalysis = {
         intent: aiAnalysis.intent || 'GENERAL',
@@ -260,7 +252,7 @@ export class GladysAgentAI {
       return analysis;
 
     } catch (error) {
-      console.error('❌ OpenAI analysis failed:', error);
+      console.error('❌ Claude analysis failed:', error);
       console.log('⚠️ Using fallback rule-based detection');
       return this.fallbackAnalysis(query);
     }

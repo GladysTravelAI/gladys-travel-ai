@@ -1,6 +1,7 @@
 // app/api/sports-events/route.ts - TRADEMARK-SAFE SPORTS EVENTS
 
 import { NextRequest, NextResponse } from "next/server";
+import { getJSONCompletion, MODELS } from "@/lib/anthropic/client";
 
 interface SportingEvent {
   id: string;
@@ -216,9 +217,6 @@ const SUMMER_2026_FOOTBALL_TOURNAMENT: SportingEvent[] = [
 // Generate AI-powered travel itinerary for sports event
 async function generateEventTravelPlan(event: SportingEvent, userPrefs: any): Promise<any> {
   try {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) return null;
-
     const prompt = `Create a 5-day travel itinerary for someone attending a football match in ${event.location.city}, ${event.location.country} on ${event.date}.
 
 Include:
@@ -254,23 +252,14 @@ Return as JSON:
   }
 }`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 2000
-      })
+    const data = await getJSONCompletion({
+      system:      "You are a football travel planning assistant. Return only valid JSON.",
+      user:        prompt,
+      model:       MODELS.fast,
+      maxTokens:   2000,
+      temperature: 0.7,
     });
-
-    const data = await response.json();
-    return JSON.parse(data.choices[0]?.message?.content || "{}");
+    return data || {};
 
   } catch (error) {
     console.error("Failed to generate event travel plan:", error);

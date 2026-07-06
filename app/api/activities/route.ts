@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getJSONCompletion, MODELS } from "@/lib/anthropic/client";
 
 // Fallback activities for common destinations
 const FALLBACK_ACTIVITIES: Record<string, any[]> = {
@@ -158,15 +159,9 @@ async function fetchGoogleActivities(location: string, apiKey: string): Promise<
  */
 async function fetchAIActivities(location: string, tripType?: string): Promise<any[]> {
   try {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    if (!openaiKey) {
-      console.log("OpenAI: API key not configured");
-      return [];
-    }
+    console.log(`🤖 Claude: Generating activities for ${location}`);
 
-    console.log(`🤖 OpenAI: Generating activities for ${location}`);
-
-    const prompt = `Generate a JSON array of 10 must-do activities and attractions in ${location}.
+    const prompt = `Generate a JSON object with a "activities" array of 10 must-do activities and attractions in ${location}.
     ${tripType ? `Focus on ${tripType} activities.` : ''}
     
     Include a diverse mix:
@@ -179,52 +174,36 @@ async function fetchAIActivities(location: string, tripType?: string): Promise<a
     - Day and evening activities
     
     Format EXACTLY as:
-    [
-      {
-        "name": "Activity Name",
-        "type": "Museum|Landmark|Park|Tour|Entertainment|Cultural|Shopping|Food|Adventure|Nightlife",
-        "duration": "1-2 hours",
-        "priceRange": "Free|$|$$|$$$|$$$$",
-        "rating": "4.5",
-        "bestTime": "Morning|Afternoon|Evening|Any time",
-        "description": "One sentence description"
-      }
-    ]
+    {
+      "activities": [
+        {
+          "name": "Activity Name",
+          "type": "Museum|Landmark|Park|Tour|Entertainment|Cultural|Shopping|Food|Adventure|Nightlife",
+          "duration": "1-2 hours",
+          "priceRange": "Free|$|$$|$$$|$$$$",
+          "rating": "4.5",
+          "bestTime": "Morning|Afternoon|Evening|Any time",
+          "description": "One sentence description"
+        }
+      ]
+    }
     
-    Use REAL activity names. Make it realistic and exciting. Return ONLY the JSON array.`;
+    Use REAL activity names. Make it realistic and exciting.`;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${openaiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 2000
-      }),
-      signal: AbortSignal.timeout(20000)
+    const data = await getJSONCompletion({
+      system:      "You are a local activities expert. Return only valid JSON.",
+      user:        prompt,
+      model:       MODELS.fast,
+      maxTokens:   2000,
+      temperature: 0.7,
     });
 
-    if (!response.ok) {
-      console.log(`OpenAI: Request failed (${response.status})`);
+    const activities = Array.isArray(data?.activities) ? data.activities : [];
+    if (!activities.length) {
+      console.log("Claude: No valid activities in response");
       return [];
     }
 
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content || "[]";
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.log("OpenAI: No valid JSON in response");
-      return [];
-    }
-
-    const activities = JSON.parse(jsonMatch[0]);
-    
     // Add IDs and placeholder images
     const activitiesWithExtras = activities.map((activity: any, index: number) => ({
       ...activity,
@@ -234,11 +213,11 @@ async function fetchAIActivities(location: string, tripType?: string): Promise<a
       location: location
     }));
 
-    console.log(`✅ OpenAI: Generated ${activitiesWithExtras.length} activities`);
+    console.log(`✅ Claude: Generated ${activitiesWithExtras.length} activities`);
     return activitiesWithExtras;
 
   } catch (error: any) {
-    console.error("OpenAI Activities Error:", error.message);
+    console.error("Claude Activities Error:", error.message);
     return [];
   }
 }
@@ -405,14 +384,14 @@ export async function POST(req: NextRequest) {
  */
 export async function GET() {
   const hasGooglePlaces = !!(process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_PLACE_API_KEY);
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
 
   return NextResponse.json({
     status: "operational",
     service: "GladysTravelAI Activities API",
     sources: {
       google_places: hasGooglePlaces ? "configured" : "missing (add GOOGLE_PLACES_API_KEY)",
-      ai_generated: hasOpenAI ? "available" : "unavailable",
+      ai_generated: hasClaude ? "available" : "unavailable",
       fallback: "always available"
     },
     recommendation: !hasGooglePlaces
