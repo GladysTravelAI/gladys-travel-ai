@@ -309,6 +309,7 @@ async function buildTicketmasterTripResponse({ tmEvent, message, budgetLevel, or
     system: buildAISystemPrompt(),
     user: buildAIUserPrompt({ event_name: tmEvent.name, city_name: tmEvent.city, country: tmEvent.country, event_date: tmEvent.date, event_category: tmEvent.category, budget_level: budgetLevel, day_slots: daySlots }),
     model: MODELS.heavy,
+    maxTokens: 8192,
   });
 
   return NextResponse.json({
@@ -341,6 +342,7 @@ async function buildAIFallbackResponse({ message, context, budgetLevel }: { mess
     system: buildAISystemPrompt(),
     user: `User message: ${message}\nContext: ${JSON.stringify(context || {})}\nReturn STRICT JSON only.`,
     model: MODELS.heavy,
+    maxTokens: 8192,
   });
   if (!content) throw new Error('Invalid JSON from AI fallback');
   return NextResponse.json({ success: true, data: content });
@@ -361,6 +363,7 @@ async function buildRegistryTripResponse({ eventId, cityId, matchDate, budgetLev
     system: buildAISystemPrompt(),
     user: buildAIUserPrompt({ trip_plan: tripPlan, event_name: event.name, city_name: city.name, country: city.country, event_date: matchDate, event_category: event.category, day_slots: tripPlan.travel_dates.day_slots, budget_level: budgetLevel }),
     model: MODELS.heavy,
+    maxTokens: 8192,
   });
 
   return NextResponse.json({

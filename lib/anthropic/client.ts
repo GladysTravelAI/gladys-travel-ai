@@ -30,12 +30,10 @@ export const MODELS = {
   fast: 'claude-haiku-4-5-20251001',
 } as const;
 
-// Drop-in analogue of the old OPENAI_CONFIG (used by app/api/agent/route.ts).
-// Note: no `temperature` here — see supportsSamplingParams() below.
-export const CLAUDE_CONFIG = {
-  model: MODELS.heavy,
-  max_tokens: 8192,
-} as const;
+// Note: CLAUDE_CONFIG was removed — it wasn't actually imported anywhere
+// (app/api/agent/route.ts calls getJSONCompletion directly), so "fixing" it
+// last time didn't touch the real default below. Leaving this note so that
+// mistake doesn't get made twice.
 
 // ==================== SAMPLING PARAMETER COMPATIBILITY ====================
 // Claude Opus 4.7/4.8 and Sonnet 5 run on mandatory adaptive thinking and
@@ -63,7 +61,7 @@ export async function getJSONCompletion({
   system,
   user,
   model = MODELS.fast,
-  maxTokens = 4000,
+  maxTokens = 8192,
   temperature = 0.3,
 }: {
   system: string;
